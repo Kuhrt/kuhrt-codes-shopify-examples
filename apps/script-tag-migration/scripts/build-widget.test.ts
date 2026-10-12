@@ -27,6 +27,8 @@ import {
 
 const MOUNT_MODULE = fileURLToPath(new URL('../widget/mount.ts', import.meta.url));
 
+const SILENT = 'silent';
+
 let outDir: string;
 let exitCode: typeof process.exitCode;
 
@@ -78,14 +80,14 @@ describe('widget bundles', () => {
   it('build within both size limits', async () => {
     const bundles = BUNDLES.map((bundle, index) => inOutDir(bundle, `bundle-${index}.js`));
 
-    const sizes = await buildBundles(bundles);
+    const sizes = await buildBundles(bundles, SILENT);
 
     expect(sizes).toHaveLength(BUNDLES.length);
     expect(budgetFailure(sizes)).toBeUndefined();
   });
 
   it('measure the raw and gzipped size of each bundle', async () => {
-    const [size] = await buildBundles([compressibleEntry()]);
+    const [size] = await buildBundles([compressibleEntry()], SILENT);
 
     expect(size?.rawBytes).toBeGreaterThan(RAW_LIMIT_BYTES);
     expect(size?.gzipBytes).toBeLessThan(size?.rawBytes ?? 0);
@@ -93,7 +95,7 @@ describe('widget bundles', () => {
 
   it('fail both limits when an embed entry pulls in an oversized import', async () => {
     const oversized = oversizedEntry(EMBED_LIMITS);
-    const sizes = await buildBundles([oversized]);
+    const sizes = await buildBundles([oversized], SILENT);
 
     const failure = budgetFailure(sizes);
     expect(failure).toContain(oversized.outfile);
@@ -103,7 +105,7 @@ describe('widget bundles', () => {
 
   it('fail the embed bundle on the raw limit alone when it compresses under the gzip budget', async () => {
     const compressible = compressibleEntry(EMBED_LIMITS);
-    const sizes = await buildBundles([compressible]);
+    const sizes = await buildBundles([compressible], SILENT);
 
     const failure = budgetFailure(sizes);
     expect(sizes[0]?.gzipBytes).toBeLessThanOrEqual(GZIP_BUDGET_BYTES);
@@ -113,7 +115,7 @@ describe('widget bundles', () => {
   });
 
   it('pass the legacy bundle over the raw limit when it is within the gzip budget', async () => {
-    const sizes = await buildBundles([compressibleEntry(LEGACY_LIMITS)]);
+    const sizes = await buildBundles([compressibleEntry(LEGACY_LIMITS)], SILENT);
 
     expect(sizes[0]?.rawBytes).toBeGreaterThan(RAW_LIMIT_BYTES);
     expect(sizes[0]?.gzipBytes).toBeLessThanOrEqual(GZIP_BUDGET_BYTES);
@@ -123,7 +125,7 @@ describe('widget bundles', () => {
   it('still fail the legacy bundle over the gzip budget', async () => {
     const oversized = oversizedEntry(LEGACY_LIMITS);
 
-    const failure = budgetFailure(await buildBundles([oversized]));
+    const failure = budgetFailure(await buildBundles([oversized], SILENT));
 
     expect(failure).toContain(oversized.outfile);
     expect(failure).toContain(GZIP_LIMIT.label);
@@ -155,7 +157,7 @@ describe('widget bundles', () => {
 
 describe('main', () => {
   it('leaves the exit code alone when every bundle is within its limits', async () => {
-    await main([], [inOutDir(BUNDLES[0] as Bundle, 'within-budget.js')]);
+    await main([], [inOutDir(BUNDLES[0] as Bundle, 'within-budget.js')], SILENT);
 
     expect(process.exitCode).toBeUndefined();
   });
@@ -163,7 +165,7 @@ describe('main', () => {
   it('reports the sizes of the bundles it built', async () => {
     const bundle = inOutDir(BUNDLES[0] as Bundle, 'reported.js');
 
-    await main([], [bundle]);
+    await main([], [bundle], SILENT);
 
     expect(console.log).toHaveBeenCalledWith(
       expect.stringContaining(describeSizes(measureBundles([bundle])))
@@ -171,13 +173,13 @@ describe('main', () => {
   });
 
   it('fails the process when a bundle is over the gzip budget', async () => {
-    await main([], [oversizedEntry()]);
+    await main([], [oversizedEntry()], SILENT);
 
     expect(process.exitCode).toBe(1);
   });
 
   it('fails the process when a bundle is over only the raw limit', async () => {
-    await main([], [compressibleEntry()]);
+    await main([], [compressibleEntry()], SILENT);
 
     expect(process.exitCode).toBe(1);
   });
@@ -191,7 +193,7 @@ describe('run', () => {
   }
 
   it('fails the process and reports a summary when a build has errors', async () => {
-    await run([], [brokenEntry()]);
+    await run([], [brokenEntry()], SILENT);
 
     expect(process.exitCode).toBe(1);
     expect(console.error).toHaveBeenCalledTimes(1);
@@ -201,7 +203,7 @@ describe('run', () => {
 describe('watchBundles', () => {
   it('reports an over-limit bundle after its first build', async () => {
     const oversized = oversizedEntry();
-    const { contexts, firstBuilds } = await watchBundles([oversized]);
+    const { contexts, firstBuilds } = await watchBundles([oversized], SILENT);
 
     try {
       expect(await firstBuilds).toEqual([false]);
@@ -212,9 +214,10 @@ describe('watchBundles', () => {
   });
 
   it('reports a within-limit bundle after its first build', async () => {
-    const { contexts, firstBuilds } = await watchBundles([
-      inOutDir(BUNDLES[0] as Bundle, 'watched.js')
-    ]);
+    const { contexts, firstBuilds } = await watchBundles(
+      [inOutDir(BUNDLES[0] as Bundle, 'watched.js')],
+      SILENT
+    );
 
     try {
       expect(await firstBuilds).toEqual([true]);

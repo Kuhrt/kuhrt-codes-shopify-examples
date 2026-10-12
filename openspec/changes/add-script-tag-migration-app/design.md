@@ -312,9 +312,9 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **Known divergences in link checking.** Liquid checks the link's shape, not whether it is a valid URL. Only the merchant can enter a link, so neither direction is a security issue.
   - **Liquid keeps links that `parseConfig` rejects:** a malformed host (`https://[`, `http://a@`), Unicode whitespace, or a C1 control character. The embed renders the link, and `mountEmbed` warns about it.
   - **Liquid drops links that `parseConfig` accepts:** a backslash anywhere (`/a\b`), and scheme-relative forms like `https:x.com`.
-- **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block emits the `<link>` just before the bar instead, so it should block only the bar. Where it lands in the live page source has not been inspected.
+- **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block emits the `<link>` just before the bar instead, so content above the bar renders without waiting for it. It still delays parser-inserted scripts that come after it, and therefore `DOMContentLoaded`, until the 1 KB file loads. Where it lands in the live page source has not been inspected.
 - **Labels have one source.** `DEFAULT_LABELS` is read from the extension's `locales/en.default.json`, so both paths use the same strings.
-- **Theme Check** runs as part of the app's `lint`, which depends on `build`, so CI enforces it. It is `shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension`, and the deploy build runs the same checks.
+- **Theme Check** runs as part of the app's `lint`, which depends on `build:widget`, so CI enforces it. It is `shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension`, and the deploy build runs the same checks.
 - **Checked on `kuhrt-codes` (task 3.3)** on Horizon and `debut-vintage-theme`, both as previews:
   - the embed appears under App embeds;
   - the bar, the countdown, the ended message and dismissal work;

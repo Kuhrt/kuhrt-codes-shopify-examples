@@ -27,13 +27,14 @@ function legacySrc(params: Record<string, string>): string {
 const FAR_FUTURE_MS = Date.UTC(2999, 0, 1);
 const PAST_MS = 1000;
 
+const EMBED_CONFIG: BarConfig = {
+  message: 'Embedded',
+  ended: { behavior: ENDED_BEHAVIOR.hide },
+  dismissible: true
+};
+
 function embedRoot(overrides: Partial<BarConfig> = {}): HTMLElement {
-  const root = buildBar({
-    message: 'Embedded',
-    ended: { behavior: ENDED_BEHAVIOR.hide },
-    dismissible: true,
-    ...overrides
-  });
+  const root = buildBar({ ...EMBED_CONFIG, ...overrides });
   document.body.appendChild(root);
   return root;
 }
@@ -70,8 +71,19 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+/**
+ * Fires the DOMContentLoaded listeners a test left registered on the shared document, which also
+ * disconnects their observers. The page is marked as mounted and empty so none of them mounts anything.
+ */
+function drainPendingListeners(): void {
+  Reflect.set(window, MOUNTED, true);
+  document.body.replaceChildren();
+  document.dispatchEvent(new Event('DOMContentLoaded'));
+}
+
 afterEach(() => {
   vi.useRealTimers();
+  drainPendingListeners();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.replaceChildren();
@@ -253,13 +265,8 @@ describe('mountEmbed', () => {
   });
 
   it('removes a previously dismissed bar at once while the document is loading', () => {
-    const config: BarConfig = {
-      message: 'Embedded',
-      ended: { behavior: ENDED_BEHAVIOR.hide },
-      dismissible: true
-    };
-    createDismissalStore().dismiss(campaignKey(config));
-    embedRoot(config);
+    createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+    embedRoot(EMBED_CONFIG);
     setReadyState('loading');
     closeRoot();
 
@@ -430,22 +437,28 @@ describe('mountEmbed', () => {
   });
 
   describe('while the document is loading', () => {
-    const dismissedConfig: BarConfig = {
-      message: 'Embedded',
-      ended: { behavior: ENDED_BEHAVIOR.hide },
-      dismissible: true
-    };
-
     beforeEach(() => {
       setReadyState('loading');
     });
 
     it('enhances a root that is closed after mounting, without waiting for DOMContentLoaded', async () => {
-      createDismissalStore().dismiss(campaignKey(dismissedConfig));
+      createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
       mountEmbed(document);
 
-      embedRoot(dismissedConfig);
+      embedRoot(EMBED_CONFIG);
       closeRoot();
+      await flushObserver();
+
+      expect(bars()).toHaveLength(0);
+    });
+
+    it('enhances a root that arrives inside an added wrapper element', async () => {
+      createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+      mountEmbed(document);
+
+      const wrapper = document.createElement('div');
+      wrapper.append(buildBar(EMBED_CONFIG), document.createComment(''));
+      document.body.appendChild(wrapper);
       await flushObserver();
 
       expect(bars()).toHaveLength(0);
@@ -468,6 +481,8 @@ describe('mountEmbed', () => {
       mountEmbed(document);
       const embed = embedRoot();
       await flushObserver();
+      dismiss(embed);
+      expect(bars()).toEqual([embed]);
 
       document.dispatchEvent(new Event('DOMContentLoaded'));
       dismiss(embed);
@@ -488,23 +503,22 @@ describe('mountEmbed', () => {
     });
 
     it('stops observing after the observer enhances', async () => {
-      const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
       mountEmbed(document);
+      const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
       embedRoot();
       closeRoot();
       await flushObserver();
 
-      expect(disconnect).toHaveBeenCalled();
+      expect(disconnect).toHaveBeenCalledTimes(1);
     });
 
     it('stops observing on DOMContentLoaded', () => {
-      const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
       mountEmbed(document);
-      expect(disconnect).not.toHaveBeenCalled();
+      const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
 
       document.dispatchEvent(new Event('DOMContentLoaded'));
 
-      expect(disconnect).toHaveBeenCalled();
+      expect(disconnect).toHaveBeenCalledTimes(1);
     });
 
     it('falls back to DOMContentLoaded when MutationObserver is unavailable', async () => {
@@ -531,13 +545,8 @@ describe('mountEmbed in the theme editor', () => {
   }
 
   it('keeps the bar when a dismissal was stored earlier', () => {
-    const config: BarConfig = {
-      message: 'Embedded',
-      ended: { behavior: ENDED_BEHAVIOR.hide },
-      dismissible: true
-    };
-    createDismissalStore().dismiss(campaignKey(config));
-    designModeRoot(config);
+    createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+    designModeRoot(EMBED_CONFIG);
 
     mountEmbed(document);
 

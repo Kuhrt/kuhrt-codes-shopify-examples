@@ -146,21 +146,54 @@ function enhanceEmbed(doc: Document): void {
   if (root) enhanceRoot(doc, root, parseRoot(root));
 }
 
-/** Enhances the root if the parser has finished it, and reports whether it did. */
-function enhanceIfParsed(doc: Document): boolean {
-  const root = findRoot(doc);
-  if (!root) return false;
-  const parsed = parseRoot(root);
-  if (!isRootParsed(root, parsed.config)) return false;
-  enhanceRoot(doc, root, parsed);
+interface FoundRoot {
+  root: HTMLElement;
+  parsed: ParseResult;
+}
+
+function parseFound(root: HTMLElement | null): FoundRoot | null {
+  return root ? { root, parsed: parseRoot(root) } : null;
+}
+
+function isElement(node: Node): node is Element {
+  return node.nodeType === Node.ELEMENT_NODE;
+}
+
+/** The root that is `node` or inside it. */
+function rootWithin(node: Node): HTMLElement | null {
+  if (!isElement(node)) return null;
+  if (node.hasAttribute(ROOT_ATTRIBUTE)) return node as HTMLElement;
+  return node.querySelector<HTMLElement>(`[${ROOT_ATTRIBUTE}]`);
+}
+
+/** The first root among the nodes the records added. */
+function rootAddedBy(records: MutationRecord[]): HTMLElement | null {
+  for (const { addedNodes } of records) {
+    for (const node of addedNodes) {
+      const root = rootWithin(node);
+      if (root) return root;
+    }
+  }
+  return null;
+}
+
+/** Enhances `found` if the parser has finished it, and reports whether it did. */
+function enhanceIfParsed(doc: Document, found: FoundRoot | null): boolean {
+  if (!found || !isRootParsed(found.root, found.parsed.config)) return false;
+  enhanceRoot(doc, found.root, found.parsed);
   return true;
 }
 
-/** Enhances as soon as the parser finishes the root, and returns a function that stops watching. */
-function watchForParsedRoot(doc: Document): () => void {
+/**
+ * Enhances as soon as the parser finishes the root, and returns a function that stops watching.
+ * `initial` is the root already in the document, if any; later roots are found among added nodes.
+ */
+function watchForParsedRoot(doc: Document, initial: FoundRoot | null): () => void {
   if (typeof MutationObserver === 'undefined') return () => {};
-  const observer = new MutationObserver(() => {
-    if (enhanceIfParsed(doc)) observer.disconnect();
+  let found = initial;
+  const observer = new MutationObserver((records) => {
+    found ??= parseFound(rootAddedBy(records));
+    if (enhanceIfParsed(doc, found)) observer.disconnect();
   });
   observer.observe(doc.documentElement, { childList: true, subtree: true });
   return () => observer.disconnect();
@@ -176,8 +209,9 @@ export function mountEmbed(doc: Document): void {
     enhanceEmbed(doc);
     return;
   }
-  if (enhanceIfParsed(doc)) return;
-  const stopWatching = watchForParsedRoot(doc);
+  const found = parseFound(findRoot(doc));
+  if (enhanceIfParsed(doc, found)) return;
+  const stopWatching = watchForParsedRoot(doc, found);
   doc.addEventListener(
     'DOMContentLoaded',
     () => {

@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-import type { BuildContext, BuildOptions, Plugin } from 'esbuild';
+import type { BuildContext, BuildOptions, LogLevel, Plugin } from 'esbuild';
 import { build, context } from 'esbuild';
 
 export const GZIP_BUDGET_BYTES = 10 * 1024;
@@ -41,6 +41,8 @@ export const RAW_LIMIT: SizeLimit = {
   limit: RAW_LIMIT_BYTES
 };
 
+const DEFAULT_LOG_LEVEL: LogLevel = 'warning';
+
 export const EMBED_LIMITS: SizeLimit[] = [GZIP_LIMIT, RAW_LIMIT];
 export const LEGACY_LIMITS: SizeLimit[] = [GZIP_LIMIT];
 
@@ -63,6 +65,7 @@ export const BUNDLES: Bundle[] = [
 
 function optionsFor(
   { entry, outfile }: Bundle,
+  logLevel: LogLevel,
   plugins: BuildOptions['plugins'] = []
 ): BuildOptions {
   return {
@@ -75,7 +78,7 @@ function optionsFor(
     target: 'es2020',
     sourcemap: false,
     legalComments: 'none',
-    logLevel: 'warning',
+    logLevel,
     plugins
   };
 }
@@ -117,8 +120,11 @@ export function budgetFailure(sizes: BundleSize[]): string | undefined {
 }
 
 /** Bundles every entry and returns the raw and gzipped sizes. */
-export async function buildBundles(bundles: Bundle[]): Promise<BundleSize[]> {
-  await Promise.all(bundles.map((bundle) => build(optionsFor(bundle))));
+export async function buildBundles(
+  bundles: Bundle[],
+  logLevel: LogLevel = DEFAULT_LOG_LEVEL
+): Promise<BundleSize[]> {
+  await Promise.all(bundles.map((bundle) => build(optionsFor(bundle, logLevel))));
   return measureBundles(bundles);
 }
 
@@ -149,13 +155,16 @@ export interface Watch {
 }
 
 /** Starts watching `bundles`; the caller disposes the returned contexts. */
-export async function watchBundles(bundles: Bundle[]): Promise<Watch> {
+export async function watchBundles(
+  bundles: Bundle[],
+  logLevel: LogLevel = DEFAULT_LOG_LEVEL
+): Promise<Watch> {
   const firstBuilds: Promise<boolean>[] = [];
   const contexts = await Promise.all(
     bundles.map((bundle) => {
       let onFirstBuild: (withinLimits: boolean) => void = () => {};
       firstBuilds.push(new Promise((resolve) => (onFirstBuild = resolve)));
-      return context(optionsFor(bundle, [reporter(bundle, onFirstBuild)]));
+      return context(optionsFor(bundle, logLevel, [reporter(bundle, onFirstBuild)]));
     })
   );
   await Promise.all(contexts.map((ctx) => ctx.watch()));
@@ -163,12 +172,16 @@ export async function watchBundles(bundles: Bundle[]): Promise<Watch> {
 }
 
 /** Builds `bundles` (watching with `--watch`). Sets a failing exit code when one is over a limit. */
-export async function main(args: string[], bundles: Bundle[] = BUNDLES): Promise<void> {
+export async function main(
+  args: string[],
+  bundles: Bundle[] = BUNDLES,
+  logLevel: LogLevel = DEFAULT_LOG_LEVEL
+): Promise<void> {
   if (args.includes('--watch')) {
-    await watchBundles(bundles);
+    await watchBundles(bundles, logLevel);
     return;
   }
-  const sizes = await buildBundles(bundles);
+  const sizes = await buildBundles(bundles, logLevel);
   if (!reportSizes(sizes)) process.exitCode = 1;
 }
 
@@ -196,9 +209,13 @@ function reportFailure(error: unknown): void {
 }
 
 /** Runs `main`, reporting any failure and setting a failing exit code instead of throwing. */
-export async function run(argv: string[], bundles: Bundle[] = BUNDLES): Promise<void> {
+export async function run(
+  argv: string[],
+  bundles: Bundle[] = BUNDLES,
+  logLevel: LogLevel = DEFAULT_LOG_LEVEL
+): Promise<void> {
   try {
-    await main(argv, bundles);
+    await main(argv, bundles, logLevel);
   } catch (error: unknown) {
     reportFailure(error);
     process.exitCode = 1;
