@@ -1,5 +1,5 @@
 import type { BarConfig } from './config';
-import { formatCountdown, remaining } from './countdown';
+import { formatCountdown, MS_PER_SECOND, remaining } from './countdown';
 import type { DismissalStore } from './dismissal';
 import { campaignKey, createDismissalStore } from './dismissal';
 import {
@@ -15,15 +15,22 @@ export interface EnhanceDeps {
   store?: DismissalStore;
 }
 
-const TICK_INTERVAL_MS = 1000;
-
 function moveFocusToBody(doc: Document): void {
   const body = doc.body;
+  if (!body) return;
   if (!body.hasAttribute('tabindex')) {
     body.setAttribute('tabindex', '-1');
     body.addEventListener('blur', () => body.removeAttribute('tabindex'), { once: true });
   }
   body.focus();
+}
+
+/** Removes the bar, keeping keyboard focus on the page if it was inside the bar. */
+function removeBar(root: HTMLElement): void {
+  const doc = root.ownerDocument;
+  const hadFocus = root.contains(doc.activeElement);
+  root.remove();
+  if (hadFocus) moveFocusToBody(doc);
 }
 
 function showEndedMessage(root: HTMLElement, message: string): void {
@@ -37,8 +44,13 @@ function applyEnded(root: HTMLElement, config: BarConfig): void {
   if (config.ended.behavior === ENDED_BEHAVIOR.message) {
     showEndedMessage(root, config.ended.message);
   } else {
-    root.remove();
+    removeBar(root);
   }
+}
+
+/** Milliseconds until the displayed second next changes, so ticks land on the end time's second boundary. */
+function msUntilNextTick(endsAtMs: number, nowMs: number): number {
+  return (endsAtMs - nowMs) % MS_PER_SECOND || MS_PER_SECOND;
 }
 
 /**
@@ -49,11 +61,11 @@ export function enhance(root: HTMLElement, config: BarConfig, deps: EnhanceDeps 
   const now = deps.now ?? (() => Date.now());
   const store = deps.store ?? createDismissalStore();
   const key = campaignKey(config);
-  let timer: ReturnType<typeof setInterval> | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let removeDismissListener = (): void => {};
 
   const stop = (): void => {
-    if (timer !== undefined) clearInterval(timer);
+    clearTimeout(timer);
     timer = undefined;
     removeDismissListener();
   };
@@ -61,12 +73,11 @@ export function enhance(root: HTMLElement, config: BarConfig, deps: EnhanceDeps 
   const dismiss = (): void => {
     store.dismiss(key);
     stop();
-    root.remove();
-    moveFocusToBody(root.ownerDocument);
+    removeBar(root);
   };
 
   if (config.dismissible && store.isDismissed(key)) {
-    root.remove();
+    removeBar(root);
     return stop;
   }
 
@@ -83,15 +94,14 @@ export function enhance(root: HTMLElement, config: BarConfig, deps: EnhanceDeps 
   const tick = (): void => {
     const left = remaining(endsAtMs, now());
     if (left === 'ended') {
-      clearInterval(timer);
       timer = undefined;
       applyEnded(root, config);
-    } else if (countdown) {
-      countdown.textContent = formatCountdown(left);
+      return;
     }
+    if (countdown) countdown.textContent = formatCountdown(left);
+    timer = setTimeout(tick, msUntilNextTick(endsAtMs, now()));
   };
 
-  timer = setInterval(tick, TICK_INTERVAL_MS);
   tick();
   return stop;
 }

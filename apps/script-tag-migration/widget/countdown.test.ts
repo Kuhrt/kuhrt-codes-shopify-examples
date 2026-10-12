@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatCountdown, remaining } from './countdown';
+import { DAY, HOUR, MINUTE, SECOND } from './test-support';
 
 const NOW = 1_700_000_000_000;
-const SECOND = 1000;
-const MINUTE = 60 * SECOND;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 
 describe('remaining', () => {
   it('splits 1 day, 2 hours, 3 minutes and 4 seconds', () => {

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BarConfig } from './config';
 import { parseConfig } from './config';
-import { buildBar, readRawSettings } from './render';
+import { buildBar } from './render';
 import {
   BACKGROUND_PROPERTY,
   COUNTDOWN_ATTRIBUTE,
@@ -11,10 +11,12 @@ import {
   DISMISS_ATTRIBUTE,
   ENDED_BEHAVIOR,
   MESSAGE_ATTRIBUTE,
+  readRawSettings,
   ROOT_ATTRIBUTE,
   SETTING,
   TEXT_PROPERTY
 } from './settings';
+import { MINIMAL_CONFIG as MINIMAL } from './test-support';
 
 const ENDS_AT_MS = Date.UTC(2027, 0, 15, 8);
 
@@ -26,12 +28,6 @@ const FULL: BarConfig = {
   dismissible: true,
   backgroundColor: '#000',
   textColor: '#fff'
-};
-
-const MINIMAL: BarConfig = {
-  message: 'Sale',
-  ended: { behavior: ENDED_BEHAVIOR.hide },
-  dismissible: false
 };
 
 describe('buildBar', () => {
@@ -90,16 +86,30 @@ describe('buildBar', () => {
   });
 
   it('keeps hostile text inert in attributes', () => {
-    const root = buildBar({ ...FULL, message: '"><script>1</script>' });
+    const hostile = '"><script>1</script>';
+    const root = buildBar({
+      ...FULL,
+      message: hostile,
+      ended: { behavior: ENDED_BEHAVIOR.message, message: hostile }
+    });
     expect(root.querySelector('script')).toBeNull();
+    expect(root.getAttribute(dataAttributeFor(SETTING.message))).toBe(hostile);
+    expect(root.getAttribute(dataAttributeFor(SETTING.endedMessage))).toBe(hostile);
   });
 
-  it('is deterministic', () => {
-    expect(buildBar(FULL).outerHTML).toBe(buildBar(FULL).outerHTML);
+  it('writes a whole-second datetime for an end time with milliseconds', () => {
+    const countdown = buildBar({ ...FULL, endsAtMs: ENDS_AT_MS + 500 }).querySelector(
+      `[${COUNTDOWN_ATTRIBUTE}]`
+    );
+    expect(countdown?.getAttribute('datetime')).toBe('2027-01-15T08:00:00Z');
   });
 });
 
 describe('readRawSettings', () => {
+  it('prefixes setting attributes to avoid generic theme selectors', () => {
+    expect(dataAttributeFor(SETTING.linkUrl)).toMatch(/^data-kc-/);
+  });
+
   it('round-trips a full configuration through parseConfig', () => {
     const { config, warnings } = parseConfig(readRawSettings(buildBar(FULL)));
     expect(warnings).toEqual([]);

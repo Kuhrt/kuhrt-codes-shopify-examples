@@ -2,16 +2,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { campaignKey, createDismissalStore } from './dismissal';
-
-function throwingStorage(): Storage {
-  const fail = (): never => {
-    throw new DOMException('blocked', 'SecurityError');
-  };
-  return { getItem: fail, setItem: fail } as unknown as Storage;
-}
+import { blockedStorage } from './test-support';
 
 afterEach(() => {
   localStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe('campaignKey', () => {
@@ -56,18 +51,18 @@ describe('createDismissalStore', () => {
 
   describe('when storage throws', () => {
     it('does not throw on read and reports undismissed', () => {
-      expect(createDismissalStore(throwingStorage).isDismissed('abc')).toBe(false);
+      expect(createDismissalStore(blockedStorage).isDismissed('abc')).toBe(false);
     });
 
     it('does not throw on write and remembers the dismissal for the current page', () => {
-      const store = createDismissalStore(throwingStorage);
+      const store = createDismissalStore(blockedStorage);
       expect(() => store.dismiss('abc')).not.toThrow();
       expect(store.isDismissed('abc')).toBe(true);
     });
 
     it('does not carry the dismissal to a new page', () => {
-      createDismissalStore(throwingStorage).dismiss('abc');
-      expect(createDismissalStore(throwingStorage).isDismissed('abc')).toBe(false);
+      createDismissalStore(blockedStorage).dismiss('abc');
+      expect(createDismissalStore(blockedStorage).isDismissed('abc')).toBe(false);
     });
 
     it('survives the storage accessor itself throwing', () => {
@@ -89,6 +84,5 @@ describe('createDismissalStore', () => {
     const store = createDismissalStore();
     store.dismiss('abc');
     expect(store.isDismissed('abc')).toBe(true);
-    vi.restoreAllMocks();
   });
 });

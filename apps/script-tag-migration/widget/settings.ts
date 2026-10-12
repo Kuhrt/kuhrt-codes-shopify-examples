@@ -11,15 +11,15 @@ export const SETTING = {
 
 export type SettingName = (typeof SETTING)[keyof typeof SETTING];
 
+export type RawSettings = Record<string, string | undefined>;
+
 export const ENDED_BEHAVIOR = {
   hide: 'hide',
   message: 'message'
 } as const;
 
-export type EndedBehavior = (typeof ENDED_BEHAVIOR)[keyof typeof ENDED_BEHAVIOR];
-
 export const ROOT_ATTRIBUTE = 'data-kc-announcement-bar';
-export const MESSAGE_ATTRIBUTE = 'data-kc-message';
+export const MESSAGE_ATTRIBUTE = 'data-kc-text';
 export const COUNTDOWN_ATTRIBUTE = 'data-kc-countdown';
 export const DISMISS_ATTRIBUTE = 'data-kc-dismiss';
 export const ENDED_ATTRIBUTE = 'data-kc-ended';
@@ -32,7 +32,16 @@ export const DEFAULT_LABELS = {
   dismiss: 'Dismiss announcement'
 } as const;
 
-/** The root data attribute that carries a setting's value, e.g. `link_url` becomes `data-link-url`. */
+/** The root data attribute that carries a setting's value, e.g. `link_url` becomes `data-kc-link-url`. */
 export function dataAttributeFor(setting: SettingName): string {
-  return `data-${setting.replaceAll('_', '-')}`;
+  return `data-kc-${setting.replaceAll('_', '-')}`;
+}
+
+/** Reads the raw settings carried on a bar root. */
+export function readRawSettings(root: Element): RawSettings {
+  const raw: RawSettings = {};
+  for (const setting of Object.values(SETTING)) {
+    raw[setting] = root.getAttribute(dataAttributeFor(setting)) ?? undefined;
+  }
+  return raw;
 }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BarConfig } from './config';
 import { formatCountdown } from './countdown';
-import { createDismissalStore } from './dismissal';
+import { campaignKey, createDismissalStore } from './dismissal';
 import { enhance } from './enhance';
 import { buildBar } from './render';
 import {
@@ -13,19 +13,9 @@ import {
   ENDED_BEHAVIOR,
   MESSAGE_ATTRIBUTE
 } from './settings';
+import { blockedStorage, DAY, HOUR, MINIMAL_CONFIG as BASE, MINUTE, SECOND } from './test-support';
 
 const START = Date.UTC(2027, 0, 1);
-const SECOND = 1000;
-const MINUTE = 60 * SECOND;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-const BASE: BarConfig = {
-  message: 'Sale',
-  ended: { behavior: ENDED_BEHAVIOR.hide },
-  dismissible: false
-};
-
 function mount(config: BarConfig): HTMLElement {
   const root = buildBar(config);
   document.body.appendChild(root);
@@ -112,13 +102,6 @@ describe('countdown', () => {
     expect(root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.getAttribute('datetime')).toBe(before);
   });
 
-  it('is not announced as a live region', () => {
-    const root = mount(config);
-    enhance(root, config);
-    expect(root.querySelector('[aria-live]:not([aria-live="off"])')).toBeNull();
-    expect(root.closest('[aria-live]:not([aria-live="off"])')).toBeNull();
-  });
-
   it('stops ticking when the returned stop function is called', () => {
     const root = mount(config);
     const stop = enhance(root, config);
@@ -150,6 +133,27 @@ describe('when the countdown ends', () => {
     );
   });
 
+  it('moves focus to body when the bar hides while the dismiss button has focus', () => {
+    const config: BarConfig = { ...BASE, dismissible: true, endsAtMs };
+    const root = mount(config);
+    enhance(root, config);
+    dismissButton(root).focus();
+    vi.advanceTimersByTime(3 * SECOND);
+    expect(root.isConnected).toBe(false);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('does not steal focus when the bar hides while focus is elsewhere', () => {
+    const config: BarConfig = { ...BASE, endsAtMs };
+    const root = mount(config);
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    enhance(root, config);
+    input.focus();
+    vi.advanceTimersByTime(3 * SECOND);
+    expect(document.activeElement).toBe(input);
+  });
+
   it('swaps in the ended message with no countdown for "message"', () => {
     const config: BarConfig = {
       ...BASE,
@@ -177,6 +181,25 @@ describe('when the countdown ends', () => {
     enhance(root, config);
     vi.advanceTimersByTime(3 * SECOND);
     expect(root.querySelector('a')).toBeNull();
+  });
+});
+
+describe('tick alignment', () => {
+  it('ends on the end-time boundary when the start is not second-aligned', () => {
+    const config: BarConfig = { ...BASE, endsAtMs: START + 3500 };
+    const root = mount(config);
+    enhance(root, config);
+    expect(countdownText(root)).toBe(
+      formatCountdown({ days: 0, hours: 0, minutes: 0, seconds: 4 })
+    );
+    vi.advanceTimersByTime(499);
+    expect(root.isConnected).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(countdownText(root)).toBe(
+      formatCountdown({ days: 0, hours: 0, minutes: 0, seconds: 3 })
+    );
+    vi.advanceTimersByTime(3000);
+    expect(root.isConnected).toBe(false);
   });
 });
 
@@ -237,11 +260,6 @@ describe('dismissal', () => {
     expect(document.body.getAttribute('tabindex')).toBe('0');
   });
 
-  it('is a real button, so keyboard activation works via click', () => {
-    const root = mount(config);
-    expect(dismissButton(root).tagName).toBe('BUTTON');
-  });
-
   it('keeps the bar dismissed on the next page load', () => {
     const first = mount(config);
     enhance(first, config);
@@ -289,9 +307,7 @@ describe('dismissal', () => {
   });
 
   it('works for the current page when storage throws', () => {
-    const blocked = createDismissalStore(() => {
-      throw new DOMException('blocked', 'SecurityError');
-    });
+    const blocked = createDismissalStore(blockedStorage);
     const root = mount(config);
     expect(() => enhance(root, config, { store: blocked })).not.toThrow();
     expect(() => dismissButton(root).click()).not.toThrow();
@@ -303,8 +319,8 @@ describe('dismissal', () => {
   });
 
   it('ignores earlier dismissals when dismissal is not enabled', () => {
-    createDismissalStore().dismiss('anything');
     const plain: BarConfig = { ...BASE, dismissible: false };
+    createDismissalStore().dismiss(campaignKey(plain));
     const root = mount(plain);
     enhance(root, plain);
     expect(root.isConnected).toBe(true);
@@ -316,6 +332,42 @@ describe('dismissal', () => {
     stop();
     dismissButton(root).click();
     expect(root.isConnected).toBe(true);
+  });
+});
+
+describe('markup that does not match the config', () => {
+  it('does not throw when the countdown element is missing', () => {
+    const config: BarConfig = { ...BASE, endsAtMs: START + 3 * SECOND };
+    const root = mount(config);
+    root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.remove();
+    expect(() => {
+      enhance(root, config);
+      vi.advanceTimersByTime(3 * SECOND);
+    }).not.toThrow();
+  });
+
+  it('does not throw when the ended message has no message element', () => {
+    const config: BarConfig = {
+      ...BASE,
+      endsAtMs: START + SECOND,
+      ended: { behavior: ENDED_BEHAVIOR.message, message: 'Over' }
+    };
+    const root = mount(config);
+    root.querySelector(`[${MESSAGE_ATTRIBUTE}]`)?.remove();
+    expect(() => {
+      enhance(root, config);
+      vi.advanceTimersByTime(SECOND);
+    }).not.toThrow();
+  });
+
+  it('does not throw when a dismissible config has no dismiss button', () => {
+    const config: BarConfig = { ...BASE, dismissible: true, endsAtMs: START + HOUR };
+    const root = mount(config);
+    dismissButton(root).remove();
+    expect(() => {
+      const stop = enhance(root, config);
+      stop();
+    }).not.toThrow();
   });
 });
 

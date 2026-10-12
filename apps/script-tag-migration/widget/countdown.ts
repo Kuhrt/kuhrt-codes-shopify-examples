@@ -5,7 +5,7 @@ export interface CountdownParts {
   seconds: number;
 }
 
-const MS_PER_SECOND = 1000;
+export const MS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 60 * SECONDS_PER_MINUTE;
 const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR;
