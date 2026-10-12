@@ -38,7 +38,7 @@ const ISO_DATE_TIME =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 const WHITESPACE_OR_CONTROL = /[\p{White_Space}\p{Cc}]/u;
 const SENTINEL_ORIGIN = 'https://x.invalid';
-const MAX_DATE_MS = 8.64e15;
+const LATEST_END_MS = Date.UTC(9999, 11, 31, 23, 59, 59);
 
 /** Drops sub-second precision. Every end time in a `BarConfig` is a whole number of seconds. */
 export function toEpochSeconds(ms: number): number {
@@ -50,6 +50,10 @@ function invalid<T>(value: T, setting: SettingName, reason: string): Parsed<T> {
 }
 
 /** Trim; empty means `fallback`; otherwise `validate` returns the value, or `undefined` when invalid. */
+function readTrimmed(raw: RawSettings, setting: SettingName): string {
+  return (raw[setting] ?? '').trim();
+}
+
 function parseSetting<T>(
   raw: RawSettings,
   setting: SettingName,
@@ -57,7 +61,7 @@ function parseSetting<T>(
   reason: string,
   validate: (text: string) => T | undefined
 ): Parsed<T> {
-  const text = (raw[setting] ?? '').trim();
+  const text = readTrimmed(raw, setting);
   if (text === '') return { value: fallback };
   const value = validate(text);
   return value === undefined ? invalid(fallback, setting, reason) : { value };
@@ -105,7 +109,7 @@ function parseIsoMs(text: string): number {
 
 function validateEndsAt(text: string): number | undefined {
   const ms = EPOCH_SECONDS.test(text) ? Number(text) * 1000 : parseIsoMs(text);
-  if (!Number.isFinite(ms) || Math.abs(ms) > MAX_DATE_MS) return undefined;
+  if (!Number.isFinite(ms) || ms < 0 || ms > LATEST_END_MS) return undefined;
   return toEpochSeconds(ms) * 1000;
 }
 
@@ -121,7 +125,7 @@ function parseEnded(raw: RawSettings): Parsed<EndedConfig> {
   if (behavior.warning) return { value: hide, warning: behavior.warning };
   if (behavior.value === ENDED_BEHAVIOR.hide) return { value: hide };
 
-  const message = (raw[SETTING.endedMessage] ?? '').trim();
+  const message = readTrimmed(raw, SETTING.endedMessage);
   if (message === '') {
     return invalid(hide, SETTING.endedMessage, 'is required when ended behavior is "message"');
   }
@@ -180,7 +184,7 @@ export function parseConfig(raw: RawSettings): ParseResult {
     textColor.warning
   ].filter((warning): warning is ConfigWarning => warning !== undefined);
 
-  const message = (raw[SETTING.message] ?? '').trim();
+  const message = readTrimmed(raw, SETTING.message);
   if (message === '') return { config: null, warnings };
 
   const config: BarConfig = { message, ended: ended.value, dismissible: dismissible.value };
@@ -192,7 +196,7 @@ export function parseConfig(raw: RawSettings): ParseResult {
 }
 
 /** The exact inverse of `parseConfig`: raw settings that parse back to `config`. Unset settings are omitted. */
-export function toRawSettings(config: BarConfig): RawSettings {
+export function toRawSettings(config: BarConfig): Partial<Record<SettingName, string>> {
   const raw: RawSettings = {
     [SETTING.message]: config.message,
     [SETTING.endedBehavior]: config.ended.behavior,

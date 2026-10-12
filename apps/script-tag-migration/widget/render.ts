@@ -1,6 +1,5 @@
 import type { BarConfig } from './config';
 import { toEpochSeconds, toRawSettings } from './config';
-import type { SettingName } from './settings';
 import {
   BACKGROUND_PROPERTY,
   COUNTDOWN_ATTRIBUTE,
@@ -9,6 +8,7 @@ import {
   DISMISS_ATTRIBUTE,
   MESSAGE_ATTRIBUTE,
   ROOT_ATTRIBUTE,
+  SETTING,
   TEXT_PROPERTY
 } from './settings';
 
@@ -44,8 +44,10 @@ function createDismissButton(): HTMLButtonElement {
 }
 
 function applySettingAttributes(root: HTMLElement, config: BarConfig): void {
-  for (const [setting, value] of Object.entries(toRawSettings(config))) {
-    if (value !== undefined) root.setAttribute(dataAttributeFor(setting as SettingName), value);
+  const raw = toRawSettings(config);
+  for (const setting of Object.values(SETTING)) {
+    const value = raw[setting];
+    if (value !== undefined) root.setAttribute(dataAttributeFor(setting), value);
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BarConfig } from './config';
+import type { BarConfig, ParseResult } from './config';
 import { parseConfig, toEpochSeconds, toRawSettings } from './config';
 import type { SettingName } from './settings';
 import { ENDED_BEHAVIOR, SETTING } from './settings';
@@ -12,8 +12,8 @@ function parseWith(setting: SettingName, value: string | undefined) {
   return parseConfig({ ...VALID_MESSAGE, [setting]: value });
 }
 
-function settingsWarned(raw: Record<string, string | undefined>): SettingName[] {
-  return parseConfig(raw).warnings.map((warning) => warning.setting);
+function warnedSettings(result: ParseResult): SettingName[] {
+  return result.warnings.map((warning) => warning.setting);
 }
 
 describe('parseConfig', () => {
@@ -77,7 +77,7 @@ describe('parseConfig', () => {
       const result = parseWith(SETTING.linkUrl, url);
       expect(result.config?.linkUrl).toBeUndefined();
       expect(result.config?.message).toBe('Sale');
-      expect(result.warnings.map((warning) => warning.setting)).toEqual([SETTING.linkUrl]);
+      expect(warnedSettings(result)).toEqual([SETTING.linkUrl]);
     });
 
     it.each([undefined, '', '  '])('treats %j as no link without a warning', (url) => {
@@ -139,12 +139,13 @@ describe('parseConfig', () => {
       '-5',
       '1.5',
       '12abc',
+      '300000000000',
       '99999999999999999999'
     ])('treats %j as no end time with one warning', (value) => {
       const result = parseWith(SETTING.endsAt, value);
       expect(result.config?.endsAtMs).toBeUndefined();
       expect(result.config?.message).toBe('Sale');
-      expect(result.warnings.map((warning) => warning.setting)).toEqual([SETTING.endsAt]);
+      expect(warnedSettings(result)).toEqual([SETTING.endsAt]);
     });
 
     it('accepts a leap day', () => {
@@ -190,7 +191,7 @@ describe('parseConfig', () => {
       (value) => {
         const result = parseWith(SETTING.endedBehavior, value);
         expect(result.config?.ended).toEqual({ behavior: ENDED_BEHAVIOR.hide });
-        expect(settingsWarned({ ...VALID_MESSAGE, [SETTING.endedBehavior]: value })).toEqual([
+        expect(warnedSettings(parseWith(SETTING.endedBehavior, value))).toEqual([
           SETTING.endedBehavior
         ]);
       }
@@ -205,7 +206,7 @@ describe('parseConfig', () => {
           [SETTING.endedMessage]: ended
         };
         expect(parseConfig(raw).config?.ended).toEqual({ behavior: ENDED_BEHAVIOR.hide });
-        expect(settingsWarned(raw)).toEqual([SETTING.endedMessage]);
+        expect(warnedSettings(parseConfig(raw))).toEqual([SETTING.endedMessage]);
       }
     );
   });
@@ -232,9 +233,7 @@ describe('parseConfig', () => {
     it.each(['yes', 'on', '2', 'null'])('defaults %j to false with one warning', (value) => {
       const result = parseWith(SETTING.dismissible, value);
       expect(result.config?.dismissible).toBe(false);
-      expect(settingsWarned({ ...VALID_MESSAGE, [SETTING.dismissible]: value })).toEqual([
-        SETTING.dismissible
-      ]);
+      expect(warnedSettings(parseWith(SETTING.dismissible, value))).toEqual([SETTING.dismissible]);
     });
   });
 
@@ -261,7 +260,7 @@ describe('parseConfig', () => {
     ])('omits %j with one warning', (color) => {
       const result = parseWith(setting, color);
       expect(result.config?.[property]).toBeUndefined();
-      expect(result.warnings.map((warning) => warning.setting)).toEqual([setting]);
+      expect(warnedSettings(result)).toEqual([setting]);
     });
 
     it('omits an absent color without a warning', () => {
@@ -283,7 +282,7 @@ describe('parseConfig', () => {
     };
 
     it('reports exactly one warning per invalid setting', () => {
-      expect([...settingsWarned(everythingInvalid)].sort()).toEqual(
+      expect([...warnedSettings(parseConfig(everythingInvalid))].sort()).toEqual(
         [
           SETTING.linkUrl,
           SETTING.endsAt,
@@ -304,7 +303,7 @@ describe('parseConfig', () => {
     it('still reports invalid settings when the message is empty', () => {
       const result = parseConfig({ [SETTING.linkUrl]: 'javascript:1' });
       expect(result.config).toBeNull();
-      expect(result.warnings.map((warning) => warning.setting)).toEqual([SETTING.linkUrl]);
+      expect(warnedSettings(result)).toEqual([SETTING.linkUrl]);
     });
   });
 

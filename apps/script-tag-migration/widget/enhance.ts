@@ -92,14 +92,15 @@ export function enhance(root: HTMLElement, config: BarConfig, deps: EnhanceDeps 
 
   const countdown = root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`);
   const tick = (): void => {
-    const left = remaining(endsAtMs, now());
+    const nowMs = now();
+    const left = remaining(endsAtMs, nowMs);
     if (left === 'ended') {
       timer = undefined;
       applyEnded(root, config);
       return;
     }
     if (countdown) countdown.textContent = formatCountdown(left);
-    timer = setTimeout(tick, msUntilNextTick(endsAtMs, now()));
+    timer = setTimeout(tick, msUntilNextTick(endsAtMs, nowMs));
   };
 
   tick();

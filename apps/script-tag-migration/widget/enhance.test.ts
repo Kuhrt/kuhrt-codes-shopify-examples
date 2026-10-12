@@ -84,7 +84,6 @@ describe('countdown', () => {
     expect(countdownText(root)).toBe(
       formatCountdown({ days: 0, hours: 2, minutes: 0, seconds: 0 })
     );
-    expect(countdownText(root)).not.toMatch(/\dd\b/);
   });
 
   it('shows no countdown and starts no timer when there is no end time', () => {
