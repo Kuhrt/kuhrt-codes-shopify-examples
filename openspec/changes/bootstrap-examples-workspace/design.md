@@ -51,3 +51,10 @@ See proposal.md, "Why". The website repo (`kuhrt-codes-shopify`) already runs on
 ## Migration Plan
 
 Not applicable. This is a new repository.
+
+## Implementation Notes
+
+- **gitleaks-action is `v3`, not `v2`.** It runs as its own `secrets` job in `ci.yml` rather than as a step in the `check` job, because it needs full history (`fetch-depth: 0`) and the quality gate does not. PR comments are disabled (`GITLEAKS_ENABLE_COMMENTS: false`), so the job needs only `contents: read` and `pull-requests: read`, not write access. `Kuhrt` is a personal GitHub account, so no `GITLEAKS_LICENSE` is required.
+- **The default gitleaks rules cover all four Shopify prefixes.** Checked locally against `shpat_`, `shpss_`, `shpca_`, and `shppa_`, which hit the rules `shopify-access-token`, `shopify-shared-secret`, `shopify-custom-access-token`, and `shopify-private-app-access-token`. No custom `.gitleaks.toml` is needed.
+- **No root `tsconfig.json`.** The proposal's Impact list included one, but no root-level TypeScript exists to check. Each app extends `@repo/config/tsconfig.base.json` directly.
+- **The root README lists App 1 without a link.** Its README does not exist yet, and a dead relative link would fail the link check. App 1's task 8.2 adds the link.

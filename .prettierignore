@@ -1,0 +1,12 @@
+node_modules
+pnpm-lock.yaml
+.turbo
+.wrangler
+.shopify
+.react-router
+build
+dist
+coverage
+worker-configuration.d.ts
+openspec
+.claude
