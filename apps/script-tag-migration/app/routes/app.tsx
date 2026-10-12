@@ -3,12 +3,12 @@ import { boundary } from '@shopify/shopify-app-react-router/server';
 import type { HeadersFunction, LoaderFunctionArgs } from 'react-router';
 import { Outlet, useLoaderData, useRouteError } from 'react-router';
 
-import { authenticate } from '../shopify.server';
+import { apiKey, authenticate } from '../shopify.server';
 
-export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
-  return { apiKey: context.cloudflare.env.SHOPIFY_API_KEY };
+  return { apiKey };
 };
 
 export default function App() {

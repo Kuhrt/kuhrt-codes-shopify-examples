@@ -1,7 +1,6 @@
 import { cloudflare } from '@cloudflare/vite-plugin';
 import { reactRouter } from '@react-router/dev/vite';
 import { defineConfig } from 'vite';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 // The Shopify CLI passes the tunnel URL as HOST, which Vite would treat as its own bind address.
 if (
@@ -36,7 +35,7 @@ export default defineConfig({
       allow: ['app', 'node_modules']
     }
   },
-  plugins: [cloudflare({ viteEnvironment: { name: 'ssr' } }), reactRouter(), tsconfigPaths()],
+  plugins: [cloudflare({ viteEnvironment: { name: 'ssr' } }), reactRouter()],
   build: {
     assetsInlineLimit: 0
   },
