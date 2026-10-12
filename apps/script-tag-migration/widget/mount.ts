@@ -16,7 +16,7 @@ import {
   SETTING
 } from './settings';
 
-const LOG_PREFIX = '[kc-announcement-bar]';
+export const LOG_PREFIX = '[kc-announcement-bar]';
 export const MOUNTED = Symbol.for('kc-announcement-bar.mounted');
 
 type MountedWindow = Window & { [MOUNTED]?: true };
@@ -115,11 +115,14 @@ function markersFor(config: BarConfig): string[] {
   return markers;
 }
 
-/** Whether the parser has produced every element the config expects, so enhancing now can't miss one. */
-function isRootComplete(root: HTMLElement, config: BarConfig | null): boolean {
-  return (
-    !config || markersFor(config).every((marker) => root.querySelector(`[${marker}]`) !== null)
-  );
+/**
+ * Whether the parser has produced every element the config expects, so enhancing now can't miss one.
+ * A following node means the parser has closed the root.
+ */
+function isRootParsed(root: HTMLElement, config: BarConfig | null): boolean {
+  const hasEveryMarker =
+    !config || markersFor(config).every((marker) => root.querySelector(`[${marker}]`) !== null);
+  return root.nextSibling !== null && hasEveryMarker;
 }
 
 function parseRoot(root: HTMLElement): ParseResult {
@@ -143,16 +146,46 @@ function enhanceEmbed(doc: Document): void {
   if (root) enhanceRoot(doc, root, parseRoot(root));
 }
 
+/** Enhances the root if the parser has finished it, and reports whether it did. */
+function enhanceIfParsed(doc: Document): boolean {
+  const root = findRoot(doc);
+  if (!root) return false;
+  const parsed = parseRoot(root);
+  if (!isRootParsed(root, parsed.config)) return false;
+  enhanceRoot(doc, root, parsed);
+  return true;
+}
+
+/** Enhances as soon as the parser finishes the root, and returns a function that stops watching. */
+function watchForParsedRoot(doc: Document): () => void {
+  if (typeof MutationObserver === 'undefined') return () => {};
+  const observer = new MutationObserver(() => {
+    if (enhanceIfParsed(doc)) observer.disconnect();
+  });
+  observer.observe(doc.documentElement, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
 /**
  * Enhances the server-rendered bar, once per page. Does nothing when the page has none.
- * While the document loads, a bar whose markup is already complete is enhanced at once
- * so a dismissed or ended bar never flashes.
+ * While the document loads, the bar is enhanced as soon as its markup is complete, so a
+ * dismissed or ended bar never flashes; `DOMContentLoaded` is the fallback.
  */
 export function mountEmbed(doc: Document): void {
-  const root = findRoot(doc);
-  const parsed = root && parseRoot(root);
-  if (root && parsed && isRootComplete(root, parsed.config)) enhanceRoot(doc, root, parsed);
-  else whenDomReady(doc, () => enhanceEmbed(doc));
+  if (doc.readyState !== 'loading') {
+    enhanceEmbed(doc);
+    return;
+  }
+  if (enhanceIfParsed(doc)) return;
+  const stopWatching = watchForParsedRoot(doc);
+  doc.addEventListener(
+    'DOMContentLoaded',
+    () => {
+      stopWatching();
+      enhanceEmbed(doc);
+    },
+    { once: true }
+  );
 }
 
 /**

@@ -46,6 +46,15 @@ function dismiss(root: HTMLElement): void {
   root.querySelector<HTMLElement>(`[${DISMISS_ATTRIBUTE}]`)?.click();
 }
 
+/** Appends the node that follows the root once the parser has closed it. */
+function closeRoot(): void {
+  document.body.appendChild(document.createComment(''));
+}
+
+function flushObserver(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function setReadyState(state: DocumentReadyState): void {
   vi.spyOn(document, 'readyState', 'get').mockReturnValue(state);
 }
@@ -64,6 +73,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   document.body.replaceChildren();
   Reflect.deleteProperty(window, MOUNTED);
 });
@@ -234,6 +244,7 @@ describe('mountEmbed', () => {
   it('enhances a complete root at once while the document is loading', () => {
     const embed = embedRoot();
     setReadyState('loading');
+    closeRoot();
 
     mountEmbed(document);
 
@@ -250,6 +261,7 @@ describe('mountEmbed', () => {
     createDismissalStore().dismiss(campaignKey(config));
     embedRoot(config);
     setReadyState('loading');
+    closeRoot();
 
     mountEmbed(document);
 
@@ -259,6 +271,7 @@ describe('mountEmbed', () => {
   it('removes an ended bar at once while the document is loading when it hides on end', () => {
     embedRoot({ endsAtMs: PAST_MS, ended: { behavior: ENDED_BEHAVIOR.hide } });
     setReadyState('loading');
+    closeRoot();
 
     mountEmbed(document);
 
@@ -271,6 +284,7 @@ describe('mountEmbed', () => {
       ended: { behavior: ENDED_BEHAVIOR.message, message: 'Over' }
     });
     setReadyState('loading');
+    closeRoot();
 
     mountEmbed(document);
 
@@ -281,6 +295,7 @@ describe('mountEmbed', () => {
     const embed = embedRoot();
     embed.setAttribute(dataAttributeFor(SETTING.message), NON_BREAKING_SPACE);
     setReadyState('loading');
+    closeRoot();
 
     mountEmbed(document);
 
@@ -292,6 +307,7 @@ describe('mountEmbed', () => {
     const button = embed.querySelector(`[${DISMISS_ATTRIBUTE}]`);
     button?.remove();
     setReadyState('loading');
+    closeRoot();
 
     mountEmbed(document);
     if (button) embed.appendChild(button);
@@ -308,6 +324,7 @@ describe('mountEmbed', () => {
     const countdown = embed.querySelector('[data-kc-countdown]');
     countdown?.remove();
     setReadyState('loading');
+    closeRoot();
     vi.useFakeTimers();
 
     mountEmbed(document);
@@ -321,6 +338,7 @@ describe('mountEmbed', () => {
     const embed = embedRoot({ endsAtMs: FAR_FUTURE_MS });
     embed.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.remove();
     setReadyState('loading');
+    closeRoot();
     vi.useFakeTimers();
 
     mountEmbed(document);
@@ -333,6 +351,7 @@ describe('mountEmbed', () => {
   it('enhances at once a root that has all of its markers while the document is loading', () => {
     embedRoot({ endsAtMs: FAR_FUTURE_MS });
     setReadyState('loading');
+    closeRoot();
     vi.useFakeTimers();
 
     mountEmbed(document);
@@ -408,6 +427,99 @@ describe('mountEmbed', () => {
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warningText(0)).toContain(SETTING.linkUrl);
     expect(warningText(1)).toContain(SETTING.endsAt);
+  });
+
+  describe('while the document is loading', () => {
+    const dismissedConfig: BarConfig = {
+      message: 'Embedded',
+      ended: { behavior: ENDED_BEHAVIOR.hide },
+      dismissible: true
+    };
+
+    beforeEach(() => {
+      setReadyState('loading');
+    });
+
+    it('enhances a root that is closed after mounting, without waiting for DOMContentLoaded', async () => {
+      createDismissalStore().dismiss(campaignKey(dismissedConfig));
+      mountEmbed(document);
+
+      embedRoot(dismissedConfig);
+      closeRoot();
+      await flushObserver();
+
+      expect(bars()).toHaveLength(0);
+    });
+
+    it('waits for a following node before enhancing a root added after mounting', async () => {
+      mountEmbed(document);
+      const embed = embedRoot();
+      await flushObserver();
+      dismiss(embed);
+      expect(bars()).toHaveLength(1);
+
+      closeRoot();
+      await flushObserver();
+      dismiss(embed);
+      expect(bars()).toHaveLength(0);
+    });
+
+    it('enhances an unclosed root on DOMContentLoaded', async () => {
+      mountEmbed(document);
+      const embed = embedRoot();
+      await flushObserver();
+
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+      dismiss(embed);
+
+      expect(bars()).toHaveLength(0);
+    });
+
+    it('enhances once when the observer and DOMContentLoaded both fire', async () => {
+      mountEmbed(document);
+      embedRoot().setAttribute(dataAttributeFor(SETTING.backgroundColor), 'nope');
+      closeRoot();
+      await flushObserver();
+
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+      await flushObserver();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops observing after the observer enhances', async () => {
+      const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+      mountEmbed(document);
+      embedRoot();
+      closeRoot();
+      await flushObserver();
+
+      expect(disconnect).toHaveBeenCalled();
+    });
+
+    it('stops observing on DOMContentLoaded', () => {
+      const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+      mountEmbed(document);
+      expect(disconnect).not.toHaveBeenCalled();
+
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+
+      expect(disconnect).toHaveBeenCalled();
+    });
+
+    it('falls back to DOMContentLoaded when MutationObserver is unavailable', async () => {
+      vi.stubGlobal('MutationObserver', undefined);
+      mountEmbed(document);
+      const embed = embedRoot();
+      closeRoot();
+      await flushObserver();
+      dismiss(embed);
+      expect(bars()).toHaveLength(1);
+
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+      dismiss(embed);
+      expect(bars()).toHaveLength(0);
+    });
   });
 });
 

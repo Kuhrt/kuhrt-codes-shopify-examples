@@ -2,7 +2,7 @@
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BUNDLES } from '../scripts/build-widget';
 import { parseConfig } from './config';
@@ -13,6 +13,7 @@ import {
   readBlockSchema,
   renderBlock
 } from './liquid-test-support';
+import { LOG_PREFIX, MOUNTED, mountEmbed } from './mount';
 import { buildBar } from './render';
 import type { RawSettings } from './settings';
 import {
@@ -221,10 +222,37 @@ function invalidSettingsOn(root: Element): string[] {
   return (root.getAttribute(INVALID_ATTRIBUTE) ?? '').split(/\s+/).filter((id) => id !== '');
 }
 
-/** Every setting the embed path reports: what Liquid dropped, plus what `parseConfig` rejects on the rendered root. */
-function embedWarnedSettings(root: Element): Set<string> {
-  const { warnings } = parseConfig(readRawSettings(root));
-  return new Set([...invalidSettingsOn(root), ...warnings.map(({ setting }) => setting)]);
+let warn: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.body.replaceChildren();
+  Reflect.deleteProperty(window, MOUNTED);
+});
+
+function warnedSettingId(call: unknown[]): string {
+  return String(call[0]).slice(LOG_PREFIX.length).trim().split(' ')[0] ?? '';
+}
+
+/** The setting ids, sorted, that the embed warns about when it enhances the rendered block. */
+function embedWarnedSettings(html: string): string[] {
+  const fragment = parseFragment(html);
+  fragment.querySelector('link')?.remove();
+  document.body.replaceChildren(fragment);
+  document.body.appendChild(document.createComment(''));
+  warn.mockClear();
+  mountEmbed(document);
+  return warn.mock.calls.map(warnedSettingId).sort();
+}
+
+function legacyWarnedSettings(input: MerchantInput): string[] {
+  return parseConfig(toLegacyRawSettings(input))
+    .warnings.map(({ setting }) => setting)
+    .sort();
 }
 
 describe('Liquid block and buildBar parity across the case table', () => {
@@ -241,15 +269,15 @@ describe('Liquid block and buildBar parity across the case table', () => {
   it.each(Object.entries(CASES))(
     'round-trips through the embed parser to the same config and warnings for: %s',
     (_name, input) => {
-      const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
-      const legacy = parseConfig(toLegacyRawSettings(input));
+      const html = renderBlock(toLiquidSettings(input));
+      const liquidRoot = findLiquidRoot(html);
 
       expect(liquidRoot).not.toBeNull();
       if (liquidRoot === null) return;
-      expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(legacy.config);
-      expect(embedWarnedSettings(liquidRoot)).toEqual(
-        new Set(legacy.warnings.map(({ setting }) => setting))
+      expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(
+        parseConfig(toLegacyRawSettings(input)).config
       );
+      expect(embedWarnedSettings(html)).toEqual(legacyWarnedSettings(input));
     }
   );
 });
@@ -311,15 +339,16 @@ describe('Liquid block and buildBar parity', () => {
   });
 
   it('renders a link containing Unicode whitespace that only the embed parser rejects', () => {
-    const root = findLiquidRoot(
-      renderBlock(toLiquidSettings({ message: 'Sale', linkUrl: `/a${NON_BREAKING_SPACE}b` }))
+    const html = renderBlock(
+      toLiquidSettings({ message: 'Sale', linkUrl: `/a${NON_BREAKING_SPACE}b` })
     );
+    const root = findLiquidRoot(html);
 
     expect(root).not.toBeNull();
     if (root === null) return;
     expect(root.hasAttribute(INVALID_ATTRIBUTE)).toBe(false);
     expect(parseConfig(readRawSettings(root)).config?.linkUrl).toBeUndefined();
-    expect(embedWarnedSettings(root)).toEqual(new Set([SETTING.linkUrl]));
+    expect(embedWarnedSettings(html)).toEqual([SETTING.linkUrl]);
   });
 
   it.each(BACKSLASH_LINKS)(

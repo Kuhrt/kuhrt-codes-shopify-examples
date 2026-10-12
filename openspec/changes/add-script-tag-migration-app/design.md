@@ -53,7 +53,7 @@ apps/script-tag-migration/
 │   ├── routes/webhooks.app.uninstalled.tsx
 │   ├── services/script-tags.server.ts   listOwnedScriptTags / deleteOwnedScriptTag → Result
 │   └── shopify.server.ts         shopifyApp({ sessionStorage: <Workers adapter>, scopes })
-├── scripts/build-widget.ts      esbuild bundles for both paths + gzip budget
+├── scripts/build-widget.ts      esbuild bundles for both paths + gzip budget and the embed's raw size limit
 ├── scripts/try-legacy-install.ts dev-only: runs legacy/install against kuhrt-codes, prints the response
 ├── e2e/                          Playwright harness: embed page vs legacy page, same scenarios
 ├── shopify.app.toml · wrangler.jsonc · README.md · MIGRATION.md
@@ -297,7 +297,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **No layout shift from the countdown.** The countdown keeps a fixed-width box, `16ch` of tabular numerals that stays hidden rather than collapsed until it is filled. `formatCountdown` zero-pads hours, minutes and seconds, so the text stays inside the box unless the day count needs four or more digits. When the countdown ends with the `message` behavior, its text is cleared rather than the element removed, so the box stays reserved and the message doesn't move.
 - **The theme editor never stores a dismissal.** In the editor, the block marks the root with `data-kc-design-mode`. The widget then uses a dismissal store that neither reads nor writes `localStorage`. Clicking × hides the bar in the preview without hiding it for every later edit.
 - **Loading order.** Shopify injects an embed's `javascript` asset as `<script async>` in `<head>`, so it can run while the page is still parsing.
-  - `mountEmbed` enhances the bar immediately once the root and every child the markup contract expects for its config have been parsed. A dismissed or ended bar is then removed without waiting for `DOMContentLoaded`. Otherwise it waits.
+  - While the page is parsing, `mountEmbed` watches for the bar with a `MutationObserver`. It enhances the bar as soon as the root, every child the markup contract expects for its config, and a node after the root (so the `<aside>` is closed) have been parsed. A dismissed or ended bar is therefore removed before it paints, even when a cached script runs before `<body>` exists. `DOMContentLoaded` is the fallback.
   - The legacy entry always waits, so the embed's markup is in place when the single-instance guard runs.
   - Each path enhances a bar once. `mountEmbed` skips a page that is already mounted.
 - **`datetime` differs by path.** Liquid's `date` filter formats only in the shop's timezone, so the block emits `2026-11-27T00:00:00-0500`, while `buildBar` emits UTC `…Z`. Both are valid HTML global date-times for the same instant. JavaScript reads only `data-kc-ends-at`, and the parity test compares `datetime` as an instant.
@@ -311,7 +311,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **Warnings hold on both paths.** Every rejected setting is listed, space-separated, in `data-kc-invalid` on the root. `mountEmbed` warns once for each, so the spec's "one warning naming the setting" applies to the embed path too. The setting's own `data-kc-*` attribute is omitted rather than carrying the raw value: an all-digit entry such as `123` would otherwise read as a valid epoch.
 - **Known divergences in link checking.** Liquid checks the link's shape, not whether it is a valid URL. Only the merchant can enter a link, so neither direction is a security issue.
   - **Liquid keeps links that `parseConfig` rejects:** a malformed host (`https://[`, `http://a@`), Unicode whitespace, or a C1 control character. The embed renders the link, and `mountEmbed` warns about it.
-  - **Liquid drops links that `parseConfig` accepts:** a backslash anywhere (`/a`), and scheme-relative forms like `https:x.com`.
+  - **Liquid drops links that `parseConfig` accepts:** a backslash anywhere (`/a\b`), and scheme-relative forms like `https:x.com`.
 - **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block emits the `<link>` just before the bar instead, so it should block only the bar. Where it lands in the live page source has not been inspected.
 - **Labels have one source.** `DEFAULT_LABELS` is read from the extension's `locales/en.default.json`, so both paths use the same strings.
 - **Theme Check** runs as part of the app's `lint`, which depends on `build`, so CI enforces it. It is `shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension`, and the deploy build runs the same checks.
