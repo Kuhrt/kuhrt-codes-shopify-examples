@@ -120,9 +120,10 @@ function markersFor(config: BarConfig): string[] {
  * A following node means the parser has closed the root.
  */
 function isRootParsed(root: HTMLElement, config: BarConfig | null): boolean {
-  const hasEveryMarker =
-    !config || markersFor(config).every((marker) => root.querySelector(`[${marker}]`) !== null);
-  return root.nextSibling !== null && hasEveryMarker;
+  if (root.nextSibling === null) return false;
+  return (
+    !config || markersFor(config).every((marker) => root.querySelector(`[${marker}]`) !== null)
+  );
 }
 
 function parseRoot(root: HTMLElement): ParseResult {

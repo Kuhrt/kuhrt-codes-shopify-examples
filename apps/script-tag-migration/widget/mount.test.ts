@@ -452,6 +452,33 @@ describe('mountEmbed', () => {
       expect(bars()).toHaveLength(0);
     });
 
+    it('enhances a root that was present but unclosed at mount once it closes', async () => {
+      createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+      embedRoot(EMBED_CONFIG);
+      mountEmbed(document);
+      expect(bars()).toHaveLength(1);
+
+      closeRoot();
+      await flushObserver();
+
+      expect(bars()).toHaveLength(0);
+    });
+
+    it('enhances a present root once a missing marker arrives', async () => {
+      createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+      const embed = embedRoot(EMBED_CONFIG);
+      const button = embed.querySelector(`[${DISMISS_ATTRIBUTE}]`);
+      button?.remove();
+      closeRoot();
+      mountEmbed(document);
+      expect(bars()).toHaveLength(1);
+
+      if (button) embed.appendChild(button);
+      await flushObserver();
+
+      expect(bars()).toHaveLength(0);
+    });
+
     it('enhances a root that arrives inside an added wrapper element', async () => {
       createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
       mountEmbed(document);

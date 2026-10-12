@@ -2,23 +2,6 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
-    "build:widget": {
-      "inputs": [
-        "widget/**",
-        "!widget/**/*.test.ts",
-        "!widget/test-support.ts",
-        "!widget/liquid-test-support.ts",
-        "!widget/node_modules/**",
-        "scripts/build-widget.ts",
-        "extensions/announcement-bar/locales/**",
-        "package.json",
-        "$TURBO_ROOT$/packages/config/tsconfig.base.json"
-      ],
-      "outputs": [
-        "extensions/announcement-bar/assets/announcement-bar.js",
-        "public/legacy/announcement-bar.js"
-      ]
-    },
     "build": {
       "outputs": [
         "$TURBO_EXTENDS$",
@@ -27,7 +10,7 @@
       ]
     },
     "lint": {
-      "dependsOn": ["$TURBO_EXTENDS$", "build:widget"]
+      "dependsOn": ["$TURBO_EXTENDS$", "build"]
     },
     "dev": {
       "with": ["dev:widget"]
