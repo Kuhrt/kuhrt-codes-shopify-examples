@@ -282,3 +282,20 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - An empty ended message under the `message` behavior falls back to `hide`, with one warning.
 - **Countdown timing.** The countdown reschedules itself on second boundaries relative to the end time, so the ended transition fires on time. The stylesheet (task 3.1) should set `font-variant-numeric: tabular-nums` on the countdown so its width doesn't jitter.
 - **Removing the bar.** Ending with `hide`, dismissing, or a previously dismissed campaign removes the root. Focus moves to `body` (through a temporary `tabindex="-1"`) only when it was inside the bar.
+
+### Delivery bundles and theme extension (tasks 2.5–3.2)
+
+- **Bundles.** `scripts/build-widget.ts` (esbuild, IIFE, ES2020) writes the embed and legacy bundles and fails the build when either exceeds 10 KB gzipped. The first build measured 2.3 KB (embed) and 3.0 KB (legacy). `build` runs it before `react-router build`, because the legacy bundle ships from `public/`. `predev` runs it once, and `turbo run dev` also runs it in watch mode.
+- **Loading order.** Shopify injects an embed's `javascript` asset as `<script async>` in `<head>`, so it can run before the bar markup exists. Both entries wait for `DOMContentLoaded` when the document is still loading. Because the legacy script waits too, the embed's markup is always in place when the single-instance guard runs.
+- **`datetime` differs by path.** Liquid's `date` filter formats only in the shop's timezone, so the block emits `2026-11-27T00:00:00-0500`, while `buildBar` emits UTC `…Z`. Both are valid HTML global date-times for the same instant. JavaScript reads only `data-kc-ends-at`. The parity test compares `datetime` as an instant.
+- **Liquid mirrors two parser fallbacks** so both paths render the same markup:
+  - the `message` behavior with a blank ended message renders as `hide`;
+  - an end time that `date` can't parse (the filter returns the input unchanged) emits no `data-kc-ends-at` and no countdown. The check is that `| plus: 0` round-trips the `'%s'` output.
+- **Settings.** `link_url` is a `url` setting, so Shopify validates it. JavaScript still re-validates every value through `parseConfig`. Colors are `color` settings with no default, and blank means the stylesheet defaults apply.
+- **Theme Check.** `pnpm exec shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension` passes. The deploy build runs the same checks, including the 10 KB JavaScript limit.
+- **To confirm on a real storefront (task 3.3):**
+  - Shopify wraps the embed in its own element. Check that the bar still renders correctly inside it.
+  - A `color` setting is expected to print as `#rrggbb`. A value with alpha would still apply inline, but `parseConfig` would warn and drop it.
+  - The stylesheet is injected as a `<link>` in `<head>`. If it blocks rendering, inline the critical rules.
+- **Gap: the legacy bar has no stylesheet.** `announcement-bar.css` ships only with the embed, so the legacy bundle builds an unstyled bar. Group 4 must serve the same stylesheet next to the legacy script, or have the legacy entry inject it.
+- **Parity test.** `widget/parity.test.ts` renders the block with liquidjs, using stubs for `t` and `date` (in a UTC store timezone) from `widget/liquid-test-support.ts`. It then compares normalized trees with `buildBar` across one table of cases. The widget tsconfig includes Node types so these tests can read the extension files. Node built-in imports in widget source still fail the browser build. The test needs the built embed asset, which turbo's `test` task builds first.

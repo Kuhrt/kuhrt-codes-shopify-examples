@@ -39,7 +39,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - `data-ends-at` produced through the decision 4 conversion.
 
   Write `assets/announcement-bar.css` (fixed to the bottom, honors `prefers-reduced-motion`) and `locales/en.default.json`. Verify: Theme Check passes on the extension, and the embed shows up in the theme editor's App embeds panel on `kuhrt-codes`.
-- [ ] 3.2 Add parity tests (design decision 2). Render the block with liquidjs (Shopify filters stubbed) and `buildBar()` with the same settings; assert the normalized DOM trees match. Assert the `{% schema %}` setting IDs equal the widget constants. Verify: both tests pass, and renaming a data attribute in either file fails them.
+- [x] 3.2 Add parity tests (design decision 2). Render the block with liquidjs (Shopify filters stubbed) and `buildBar()` with the same settings; assert the normalized DOM trees match. Assert the `{% schema %}` setting IDs equal the widget constants. Verify: both tests pass, and renaming a data attribute in either file fails them.
 - [ ] 3.3 Manual check on `kuhrt-codes`. Enable the embed on Horizon (unpublished preview) and on `debut-vintage-theme` (preview), and check the bar, the countdown, editing a setting in the theme editor, and disabling the embed. Verify: record a short checklist result with screenshots in the PR description.
 
 ## 4. Legacy reference path
