@@ -10,3 +10,4 @@ coverage
 worker-configuration.d.ts
 openspec
 .claude
+migrations/meta
