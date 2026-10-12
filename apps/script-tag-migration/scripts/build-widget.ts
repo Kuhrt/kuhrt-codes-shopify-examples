@@ -9,27 +9,40 @@ import { build, context } from 'esbuild';
 export const GZIP_BUDGET_BYTES = 10 * 1024;
 export const RAW_LIMIT_BYTES = 10_000;
 
-export interface Bundle {
-  entry: string;
-  outfile: string;
-}
-
-export interface BundleSize {
-  outfile: string;
-  rawBytes: number;
-  gzipBytes: number;
-}
-
 export interface SizeLimit {
   label: string;
   measure: (size: BundleSize) => number;
   limit: number;
 }
 
-export const SIZE_LIMITS: SizeLimit[] = [
-  { label: 'gzip budget', measure: ({ gzipBytes }) => gzipBytes, limit: GZIP_BUDGET_BYTES },
-  { label: 'raw size limit', measure: ({ rawBytes }) => rawBytes, limit: RAW_LIMIT_BYTES }
-];
+export interface Bundle {
+  entry: string;
+  outfile: string;
+  limits: SizeLimit[];
+}
+
+export interface BundleSize {
+  outfile: string;
+  rawBytes: number;
+  gzipBytes: number;
+  limits: SizeLimit[];
+}
+
+export const GZIP_LIMIT: SizeLimit = {
+  label: 'gzip budget',
+  measure: ({ gzipBytes }) => gzipBytes,
+  limit: GZIP_BUDGET_BYTES
+};
+
+/** Theme Check enforces this only on JavaScript loaded by an app block. */
+export const RAW_LIMIT: SizeLimit = {
+  label: 'raw size limit',
+  measure: ({ rawBytes }) => rawBytes,
+  limit: RAW_LIMIT_BYTES
+};
+
+export const EMBED_LIMITS: SizeLimit[] = [GZIP_LIMIT, RAW_LIMIT];
+export const LEGACY_LIMITS: SizeLimit[] = [GZIP_LIMIT];
 
 function appPath(relative: string): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', relative);
@@ -38,11 +51,13 @@ function appPath(relative: string): string {
 export const BUNDLES: Bundle[] = [
   {
     entry: appPath('widget/entry-embed.ts'),
-    outfile: appPath('extensions/announcement-bar/assets/announcement-bar.js')
+    outfile: appPath('extensions/announcement-bar/assets/announcement-bar.js'),
+    limits: EMBED_LIMITS
   },
   {
     entry: appPath('widget/entry-legacy.ts'),
-    outfile: appPath('public/legacy/announcement-bar.js')
+    outfile: appPath('public/legacy/announcement-bar.js'),
+    limits: LEGACY_LIMITS
   }
 ];
 
@@ -67,17 +82,19 @@ function optionsFor(
 
 /** Raw and gzipped size of each written bundle. */
 export function measureBundles(bundles: Bundle[]): BundleSize[] {
-  return bundles.map(({ outfile }) => {
+  return bundles.map(({ outfile, limits }) => {
     const contents = readFileSync(outfile);
     return {
       outfile,
       rawBytes: contents.byteLength,
-      gzipBytes: gzipSync(contents, { level: 9 }).byteLength
+      gzipBytes: gzipSync(contents, { level: 9 }).byteLength,
+      limits
     };
   });
 }
 
-function describeSizes(sizes: BundleSize[]): string {
+/** One line per bundle with its raw and gzipped size. */
+export function describeSizes(sizes: BundleSize[]): string {
   return sizes
     .map(
       ({ outfile, rawBytes, gzipBytes }) =>
@@ -86,16 +103,16 @@ function describeSizes(sizes: BundleSize[]): string {
     .join('\n');
 }
 
-/** Describes every bundle over any limit, or `undefined` when all are within them. */
-export function budgetFailure(
-  sizes: BundleSize[],
-  limits: SizeLimit[] = SIZE_LIMITS
-): string | undefined {
-  const failures = limits.flatMap(({ label, measure, limit }) => {
-    const over = sizes.filter((size) => measure(size) > limit);
-    if (over.length === 0) return [];
-    return [`Widget bundle exceeds the ${limit} byte ${label}:\n${describeSizes(over)}`];
-  });
+/** Describes every bundle over any of its own limits, or `undefined` when all are within them. */
+export function budgetFailure(sizes: BundleSize[]): string | undefined {
+  const failures = sizes.flatMap((size) =>
+    size.limits
+      .filter(({ measure, limit }) => measure(size) > limit)
+      .map(
+        ({ label, measure, limit }) =>
+          `Widget bundle exceeds the ${limit} byte ${label}: ${size.outfile} is ${measure(size)} bytes`
+      )
+  );
   return failures.length === 0 ? undefined : failures.join('\n');
 }
 

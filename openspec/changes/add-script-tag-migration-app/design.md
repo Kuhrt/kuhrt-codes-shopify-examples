@@ -157,8 +157,8 @@ apps/script-tag-migration/
   - If only a KV adapter is officially maintained, use KV and accept KV's eventual consistency, because a just-written session can briefly read as missing. Mitigate this with the adapter's own guidance, and record the choice here.
   - Remove Prisma entirely.
 - **Deploy:** two manual commands, documented in the README:
-  - `wrangler deploy`, for the app server and the legacy asset;
-  - `shopify app deploy`, for the app config and theme extension.
+  - `pnpm build && pnpm exec wrangler deploy`, for the app server and the legacy asset;
+  - `pnpm run app:deploy`, for the app config and theme extension. It builds the widget first. Plain `shopify app deploy` would ship a missing or stale bundle, and `pnpm deploy` is pnpm's own command.
   - Secrets (`SHOPIFY_API_SECRET`) live in `wrangler secret`, and locally in `.dev.vars`.
   - **Alternative considered:** SST, as the website uses. One Worker and one D1 database don't justify it. Plain `wrangler.jsonc` is easier for a reviewer to read. Rejected.
 - **Local dev:** `shopify.web.toml` runs the Vite dev server with the Cloudflare plugin (workerd locally). The Shopify CLI tunnels it as usual.
@@ -173,7 +173,7 @@ apps/script-tag-migration/
 | Parity | Vitest + liquidjs | Liquid-rendered markup ≡ `buildBar()` markup for the same settings; the `{% schema %}` setting IDs ≡ the widget's setting-name constants |
 | Route | Vitest | Console loader and action with a mocked admin client: list, empty, query failure, gated delete, forged ID, delete user error; the uninstall webhook deletes sessions |
 | E2E | Playwright + axe | A local harness with two pages: the Liquid-rendered embed, and a page loading the legacy bundle through its query string. Both run the same scenario suite with `page.clock`: countdown, ended, dismiss persistence, storage blocked, JavaScript disabled (embed only), the double-load page, and axe |
-| Budget | build step | gzip size of the embed JS ≤ 10 KB, or the build fails |
+| Budget | build step | each bundle ≤ 10 KB gzipped, and the embed bundle ≤ 10,000 bytes raw (Theme Check's limit), or the build fails |
 | Theme | Theme Check | `extensions/announcement-bar` lints clean |
 | Manual | checklist in tasks | Horizon on `kuhrt-codes-demo`, `debut-vintage-theme` on `kuhrt-codes`, the theme editor deep link, the console on a real install |
 
@@ -192,8 +192,8 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 1. Develop entirely against `kuhrt-codes`.
 2. Once acceptance is checked there:
-   - `wrangler deploy`;
-   - `shopify app deploy`;
+   - `pnpm build && pnpm exec wrangler deploy`;
+   - `pnpm run app:deploy`;
    - install on `kuhrt-codes-demo`;
    - enable the embed on Horizon.
 3. Record the README GIF on `kuhrt-codes-demo`.
@@ -288,13 +288,14 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 ### Delivery bundles and theme extension (tasks 2.5–3.3)
 
-- **Bundles.** `scripts/build-widget.ts` (esbuild, IIFE, ES2020) writes the embed and legacy bundles. The build fails when either goes over 10 KB gzipped, which is the spec's budget, or over 10,000 bytes raw, which is Theme Check's `AssetSizeAppBlockJavaScript` limit. Both are about 6–7 KB raw and 3 KB gzipped. The script runs as part of:
+- **Bundles.** `scripts/build-widget.ts` (esbuild, IIFE, ES2020) writes the embed and legacy bundles. The build fails when either goes over 10 KB gzipped, which is the spec's budget. It also fails when the embed bundle goes over 10,000 bytes raw, which is Theme Check's `AssetSizeAppBlockJavaScript` limit for app-block JavaScript. The embed bundle is about 6 KB raw and the legacy bundle about 7.5 KB; both are about 3 KB gzipped. The script runs as part of:
   - `build`, before `react-router build`, because the legacy bundle ships from `public/`;
-  - `deploy`, so the extension never ships a stale bundle;
+  - `app:deploy`, so the extension never ships a stale bundle;
   - `predev`, once.
 
   `turbo run dev` also runs it in watch mode. Under turbo, the `predev` build and the first watch build write the same files. That is redundant but harmless, and it is the only build when `pnpm dev` runs in the app directly.
-- **No layout shift from the countdown.** The countdown keeps a fixed-width box, `16ch` of tabular numerals that stays hidden rather than collapsed until it is filled. `formatCountdown` zero-pads hours, minutes and seconds, so the width changes only when the day count gains or loses a digit.
+- **No layout shift from the countdown.** The countdown keeps a fixed-width box, `16ch` of tabular numerals that stays hidden rather than collapsed until it is filled. `formatCountdown` zero-pads hours, minutes and seconds, so the text stays inside the box unless the day count needs four or more digits. When the countdown ends with the `message` behavior, its text is cleared rather than the element removed, so the box stays reserved and the message doesn't move.
+- **The theme editor never stores a dismissal.** In the editor, the block marks the root with `data-kc-design-mode`. The widget then uses a dismissal store that neither reads nor writes `localStorage`. Clicking × hides the bar in the preview without hiding it for every later edit.
 - **Loading order.** Shopify injects an embed's `javascript` asset as `<script async>` in `<head>`, so it can run while the page is still parsing.
   - `mountEmbed` enhances the bar immediately once the root and every child the markup contract expects for its config have been parsed. A dismissed or ended bar is then removed without waiting for `DOMContentLoaded`. Otherwise it waits.
   - The legacy entry always waits, so the embed's markup is in place when the single-instance guard runs.

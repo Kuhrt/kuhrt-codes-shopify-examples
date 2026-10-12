@@ -91,6 +91,7 @@
     {%- if background_color != blank %} data-kc-background-color="{{ background_color | escape }}"{% endif %}
     {%- if text_color != blank %} data-kc-text-color="{{ text_color | escape }}"{% endif %}
     {%- if invalid_settings != blank %} data-kc-invalid="{{ invalid_settings }}"{% endif %}
+    {%- if request.design_mode %} data-kc-design-mode{% endif %}
     {%- if background_color != blank or text_color != blank %}
       style="
         {%- if background_color != blank %}--kc-bar-background: {{ background_color | escape }};{% endif %}

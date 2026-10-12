@@ -1,10 +1,12 @@
 import type { BarConfig, ConfigWarning, ParseResult } from './config';
 import { parseConfig } from './config';
+import { createEphemeralDismissalStore } from './dismissal';
 import { enhance } from './enhance';
 import { buildBar } from './render';
 import type { RawSettings, SettingName } from './settings';
 import {
   COUNTDOWN_ATTRIBUTE,
+  DESIGN_MODE_ATTRIBUTE,
   DISMISS_ATTRIBUTE,
   INVALID_ATTRIBUTE,
   MESSAGE_ATTRIBUTE,
@@ -99,19 +101,25 @@ function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
 
 function mountBar(doc: Document, root: HTMLElement, config: BarConfig): void {
   markMounted(doc);
-  enhance(root, config);
+  const store = root.hasAttribute(DESIGN_MODE_ATTRIBUTE)
+    ? createEphemeralDismissalStore()
+    : undefined;
+  enhance(root, config, { store });
 }
 
-/** The attribute of the last child the markup carries for `config`, in markup order. */
-function lastMarkerFor(config: BarConfig): string {
-  if (config.dismissible) return DISMISS_ATTRIBUTE;
-  if (config.endsAtMs !== undefined) return COUNTDOWN_ATTRIBUTE;
-  return MESSAGE_ATTRIBUTE;
+/** The attributes of every child the markup carries for `config`. */
+function markersFor(config: BarConfig): string[] {
+  const markers = [MESSAGE_ATTRIBUTE];
+  if (config.endsAtMs !== undefined) markers.push(COUNTDOWN_ATTRIBUTE);
+  if (config.dismissible) markers.push(DISMISS_ATTRIBUTE);
+  return markers;
 }
 
-/** Whether the parser is past every element the config expects, so enhancing now can't miss one. */
+/** Whether the parser has produced every element the config expects, so enhancing now can't miss one. */
 function isRootComplete(root: HTMLElement, config: BarConfig | null): boolean {
-  return !config || root.querySelector(`[${lastMarkerFor(config)}]`) !== null;
+  return (
+    !config || markersFor(config).every((marker) => root.querySelector(`[${marker}]`) !== null)
+  );
 }
 
 function parseRoot(root: HTMLElement): ParseResult {

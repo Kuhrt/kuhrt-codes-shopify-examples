@@ -1,19 +1,25 @@
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Bundle } from './build-widget';
+import type { Bundle, SizeLimit } from './build-widget';
 import {
   budgetFailure,
   buildBundles,
   BUNDLES,
+  describeSizes,
+  EMBED_LIMITS,
   GZIP_BUDGET_BYTES,
+  GZIP_LIMIT,
   isEntryPoint,
+  LEGACY_LIMITS,
   main,
+  measureBundles,
+  RAW_LIMIT,
   RAW_LIMIT_BYTES,
   run,
   watchBundles
@@ -39,10 +45,10 @@ afterEach(() => {
 });
 
 function inOutDir(bundle: Bundle, name: string): Bundle {
-  return { entry: bundle.entry, outfile: join(outDir, name) };
+  return { ...bundle, outfile: join(outDir, name) };
 }
 
-function entryWithFiller(name: string, filler: string): Bundle {
+function entryWithFiller(name: string, filler: string, limits: SizeLimit[]): Bundle {
   const entry = join(outDir, `${name}-entry.ts`);
   writeFileSync(
     entry,
@@ -51,17 +57,21 @@ export const filler = ${JSON.stringify(filler)};
 console.log(filler);
 `
   );
-  return { entry, outfile: join(outDir, `${name}.js`) };
+  return { entry, outfile: join(outDir, `${name}.js`), limits };
 }
 
 /** Incompressible filler, so the bundle is over both the gzip budget and the raw limit. */
-function oversizedEntry(): Bundle {
-  return entryWithFiller('oversized', randomBytes(GZIP_BUDGET_BYTES * 2).toString('base64'));
+function oversizedEntry(limits: SizeLimit[] = EMBED_LIMITS): Bundle {
+  return entryWithFiller(
+    'oversized',
+    randomBytes(GZIP_BUDGET_BYTES * 2).toString('base64'),
+    limits
+  );
 }
 
 /** Highly compressible filler, so the bundle is within the gzip budget but over the raw limit. */
-function compressibleEntry(): Bundle {
-  return entryWithFiller('compressible', 'a'.repeat(RAW_LIMIT_BYTES * 2));
+function compressibleEntry(limits: SizeLimit[] = EMBED_LIMITS): Bundle {
+  return entryWithFiller('compressible', 'a'.repeat(RAW_LIMIT_BYTES * 2), limits);
 }
 
 describe('widget bundles', () => {
@@ -81,40 +91,65 @@ describe('widget bundles', () => {
     expect(size?.gzipBytes).toBeLessThan(size?.rawBytes ?? 0);
   });
 
-  it('fail both limits when an entry pulls in an oversized import', async () => {
-    const oversized = oversizedEntry();
+  it('fail both limits when an embed entry pulls in an oversized import', async () => {
+    const oversized = oversizedEntry(EMBED_LIMITS);
     const sizes = await buildBundles([oversized]);
 
     const failure = budgetFailure(sizes);
     expect(failure).toContain(oversized.outfile);
-    expect(failure).toContain('gzip budget');
-    expect(failure).toContain('raw size limit');
+    expect(failure).toContain(GZIP_LIMIT.label);
+    expect(failure).toContain(RAW_LIMIT.label);
   });
 
-  it('fail only the raw limit when a bundle compresses under the gzip budget', async () => {
-    const compressible = compressibleEntry();
+  it('fail the embed bundle on the raw limit alone when it compresses under the gzip budget', async () => {
+    const compressible = compressibleEntry(EMBED_LIMITS);
     const sizes = await buildBundles([compressible]);
 
     const failure = budgetFailure(sizes);
     expect(sizes[0]?.gzipBytes).toBeLessThanOrEqual(GZIP_BUDGET_BYTES);
     expect(failure).toContain(compressible.outfile);
-    expect(failure).toContain('raw size limit');
-    expect(failure).not.toContain('gzip budget');
+    expect(failure).toContain(RAW_LIMIT.label);
+    expect(failure).not.toContain(GZIP_LIMIT.label);
   });
 
-  it('report only the bundles over a given limit', () => {
+  it('pass the legacy bundle over the raw limit when it is within the gzip budget', async () => {
+    const sizes = await buildBundles([compressibleEntry(LEGACY_LIMITS)]);
+
+    expect(sizes[0]?.rawBytes).toBeGreaterThan(RAW_LIMIT_BYTES);
+    expect(sizes[0]?.gzipBytes).toBeLessThanOrEqual(GZIP_BUDGET_BYTES);
+    expect(budgetFailure(sizes)).toBeUndefined();
+  });
+
+  it('still fail the legacy bundle over the gzip budget', async () => {
+    const oversized = oversizedEntry(LEGACY_LIMITS);
+
+    const failure = budgetFailure(await buildBundles([oversized]));
+
+    expect(failure).toContain(oversized.outfile);
+    expect(failure).toContain(GZIP_LIMIT.label);
+    expect(failure).not.toContain(RAW_LIMIT.label);
+  });
+
+  it('limit the embed bundle on gzip and raw size and the legacy bundle on gzip only', () => {
+    const limitsByEntry = BUNDLES.map(({ entry, limits }) => [basename(entry), limits]);
+
+    expect(limitsByEntry).toEqual([
+      ['entry-embed.ts', EMBED_LIMITS],
+      ['entry-legacy.ts', LEGACY_LIMITS]
+    ]);
+  });
+
+  it('report only the bundles over a limit', () => {
+    const limits: SizeLimit[] = [{ ...RAW_LIMIT, limit: 50 }];
     const sizes = [
-      { outfile: 'small.js', rawBytes: 10, gzipBytes: 10 },
-      { outfile: 'large.js', rawBytes: 100, gzipBytes: 100 }
-    ];
-    const limitOf = (limit: number) => [
-      { label: 'raw size limit', measure: ({ rawBytes }: { rawBytes: number }) => rawBytes, limit }
+      { outfile: 'small.js', rawBytes: 10, gzipBytes: 10, limits },
+      { outfile: 'large.js', rawBytes: 100, gzipBytes: 100, limits }
     ];
 
-    const failure = budgetFailure(sizes, limitOf(50));
+    const failure = budgetFailure(sizes);
     expect(failure).toContain('large.js');
     expect(failure).not.toContain('small.js');
-    expect(budgetFailure(sizes, limitOf(100))).toBeUndefined();
+    expect(budgetFailure(sizes.slice(0, 1))).toBeUndefined();
   });
 });
 
@@ -125,17 +160,13 @@ describe('main', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
-  it('reports the raw and gzipped sizes of the bundles it built', async () => {
+  it('reports the sizes of the bundles it built', async () => {
     const bundle = inOutDir(BUNDLES[0] as Bundle, 'reported.js');
 
     await main([], [bundle]);
 
-    const [size] = await buildBundles([bundle]);
     expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining(`${size?.rawBytes} bytes raw`)
-    );
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining(`${size?.gzipBytes} bytes gzipped`)
+      expect.stringContaining(describeSizes(measureBundles([bundle])))
     );
   });
 
@@ -156,7 +187,7 @@ describe('run', () => {
   function brokenEntry(): Bundle {
     const entry = join(outDir, 'broken-entry.ts');
     writeFileSync(entry, 'export const = ;');
-    return { entry, outfile: join(outDir, 'broken.js') };
+    return { entry, outfile: join(outDir, 'broken.js'), limits: EMBED_LIMITS };
   }
 
   it('fails the process and reports a summary when a build has errors', async () => {

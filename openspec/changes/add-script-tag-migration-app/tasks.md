@@ -96,7 +96,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 ## 9. Acceptance on the demo store
 
 - [ ] 9.1 Confirm in the Partner Dashboard that the app can be installed on both `kuhrt-codes` and `kuhrt-codes-demo` (distribution setting), and pick the Worker hostname (design.md, Open Questions). Verify: the setting and hostname are recorded in design.md.
-- [ ] 9.2 Deploy with `wrangler deploy` and `shopify app deploy`. Install on `kuhrt-codes-demo`, enable the embed on Horizon, and configure a realistic campaign. Verify:
+- [ ] 9.2 Deploy with `pnpm build && pnpm exec wrangler deploy` and `pnpm run app:deploy`, which builds the widget first. Install on `kuhrt-codes-demo`, enable the embed on Horizon, and configure a realistic campaign. Verify:
   - the spec acceptance holds: the bar works and its settings are editable in the theme editor;
   - the console shows the embed active and no legacy tags;
   - Lighthouse shows no CLS from the bar.

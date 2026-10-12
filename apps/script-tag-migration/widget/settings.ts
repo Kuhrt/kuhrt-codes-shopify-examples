@@ -30,6 +30,10 @@ export const BACKGROUND_PROPERTY = '--kc-bar-background';
 export const TEXT_PROPERTY = '--kc-bar-color';
 
 export const INVALID_ATTRIBUTE = 'data-kc-invalid';
+export const DESIGN_MODE_ATTRIBUTE = 'data-kc-design-mode';
+
+/** Root attributes only the embed's markup carries, so the legacy bar never has them. */
+export const EMBED_ONLY_ATTRIBUTES: readonly string[] = [INVALID_ATTRIBUTE, DESIGN_MODE_ATTRIBUTE];
 
 export const DEFAULT_LABELS = labels.announcement_bar;
 

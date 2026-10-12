@@ -17,6 +17,8 @@ import { buildBar } from './render';
 import type { RawSettings } from './settings';
 import {
   dataAttributeFor,
+  DESIGN_MODE_ATTRIBUTE,
+  EMBED_ONLY_ATTRIBUTES,
   ENDED_BEHAVIOR,
   INVALID_ATTRIBUTE,
   readRawSettings,
@@ -190,7 +192,7 @@ function normalizeText(text: string): string {
 function normalize(element: Element): NormalizedElement {
   const attributes: NormalizedElement['attributes'] = {};
   for (const { name, value } of Array.from(element.attributes)) {
-    if (name === INVALID_ATTRIBUTE) continue;
+    if (EMBED_ONLY_ATTRIBUTES.includes(name)) continue;
     attributes[name] = normalizeAttribute(name, value);
   }
   const children: NormalizedElement['children'] = [];
@@ -334,6 +336,17 @@ describe('Liquid block and buildBar parity', () => {
       );
     }
   );
+
+  it('marks the root in the theme editor only', () => {
+    const settings = toLiquidSettings({ message: 'Sale' });
+
+    expect(
+      findLiquidRoot(renderBlock(settings, { designMode: true }))?.hasAttribute(
+        DESIGN_MODE_ATTRIBUTE
+      )
+    ).toBe(true);
+    expect(findLiquidRoot(renderBlock(settings))?.hasAttribute(DESIGN_MODE_ATTRIBUTE)).toBe(false);
+  });
 
   it('loads the stylesheet before the bar', () => {
     const fragment = parseFragment(renderBlock(toLiquidSettings({ message: 'Sale' })));

@@ -6,7 +6,9 @@ import { campaignKey, createDismissalStore } from './dismissal';
 import { MOUNTED, mountEmbed, mountLegacy } from './mount';
 import { buildBar } from './render';
 import {
+  COUNTDOWN_ATTRIBUTE,
   dataAttributeFor,
+  DESIGN_MODE_ATTRIBUTE,
   DISMISS_ATTRIBUTE,
   ENDED_ATTRIBUTE,
   ENDED_BEHAVIOR,
@@ -315,6 +317,29 @@ describe('mountEmbed', () => {
     expect(vi.getTimerCount()).toBe(1);
   });
 
+  it('waits for DOMContentLoaded when the dismiss button is parsed but the countdown is not', () => {
+    const embed = embedRoot({ endsAtMs: FAR_FUTURE_MS });
+    embed.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.remove();
+    setReadyState('loading');
+    vi.useFakeTimers();
+
+    mountEmbed(document);
+    expect(vi.getTimerCount()).toBe(0);
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('enhances at once a root that has all of its markers while the document is loading', () => {
+    embedRoot({ endsAtMs: FAR_FUTURE_MS });
+    setReadyState('loading');
+    vi.useFakeTimers();
+
+    mountEmbed(document);
+
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
   it('waits for DOMContentLoaded when no root exists yet', () => {
     setReadyState('loading');
 
@@ -383,5 +408,38 @@ describe('mountEmbed', () => {
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warningText(0)).toContain(SETTING.linkUrl);
     expect(warningText(1)).toContain(SETTING.endsAt);
+  });
+});
+
+describe('mountEmbed in the theme editor', () => {
+  function designModeRoot(overrides: Partial<BarConfig> = {}): HTMLElement {
+    const embed = embedRoot(overrides);
+    embed.setAttribute(DESIGN_MODE_ATTRIBUTE, '');
+    return embed;
+  }
+
+  it('keeps the bar when a dismissal was stored earlier', () => {
+    const config: BarConfig = {
+      message: 'Embedded',
+      ended: { behavior: ENDED_BEHAVIOR.hide },
+      dismissible: true
+    };
+    createDismissalStore().dismiss(campaignKey(config));
+    designModeRoot(config);
+
+    mountEmbed(document);
+
+    expect(bars()).toHaveLength(1);
+  });
+
+  it('removes the bar on dismiss without writing to storage', () => {
+    const embed = designModeRoot();
+    const write = vi.spyOn(localStorage, 'setItem');
+
+    mountEmbed(document);
+    dismiss(embed);
+
+    expect(bars()).toHaveLength(0);
+    expect(write).not.toHaveBeenCalled();
   });
 });

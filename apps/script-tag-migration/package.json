@@ -8,7 +8,7 @@
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
-    "deploy": "pnpm build:widget && shopify app deploy",
+    "app:deploy": "pnpm build:widget && shopify app deploy",
     "config:use": "shopify app config use",
     "env": "shopify app env",
     "lint": "eslint . && shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension --fail-level info",

@@ -137,6 +137,9 @@ function createEngine(): Liquid {
   return engine;
 }
 
-export function renderBlock(settings: BlockSettings): string {
-  return createEngine().parseAndRenderSync(readBlockSource(), { block: { settings } });
+export function renderBlock(settings: BlockSettings, { designMode = false } = {}): string {
+  return createEngine().parseAndRenderSync(readBlockSource(), {
+    block: { settings },
+    request: { design_mode: designMode }
+  });
 }
