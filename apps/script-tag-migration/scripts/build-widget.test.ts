@@ -13,7 +13,8 @@ import {
   BUNDLES,
   GZIP_BUDGET_BYTES,
   isEntryPoint,
-  main
+  main,
+  run
 } from './build-widget';
 
 const MOUNT_MODULE = fileURLToPath(new URL('../widget/mount.ts', import.meta.url));
@@ -97,6 +98,41 @@ describe('main', () => {
     await main([], [oversizedEntry()]);
 
     expect(process.exitCode).toBe(1);
+  });
+});
+
+describe('run', () => {
+  let exitCode: typeof process.exitCode;
+
+  beforeEach(() => {
+    exitCode = process.exitCode;
+    process.exitCode = undefined;
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.exitCode = exitCode;
+    vi.restoreAllMocks();
+  });
+
+  function brokenEntry(): Bundle {
+    const entry = join(outDir, 'broken-entry.ts');
+    writeFileSync(entry, 'export const = ;');
+    return { entry, outfile: join(outDir, 'broken.js') };
+  }
+
+  it('fails the process and reports a summary when a build has errors', async () => {
+    await run([], [brokenEntry()]);
+
+    expect(process.exitCode).toBe(1);
+    expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the exit code alone when every bundle is within budget', async () => {
+    await run([], [inOutDir(BUNDLES[0] as Bundle, 'within-budget.js')]);
+
+    expect(process.exitCode).toBeUndefined();
   });
 });
 

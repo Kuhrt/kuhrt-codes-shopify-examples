@@ -1,4 +1,4 @@
-import type { BarConfig, ConfigWarning } from './config';
+import type { BarConfig, ConfigWarning, ParseResult } from './config';
 import { parseConfig } from './config';
 import { enhance } from './enhance';
 import { buildBar } from './render';
@@ -102,17 +102,17 @@ function lastMarkerFor(config: BarConfig): string {
 }
 
 /** Whether the parser is past every element the config expects, so enhancing now can't miss one. */
-function isRootComplete(root: HTMLElement): boolean {
-  const { config } = parseConfig(readRawSettings(root));
+function isRootComplete(root: HTMLElement, config: BarConfig | null): boolean {
   return !config || root.querySelector(`[${lastMarkerFor(config)}]`) !== null;
 }
 
-function enhanceEmbed(doc: Document): void {
+function parseRoot(root: HTMLElement): ParseResult {
+  return parseConfig(readRawSettings(root));
+}
+
+function enhanceRoot(doc: Document, root: HTMLElement, { config, warnings }: ParseResult): void {
   if (isMounted(doc)) return;
-  const root = findRoot(doc);
-  if (!root) return;
   markMounted(doc);
-  const { config, warnings } = parseConfig(readRawSettings(root));
   reportInvalidSettings(root);
   reportWarnings(warnings);
   if (!config) {
@@ -123,6 +123,11 @@ function enhanceEmbed(doc: Document): void {
   enhance(root, config);
 }
 
+function enhanceEmbed(doc: Document): void {
+  const root = findRoot(doc);
+  if (root) enhanceRoot(doc, root, parseRoot(root));
+}
+
 /**
  * Enhances the server-rendered bar, once per page. Does nothing when the page has none.
  * While the document loads, a bar whose markup is already complete is enhanced at once
@@ -130,11 +135,9 @@ function enhanceEmbed(doc: Document): void {
  */
 export function mountEmbed(doc: Document): void {
   const root = findRoot(doc);
-  if (doc.readyState === 'loading' && !(root && isRootComplete(root))) {
-    doc.addEventListener('DOMContentLoaded', () => enhanceEmbed(doc), { once: true });
-    return;
-  }
-  enhanceEmbed(doc);
+  const parsed = root && parseRoot(root);
+  if (root && parsed && isRootComplete(root, parsed.config)) enhanceRoot(doc, root, parsed);
+  else whenDomReady(doc, () => enhanceEmbed(doc));
 }
 
 /**

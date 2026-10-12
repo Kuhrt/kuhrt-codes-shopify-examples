@@ -2,11 +2,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BarConfig } from './config';
+import { campaignKey, createDismissalStore } from './dismissal';
 import { MOUNTED, mountEmbed, mountLegacy } from './mount';
 import { buildBar } from './render';
 import {
   dataAttributeFor,
   DISMISS_ATTRIBUTE,
+  ENDED_ATTRIBUTE,
   ENDED_BEHAVIOR,
   INVALID_ATTRIBUTE,
   ROOT_ATTRIBUTE,
@@ -21,6 +23,7 @@ function legacySrc(params: Record<string, string>): string {
 }
 
 const FAR_FUTURE_MS = Date.UTC(2999, 0, 1);
+const PAST_MS = 1000;
 
 function embedRoot(overrides: Partial<BarConfig> = {}): HTMLElement {
   const root = buildBar({
@@ -233,6 +236,52 @@ describe('mountEmbed', () => {
     mountEmbed(document);
 
     dismiss(embed);
+    expect(bars()).toHaveLength(0);
+  });
+
+  it('removes a previously dismissed bar at once while the document is loading', () => {
+    const config: BarConfig = {
+      message: 'Embedded',
+      ended: { behavior: ENDED_BEHAVIOR.hide },
+      dismissible: true
+    };
+    createDismissalStore().dismiss(campaignKey(config));
+    embedRoot(config);
+    setReadyState('loading');
+
+    mountEmbed(document);
+
+    expect(bars()).toHaveLength(0);
+  });
+
+  it('removes an ended bar at once while the document is loading when it hides on end', () => {
+    embedRoot({ endsAtMs: PAST_MS, ended: { behavior: ENDED_BEHAVIOR.hide } });
+    setReadyState('loading');
+
+    mountEmbed(document);
+
+    expect(bars()).toHaveLength(0);
+  });
+
+  it('marks an ended bar at once while the document is loading when it shows a message', () => {
+    const embed = embedRoot({
+      endsAtMs: PAST_MS,
+      ended: { behavior: ENDED_BEHAVIOR.message, message: 'Over' }
+    });
+    setReadyState('loading');
+
+    mountEmbed(document);
+
+    expect(embed.hasAttribute(ENDED_ATTRIBUTE)).toBe(true);
+  });
+
+  it('removes a bar whose message is only whitespace at once while the document is loading', () => {
+    const embed = embedRoot();
+    embed.setAttribute(dataAttributeFor(SETTING.message), NON_BREAKING_SPACE);
+    setReadyState('loading');
+
+    mountEmbed(document);
+
     expect(bars()).toHaveLength(0);
   });
 

@@ -85,7 +85,7 @@ apps/script-tag-migration/
 
 ### 2. The embed renders markup in Liquid; JavaScript only enhances
 
-- The Liquid block renders the full bar (message, link, `<time datetime>`, dismiss button) into the first HTML response. `entry-embed.ts` adds the ticking countdown and dismissal.
+- The Liquid block renders the full bar (message, link, `<time datetime>`, dismiss button) into the first HTML response. `mountEmbed` (loaded by `entry-embed.ts`) adds the ticking countdown and dismissal.
 - This is the main technical upgrade over a script tag. The bar exists before JavaScript runs, so it works without JavaScript and doesn't pop in late. It is also a talking point for `MIGRATION.md`.
 - **Cost:** the markup exists twice, in `announcement-bar.liquid` and in `render.ts` (legacy). A **parity test** renders the Liquid block with `liquidjs` (with Shopify filters stubbed) and the TS `buildBar()` with the same settings. It compares their normalized DOM structure (roles, data attributes, element tree). That makes drift a test failure instead of a code-review job.
 - **Alternative considered:** JavaScript renders in both paths, and Liquid emits only a config `<script type="application/json">`. That is DRY by construction, but it throws away server rendering, which is the best argument for the embed. Rejected.
@@ -115,7 +115,7 @@ apps/script-tag-migration/
 
 ### 6. Single-instance guard: the embed wins
 
-- Both roots carry `data-kc-announcement-bar`. `entry-legacy.ts` exits, with one `console.warn`, if that element already exists or if a `window`-scoped "mounted" symbol is set.
+- Both roots carry `data-kc-announcement-bar`. `mountLegacy` (loaded by `entry-legacy.ts`) exits, with one `console.warn`, if that element already exists or if a `window`-scoped "mounted" symbol is set.
 - Because the embed's markup is server-rendered, it always exists before the deferred legacy script runs, so "embed wins" holds without any race.
 - **Alternative considered:** no guard. It's the typical real-world bug, but the guard *is* the migration-safety lesson. Keep it.
 
@@ -300,14 +300,16 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - Each path enhances a bar once. `mountEmbed` skips a page that is already mounted.
 - **`datetime` differs by path.** Liquid's `date` filter formats only in the shop's timezone, so the block emits `2026-11-27T00:00:00-0500`, while `buildBar` emits UTC `…Z`. Both are valid HTML global date-times for the same instant. JavaScript reads only `data-kc-ends-at`, and the parity test compares `datetime` as an instant.
 - **The block renders only valid values.** `enhance()` never touches the link or the inline style, so Liquid has to drop invalid values itself. It mirrors `parseConfig`'s rules:
-  - **link:** `http(s)://` with a host, or a single leading `/`. It must contain no space, backslash, DEL or C0 control character, which is checked through `url_encode`.
-  - **end time:** exactly `YYYY-MM-DD HH:MM`, as the help text says, converted with `date: '%s'`. A result that doesn't round-trip through `plus: 0`, or that is negative, is rejected. Shopify's `date` is lenient and would otherwise accept `Nov 27` or a trailing zone name silently.
+  - **link:** `http(s)://` followed by a host character other than `/`, `?`, `#` or `:`, or a single leading `/`. It must contain no space, backslash, DEL or C0 control character, which is checked through `url_encode`.
+  - **end time:** converted with `date: '%s'`, then formatted back with `date: '%Y-%m-%d %H:%M'`. It is rejected unless the result is a non-negative number and the round trip reproduces the input exactly. That one check enforces the help-text format. It also rejects impossible dates that `date` would roll over (`2026-02-30` becoming 2 March), lenient input such as `Nov 27`, and local times inside a spring-forward gap.
   - **colors:** `#` followed by 3 or 6 characters, and escaped. Shopify's picker emits only lowercase hex, so the hex digits themselves aren't checked.
   - **ended message:** the `message` behavior with a blank ended message renders as `hide`.
 
   Each check is inlined. Shopify wraps rendered app snippet output in `<!-- BEGIN app snippet -->` comments, so a captured snippet can't return a value. A shared color snippet broke both colors on `kuhrt-codes`.
 - **Warnings hold on both paths.** Every rejected setting is listed, space-separated, in `data-kc-invalid` on the root. `mountEmbed` warns once for each, so the spec's "one warning naming the setting" applies to the embed path too. The setting's own `data-kc-*` attribute is omitted rather than carrying the raw value: an all-digit entry such as `123` would otherwise read as a valid epoch.
-- **Known divergence.** Liquid can't detect Unicode whitespace in a link (for example U+00A0). `parseConfig` rejects such a link, but the embed still renders it. Only the merchant can enter it, and a browser keeps it inside the URL rather than stripping it.
+- **Known divergences in link checking.** Only the merchant can enter a link, so neither divergence is a security issue.
+  - Liquid can't detect Unicode whitespace in a link, for example U+00A0. `parseConfig` rejects such a link, but the embed still renders it. A browser keeps the character inside the URL rather than stripping it.
+  - Liquid rejects a backslash anywhere in a link. `parseConfig` rejects one only where it would change the origin. So the embed is stricter for a link like `/a`.
 - **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block emits the `<link>` just before the bar instead, so it should block only the bar. Where it lands in the live page source has not been inspected.
 - **Labels have one source.** `DEFAULT_LABELS` is read from the extension's `locales/en.default.json`, so both paths use the same strings.
 - **Theme Check.** `pnpm exec shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension` passes. The deploy build runs the same checks, including the 10 KB JavaScript limit.

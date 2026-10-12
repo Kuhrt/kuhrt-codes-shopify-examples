@@ -11,19 +11,23 @@
     assign link_http = link_url | slice: 0, 7 | downcase
     assign link_lead = link_url | slice: 0, 2
     assign link_first = link_lead | slice: 0
-    assign link_size = link_url | size
+    assign link_host_first = ''
+    if link_https == 'https://'
+      assign link_host_first = link_url | slice: 8
+    elsif link_http == 'http://'
+      assign link_host_first = link_url | slice: 7
+    endif
     assign link_allowed = false
-    if link_https == 'https://' and link_size > 8
+    if link_host_first != blank
       assign link_allowed = true
-    elsif link_http == 'http://' and link_size > 7
-      assign link_allowed = true
+      if link_host_first == '/' or link_host_first == '?' or link_host_first == '#' or link_host_first == ':'
+        assign link_allowed = false
+      endif
     elsif link_first == '/' and link_lead != '//'
       assign link_allowed = true
     endif
     assign link_encoded = link_url | url_encode
-    if link_encoded contains '+' or link_encoded contains '%20' or link_encoded contains '%5C'
-      assign link_allowed = false
-    elsif link_encoded contains '%7F'
+    if link_encoded contains '+' or link_encoded contains '%5C' or link_encoded contains '%7F'
       assign link_allowed = false
     elsif link_encoded contains '%0' or link_encoded contains '%1'
       assign link_allowed = false
@@ -36,20 +40,12 @@
 
   assign ends_at_epoch = ''
   if ends_at != blank
-    assign ends_at_size = ends_at | size
-    assign ends_at_dash_1 = ends_at | slice: 4
-    assign ends_at_dash_2 = ends_at | slice: 7
-    assign ends_at_space = ends_at | slice: 10
-    assign ends_at_colon = ends_at | slice: 13
-    if ends_at_size == 16 and ends_at_dash_1 == '-' and ends_at_dash_2 == '-' and ends_at_space == ' ' and ends_at_colon == ':'
-      assign ends_at_epoch = ends_at | date: '%s'
-      assign ends_at_check = ends_at_epoch | plus: 0 | append: ''
-      assign ends_at_sign = ends_at_epoch | slice: 0
-      if ends_at_check != ends_at_epoch or ends_at_sign == '-'
-        assign ends_at_epoch = ''
-      endif
-    endif
-    if ends_at_epoch == blank
+    assign ends_at_epoch = ends_at | date: '%s'
+    assign ends_at_number = ends_at_epoch | plus: 0 | append: ''
+    assign ends_at_sign = ends_at_epoch | slice: 0
+    assign ends_at_round_trip = ends_at_epoch | date: '%Y-%m-%d %H:%M'
+    if ends_at_number != ends_at_epoch or ends_at_sign == '-' or ends_at_round_trip != ends_at
+      assign ends_at_epoch = ''
       assign invalid_settings = invalid_settings | append: ' ends_at'
     endif
   endif
@@ -59,9 +55,6 @@
     assign invalid_settings = invalid_settings | append: ' ended_message'
   endif
 
-  comment
-    Shopify wraps rendered app snippet output in HTML comments, so this check can't move into a snippet.
-  endcomment
   assign background_color = block.settings.background_color | append: '' | strip
   if background_color != blank
     assign background_lead = background_color | slice: 0

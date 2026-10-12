@@ -142,9 +142,16 @@ function reportFailure(error: unknown): void {
   }
 }
 
-if (isEntryPoint(process.argv[1], import.meta.url)) {
-  main(process.argv.slice(2)).catch((error: unknown) => {
+/** Runs `main`, reporting any failure and setting a failing exit code instead of throwing. */
+export async function run(argv: string[], bundles: Bundle[] = BUNDLES): Promise<void> {
+  try {
+    await main(argv, bundles);
+  } catch (error: unknown) {
     reportFailure(error);
     process.exitCode = 1;
-  });
+  }
+}
+
+if (isEntryPoint(process.argv[1], import.meta.url)) {
+  await run(process.argv.slice(2));
 }

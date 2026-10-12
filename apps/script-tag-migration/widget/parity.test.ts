@@ -16,6 +16,7 @@ import {
 import { buildBar } from './render';
 import type { RawSettings } from './settings';
 import {
+  dataAttributeFor,
   ENDED_BEHAVIOR,
   INVALID_ATTRIBUTE,
   readRawSettings,
@@ -32,8 +33,6 @@ interface MerchantInput {
   dismissible?: boolean;
   backgroundColor?: string;
   textColor?: string;
-  /** Hands Liquid `null` rather than an empty string for unset colors. */
-  nullColors?: boolean;
 }
 
 interface NormalizedElement {
@@ -125,29 +124,38 @@ const CASES: Record<string, MerchantInput> = {
   'named color': { message: 'Sale', textColor: 'red' },
   'five digit hex color': { message: 'Sale', backgroundColor: '#12345' },
   'uppercase short hex color': { message: 'Sale', backgroundColor: '#ABC' },
-  'unset colors given to Liquid as null': { message: 'Sale', nullColors: true }
+  'end time that is not a real date': { message: 'Sale', endsAt: '2026-02-30 10:00' },
+  'link with an empty host before a query': { message: 'Sale', linkUrl: 'https://?q' },
+  'link with an empty host before a fragment': { message: 'Sale', linkUrl: 'https://#x' },
+  'link with an empty host before a port': { message: 'Sale', linkUrl: 'https://:443' },
+  'link with an uppercase http scheme': { message: 'Sale', linkUrl: 'HTTP://example.com' }
 };
 
-function unsetColor(input: MerchantInput): string | null {
-  return input.nullColors ? null : '';
-}
+const BACKSLASH_LINKS = [String.raw`/a\b`, String.raw`https://x/a\b`];
 
-function toLiquidSettings(input: MerchantInput): BlockSettings {
+const SETTINGS_REPRESENTATIONS = [
+  { name: 'empty strings', unsetAsNil: false },
+  { name: 'nil', unsetAsNil: true }
+];
+
+/** Settings as Liquid receives them. An unset setting is `null` when `unsetAsNil`, otherwise an empty string. */
+function toLiquidSettings(input: MerchantInput, unsetAsNil = false): BlockSettings {
+  const unset = unsetAsNil ? null : '';
   return {
     [SETTING.message]: input.message,
-    [SETTING.linkUrl]: input.linkUrl,
-    [SETTING.endsAt]: input.endsAt ?? '',
+    [SETTING.linkUrl]: input.linkUrl ?? unset,
+    [SETTING.endsAt]: input.endsAt ?? unset,
     [SETTING.endedBehavior]: input.endedBehavior ?? ENDED_BEHAVIOR.hide,
-    [SETTING.endedMessage]: input.endedMessage ?? '',
+    [SETTING.endedMessage]: input.endedMessage ?? unset,
     [SETTING.dismissible]: input.dismissible ?? false,
-    [SETTING.backgroundColor]: input.backgroundColor ?? unsetColor(input),
-    [SETTING.textColor]: input.textColor ?? unsetColor(input)
+    [SETTING.backgroundColor]: input.backgroundColor ?? unset,
+    [SETTING.textColor]: input.textColor ?? unset
   };
 }
 
-function toEpochSecondsText(endsAt: string): string {
-  const parsed = parseLocalDateTime(endsAt);
-  return parsed ? String(parsed.epochSeconds) : REJECTED_END_TIME;
+/** The end time as the legacy parser receives it: store-local with an offset, so an impossible date stays impossible. */
+function toLegacyEndsAt(endsAt: string): string {
+  return parseLocalDateTime(endsAt)?.isoWithOffset ?? REJECTED_END_TIME;
 }
 
 function toRawSettings(input: MerchantInput): RawSettings {
@@ -160,7 +168,7 @@ function toRawSettings(input: MerchantInput): RawSettings {
     [SETTING.backgroundColor]: input.backgroundColor,
     [SETTING.textColor]: input.textColor
   };
-  if (input.endsAt !== undefined) raw[SETTING.endsAt] = toEpochSecondsText(input.endsAt);
+  if (input.endsAt !== undefined) raw[SETTING.endsAt] = toLegacyEndsAt(input.endsAt);
   return raw;
 }
 
@@ -224,32 +232,37 @@ function embedWarnedSettings(root: Element): Set<string> {
   return new Set([...invalidSettingsOn(root), ...warnings.map(({ setting }) => setting)]);
 }
 
-describe('Liquid block and buildBar parity', () => {
-  it.each(Object.entries(CASES))('renders the same tree for: %s', (_name, input) => {
-    const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
-    const { config } = parseConfig(toRawSettings(input));
-
-    expect(liquidRoot).not.toBeNull();
-    expect(config).not.toBeNull();
-    if (liquidRoot === null || config === null) return;
-    expect(normalize(buildBar(config))).toEqual(normalize(liquidRoot));
-  });
-
-  it.each(Object.entries(CASES))(
-    'round-trips through the embed parser to the same config and warnings for: %s',
-    (_name, input) => {
-      const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
-      const legacy = parseConfig(toRawSettings(input));
+describe.each(SETTINGS_REPRESENTATIONS)(
+  'Liquid block and buildBar parity with unset settings as $name',
+  ({ unsetAsNil }) => {
+    it.each(Object.entries(CASES))('renders the same tree for: %s', (_name, input) => {
+      const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input, unsetAsNil)));
+      const { config } = parseConfig(toRawSettings(input));
 
       expect(liquidRoot).not.toBeNull();
-      if (liquidRoot === null) return;
-      expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(legacy.config);
-      expect(embedWarnedSettings(liquidRoot)).toEqual(
-        new Set(legacy.warnings.map(({ setting }) => setting))
-      );
-    }
-  );
+      expect(config).not.toBeNull();
+      if (liquidRoot === null || config === null) return;
+      expect(normalize(buildBar(config))).toEqual(normalize(liquidRoot));
+    });
 
+    it.each(Object.entries(CASES))(
+      'round-trips through the embed parser to the same config and warnings for: %s',
+      (_name, input) => {
+        const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input, unsetAsNil)));
+        const legacy = parseConfig(toRawSettings(input));
+
+        expect(liquidRoot).not.toBeNull();
+        if (liquidRoot === null) return;
+        expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(legacy.config);
+        expect(embedWarnedSettings(liquidRoot)).toEqual(
+          new Set(legacy.warnings.map(({ setting }) => setting))
+        );
+      }
+    );
+  }
+);
+
+describe('Liquid block and buildBar parity', () => {
   it('lists each dropped setting in the invalid attribute', () => {
     const root = findLiquidRoot(
       renderBlock(
@@ -289,6 +302,21 @@ describe('Liquid block and buildBar parity', () => {
     expect(parseConfig(readRawSettings(root)).config?.linkUrl).toBeUndefined();
     expect(embedWarnedSettings(root)).toEqual(new Set([SETTING.linkUrl]));
   });
+
+  it.each(BACKSLASH_LINKS)(
+    'drops a link containing a backslash that only the embed block rejects: %s',
+    (linkUrl) => {
+      const root = findLiquidRoot(renderBlock(toLiquidSettings({ message: 'Sale', linkUrl })));
+
+      expect(root).not.toBeNull();
+      if (root === null) return;
+      expect(invalidSettingsOn(root)).toEqual([SETTING.linkUrl]);
+      expect(root.hasAttribute(dataAttributeFor(SETTING.linkUrl))).toBe(false);
+      expect(parseConfig(toRawSettings({ message: 'Sale', linkUrl })).config?.linkUrl).toBe(
+        linkUrl
+      );
+    }
+  );
 
   it('loads the stylesheet before the bar', () => {
     const fragment = parseFragment(renderBlock(toLiquidSettings({ message: 'Sale' })));
