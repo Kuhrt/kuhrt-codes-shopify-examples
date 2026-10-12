@@ -1,13 +1,19 @@
 import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Bundle } from './build-widget';
-import { budgetFailure, buildBundles, BUNDLES, GZIP_BUDGET_BYTES } from './build-widget';
+import {
+  budgetFailure,
+  buildBundles,
+  BUNDLES,
+  GZIP_BUDGET_BYTES,
+  isEntryPoint
+} from './build-widget';
 
 const MOUNT_MODULE = fileURLToPath(new URL('../widget/mount.ts', import.meta.url));
 
@@ -62,5 +68,22 @@ describe('widget bundles', () => {
     expect(failure).toContain('large.js');
     expect(failure).not.toContain('small.js');
     expect(budgetFailure(sizes, 100)).toBeUndefined();
+  });
+});
+
+describe('isEntryPoint', () => {
+  const modulePath = resolve(tmpdir(), 'scripts', 'build-widget.ts');
+  const moduleUrl = pathToFileURL(modulePath).href;
+
+  it('matches the path node was started with, even when written differently', () => {
+    expect(isEntryPoint(modulePath, moduleUrl)).toBe(true);
+    expect(
+      isEntryPoint(join(tmpdir(), 'scripts', '..', 'scripts', 'build-widget.ts'), moduleUrl)
+    ).toBe(true);
+  });
+
+  it('does not match another script or a missing path', () => {
+    expect(isEntryPoint(join(tmpdir(), 'scripts', 'other.ts'), moduleUrl)).toBe(false);
+    expect(isEntryPoint(undefined, moduleUrl)).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mountEmbed, mountLegacy } from './mount';
+import { MOUNTED, mountEmbed, mountLegacy } from './mount';
 import { buildBar } from './render';
 import {
   dataAttributeFor,
@@ -12,7 +12,7 @@ import {
 } from './settings';
 
 const ROOT = `[${ROOT_ATTRIBUTE}]`;
-const MOUNTED = Symbol.for('kc-announcement-bar.mounted');
+const NON_BREAKING_SPACE = String.fromCharCode(0xa0);
 
 function legacySrc(params: Record<string, string>): string {
   return `https://app.example/legacy/announcement-bar.js?${new URLSearchParams(params)}`;
@@ -110,13 +110,47 @@ describe('mountLegacy', () => {
 
     expect(bars()).toHaveLength(0);
     expect(warn).toHaveBeenCalledTimes(1);
+    expect(warningText(0)).not.toContain(SETTING.message);
   });
 
-  it('does not throw on an invalid script URL', () => {
+  it('renders nothing and warns once, without throwing, on an invalid script URL', () => {
     expect(() => mountLegacy(document, 'not a url')).not.toThrow();
 
     expect(bars()).toHaveLength(0);
-    expect(warn).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warningText(0)).not.toContain(SETTING.message);
+  });
+
+  it('renders nothing and warns once when the embed bar was removed before it ran', () => {
+    const embed = embedRoot();
+    mountEmbed(document);
+    dismiss(embed);
+    expect(bars()).toHaveLength(0);
+
+    mountLegacy(document, legacySrc({ [SETTING.message]: 'Legacy' }));
+
+    expect(bars()).toHaveLength(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers to embed markup that arrives while the document is loading', () => {
+    setReadyState('loading');
+    mountLegacy(document, legacySrc({ [SETTING.message]: 'Legacy' }));
+    const embed = embedRoot();
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+
+    expect(bars()).toEqual([embed]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a valid copy render after a misconfigured one', () => {
+    mountLegacy(document, legacySrc({ [SETTING.dismissible]: 'true' }));
+    expect(bars()).toHaveLength(0);
+
+    mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale' }));
+
+    expect(bars()).toHaveLength(1);
   });
 
   it('ignores unknown query parameters', () => {
@@ -173,6 +207,17 @@ describe('mountEmbed', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warningText(0)).toContain(SETTING.backgroundColor);
+  });
+
+  it('removes the bar and warns once when its message is only whitespace', () => {
+    const embed = embedRoot();
+    embed.setAttribute(dataAttributeFor(SETTING.message), NON_BREAKING_SPACE);
+
+    mountEmbed(document);
+
+    expect(bars()).toHaveLength(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warningText(0)).toContain(SETTING.message);
   });
 
   it('waits for DOMContentLoaded while the document is loading', () => {

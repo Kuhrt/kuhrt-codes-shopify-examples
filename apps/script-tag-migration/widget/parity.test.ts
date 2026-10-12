@@ -1,11 +1,18 @@
 // @vitest-environment happy-dom
 import { existsSync } from 'node:fs';
+import { basename } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { BUNDLES } from '../scripts/build-widget';
 import { parseConfig } from './config';
 import type { BlockSettings } from './liquid-test-support';
-import { extensionPath, readBlockSchema, renderBlock } from './liquid-test-support';
+import {
+  extensionPath,
+  parseLocalDateTime,
+  readBlockSchema,
+  renderBlock
+} from './liquid-test-support';
 import { buildBar } from './render';
 import type { RawSettings } from './settings';
 import { ENDED_BEHAVIOR, ROOT_ATTRIBUTE, SETTING } from './settings';
@@ -27,7 +34,7 @@ interface NormalizedElement {
   children: (NormalizedElement | string)[];
 }
 
-const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
+const STYLESHEET_ASSET = 'announcement-bar.css';
 const OFFSET_WITHOUT_COLON = /([+-]\d{2})(\d{2})$/;
 
 const CASES: Record<string, MerchantInput> = {
@@ -75,7 +82,20 @@ const CASES: Record<string, MerchantInput> = {
     endedBehavior: ENDED_BEHAVIOR.message,
     endedMessage: '   '
   },
-  'unparseable end time': { message: 'Sale', endsAt: 'soon' }
+  'unparseable end time': { message: 'Sale', endsAt: 'soon' },
+  'end time in the past': { message: 'Sale', endsAt: '2020-01-01 00:00' },
+  'end time with trailing characters': { message: 'Sale', endsAt: '123abc' },
+  'mailto link': { message: 'Sale', linkUrl: 'mailto:a@b.c' },
+  'javascript link': { message: 'Sale', linkUrl: 'javascript:alert(1)' },
+  'protocol-relative link': { message: 'Sale', linkUrl: '//evil.example' },
+  'link with a space': { message: 'Sale', linkUrl: '/path with space' },
+  'link with a backslash after the slash': { message: 'Sale', linkUrl: '/\\evil.example' },
+  'link with an uppercase scheme': { message: 'Sale', linkUrl: 'HTTPS://EXAMPLE.COM/x' },
+  'relative link': { message: 'Sale', linkUrl: '/collections/all' },
+  'rgba color': { message: 'Sale', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+  'named color': { message: 'Sale', textColor: 'red' },
+  'five digit hex color': { message: 'Sale', backgroundColor: '#12345' },
+  'uppercase short hex color': { message: 'Sale', backgroundColor: '#ABC' }
 };
 
 function toLiquidSettings(input: MerchantInput): BlockSettings {
@@ -92,10 +112,8 @@ function toLiquidSettings(input: MerchantInput): BlockSettings {
 }
 
 function toEpochSecondsText(endsAt: string): string {
-  const match = LOCAL_DATE_TIME.exec(endsAt);
-  if (!match) return endsAt;
-  const [, year, month, day, hour, minute] = match;
-  return String(Date.parse(`${year}-${month}-${day}T${hour}:${minute}:00Z`) / 1000);
+  const parsed = parseLocalDateTime(endsAt);
+  return parsed ? String(parsed.epochSeconds) : endsAt;
 }
 
 function toRawSettings(input: MerchantInput): RawSettings {
@@ -151,10 +169,14 @@ function normalize(element: Element): NormalizedElement {
   return { tag: element.tagName.toLowerCase(), attributes, children };
 }
 
-function findLiquidRoot(html: string): Element | null {
+function parseFragment(html: string): DocumentFragment {
   const template = document.createElement('template');
   template.innerHTML = html;
-  return template.content.querySelector(`[${ROOT_ATTRIBUTE}]`);
+  return template.content;
+}
+
+function findLiquidRoot(html: string): Element | null {
+  return parseFragment(html).querySelector(`[${ROOT_ATTRIBUTE}]`);
 }
 
 describe('Liquid block and buildBar parity', () => {
@@ -166,6 +188,18 @@ describe('Liquid block and buildBar parity', () => {
     expect(config).not.toBeNull();
     if (liquidRoot === null || config === null) return;
     expect(normalize(buildBar(config))).toEqual(normalize(liquidRoot));
+  });
+
+  it('loads the stylesheet before the bar', () => {
+    const fragment = parseFragment(renderBlock(toLiquidSettings({ message: 'Sale' })));
+    const link = fragment.querySelector('link[rel="stylesheet"]');
+    const root = fragment.querySelector(`[${ROOT_ATTRIBUTE}]`);
+
+    expect(link?.getAttribute('href')?.endsWith(`/${STYLESHEET_ASSET}`)).toBe(true);
+    expect(link && root && link.compareDocumentPosition(root)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(existsSync(extensionPath(`assets/${STYLESHEET_ASSET}`))).toBe(true);
   });
 
   it('renders no bar for an empty message on either side', () => {
@@ -185,9 +219,11 @@ describe('block schema', () => {
     );
   });
 
-  it('targets the body and references existing assets', () => {
+  it('targets the body and loads the embed bundle', () => {
+    const embedBundle = BUNDLES.find(({ entry }) => basename(entry) === 'entry-embed.ts');
+
     expect(schema.target).toBe('body');
-    expect(existsSync(extensionPath(`assets/${schema.javascript}`))).toBe(true);
-    expect(existsSync(extensionPath(`assets/${schema.stylesheet}`))).toBe(true);
+    expect(embedBundle).toBeDefined();
+    expect(schema.javascript).toBe(embedBundle && basename(embedBundle.outfile));
   });
 });

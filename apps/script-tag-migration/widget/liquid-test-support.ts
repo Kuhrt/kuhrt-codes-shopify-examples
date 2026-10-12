@@ -17,12 +17,12 @@ export function extensionPath(relativePath: string): string {
 const SCHEMA_BLOCK = /\{%-?\s*schema\s*-?%\}([\s\S]*?)\{%-?\s*endschema\s*-?%\}/;
 const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
 const EPOCH_FORMAT = '%s';
+const ASSET_BASE_URL = 'https://cdn.example/assets/';
 const ISO_OFFSET_FORMAT = '%Y-%m-%dT%H:%M:%S%z';
 
 export interface BlockSchema {
   target: string;
   javascript: string;
-  stylesheet: string;
   settings: { id: string; type: string }[];
 }
 
@@ -54,18 +54,32 @@ function lookupTranslation(key: string): string {
   return node;
 }
 
+export interface LocalDateTime {
+  /** The wall-clock time as ISO 8601 without an offset. */
+  iso: string;
+  /** Epoch seconds, reading the wall-clock time as UTC. */
+  epochSeconds: number;
+}
+
+/** Reads `YYYY-MM-DD HH:MM`, the shape of a merchant-entered end time, with the store time zone fixed to UTC. */
+export function parseLocalDateTime(input: string): LocalDateTime | undefined {
+  const match = LOCAL_DATE_TIME.exec(input);
+  if (!match) return undefined;
+  const [, year, month, day, hour, minute] = match;
+  const iso = `${year}-${month}-${day}T${hour}:${minute}:00`;
+  return { iso, epochSeconds: Date.parse(`${iso}Z`) / 1000 };
+}
+
 /**
  * Stands in for Shopify's `date` filter with the store time zone fixed to UTC.
  * Understands inputs shaped `YYYY-MM-DD HH:MM` and the `%s` and `%Y-%m-%dT%H:%M:%S%z` formats only.
  * Like Liquid, an input it cannot parse is returned unchanged.
  */
 function stubDate(input: unknown, format: string): unknown {
-  const match = LOCAL_DATE_TIME.exec(String(input));
-  if (!match) return input;
-  const [, year, month, day, hour, minute] = match;
-  const iso = `${year}-${month}-${day}T${hour}:${minute}:00`;
-  if (format === EPOCH_FORMAT) return String(Date.parse(`${iso}Z`) / 1000);
-  if (format === ISO_OFFSET_FORMAT) return `${iso}+0000`;
+  const parsed = parseLocalDateTime(String(input));
+  if (!parsed) return input;
+  if (format === EPOCH_FORMAT) return String(parsed.epochSeconds);
+  if (format === ISO_OFFSET_FORMAT) return `${parsed.iso}+0000`;
   throw new Error(`Unsupported date format: ${format}`);
 }
 
@@ -90,10 +104,12 @@ class SchemaTag extends Tag {
 }
 
 function createEngine(): Liquid {
-  const engine = new Liquid();
+  const engine = new Liquid({ partials: extensionPath('snippets'), extname: '.liquid' });
   engine.registerTag('schema', SchemaTag);
   engine.registerFilter('t', lookupTranslation);
   engine.registerFilter('date', stubDate);
+  engine.registerFilter('asset_url', (filename: string) => `${ASSET_BASE_URL}${filename}`);
+  engine.registerFilter('stylesheet_tag', (url: string) => `<link rel="stylesheet" href="${url}">`);
   return engine;
 }
 

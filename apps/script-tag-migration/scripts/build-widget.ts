@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
@@ -18,7 +19,7 @@ export interface BundleSize {
 }
 
 function appPath(relative: string): string {
-  return fileURLToPath(new URL(`../${relative}`, import.meta.url));
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', relative);
 }
 
 export const BUNDLES: Bundle[] = [
@@ -117,9 +118,32 @@ async function main(args: string[]): Promise<void> {
   if (!reportSizes(sizes)) process.exitCode = 1;
 }
 
-if (import.meta.main) {
-  main(process.argv.slice(2)).catch((error: unknown) => {
+/** Whether the module at `moduleUrl` is the script node was started with. */
+export function isEntryPoint(argv1: string | undefined, moduleUrl: string): boolean {
+  if (argv1 === undefined) return false;
+  return resolve(argv1) === resolve(fileURLToPath(moduleUrl));
+}
+
+function isEsbuildFailure(error: unknown): error is { errors: unknown[] } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    Array.isArray((error as { errors?: unknown }).errors)
+  );
+}
+
+/** esbuild has already printed its own errors, so a build failure needs only a summary. */
+function reportFailure(error: unknown): void {
+  if (isEsbuildFailure(error)) {
+    console.error(`Widget build failed with ${error.errors.length} error(s)`);
+  } else {
     console.error(error);
+  }
+}
+
+if (isEntryPoint(process.argv[1], import.meta.url)) {
+  main(process.argv.slice(2)).catch((error: unknown) => {
+    reportFailure(error);
     process.exitCode = 1;
   });
 }

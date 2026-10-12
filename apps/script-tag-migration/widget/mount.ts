@@ -1,4 +1,4 @@
-import type { ConfigWarning } from './config';
+import type { BarConfig, ConfigWarning } from './config';
 import { parseConfig } from './config';
 import { enhance } from './enhance';
 import { buildBar } from './render';
@@ -6,7 +6,7 @@ import type { RawSettings } from './settings';
 import { readRawSettings, ROOT_ATTRIBUTE, SETTING } from './settings';
 
 const LOG_PREFIX = '[kc-announcement-bar]';
-const MOUNTED = Symbol.for('kc-announcement-bar.mounted');
+export const MOUNTED = Symbol.for('kc-announcement-bar.mounted');
 
 type MountedWindow = Window & { [MOUNTED]?: true };
 
@@ -40,20 +40,37 @@ function findRoot(doc: Document): HTMLElement | null {
   return doc.querySelector<HTMLElement>(`[${ROOT_ATTRIBUTE}]`);
 }
 
-function readQuerySettings(scriptSrc: string | undefined): RawSettings {
-  if (scriptSrc === undefined) return {};
+function warnMessageRequired(): void {
+  warn(`${SETTING.message} is required, so no bar was rendered`);
+}
+
+/** The settings in the script URL's query string, or `null` after warning that there is no usable URL. */
+function readQuerySettings(scriptSrc: string | undefined): RawSettings | null {
+  if (scriptSrc === undefined) {
+    warn('the script URL could not be found, so no settings were read');
+    return null;
+  }
   let params: URLSearchParams;
   try {
     params = new URL(scriptSrc).searchParams;
   } catch {
-    warn('script URL is invalid, so no settings were read');
-    return {};
+    warn('the script URL is invalid, so no settings were read');
+    return null;
   }
   const raw: RawSettings = {};
   for (const setting of Object.values(SETTING)) {
     raw[setting] = params.get(setting) ?? undefined;
   }
   return raw;
+}
+
+function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
+  const raw = readQuerySettings(scriptSrc);
+  if (raw === null) return null;
+  const { config, warnings } = parseConfig(raw);
+  reportWarnings(warnings);
+  if (!config) warnMessageRequired();
+  return config;
 }
 
 /** Enhances the server-rendered bar. Does nothing when the page has none. */
@@ -64,7 +81,12 @@ export function mountEmbed(doc: Document): void {
     markMounted(doc);
     const { config, warnings } = parseConfig(readRawSettings(root));
     reportWarnings(warnings);
-    if (config) enhance(root, config);
+    if (!config) {
+      root.remove();
+      warnMessageRequired();
+      return;
+    }
+    enhance(root, config);
   });
 }
 
@@ -78,15 +100,11 @@ export function mountLegacy(doc: Document, scriptSrc: string | undefined): void 
       warn('an announcement bar is already on the page, so this script did nothing');
       return;
     }
-    markMounted(doc);
-    const { config, warnings } = parseConfig(readQuerySettings(scriptSrc));
-    reportWarnings(warnings);
-    if (!config) {
-      warn(`${SETTING.message} is required, so no bar was rendered`);
-      return;
-    }
+    const config = readLegacyConfig(scriptSrc);
+    if (!config) return;
     const root = buildBar(config);
     doc.body.appendChild(root);
+    markMounted(doc);
     enhance(root, config);
   });
 }

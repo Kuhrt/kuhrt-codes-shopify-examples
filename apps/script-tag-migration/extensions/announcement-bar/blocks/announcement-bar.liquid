@@ -1,11 +1,27 @@
 {%- liquid
   assign message = block.settings.message | strip
-  assign link_url = block.settings.link_url
+  assign link_url = block.settings.link_url | append: '' | strip
   assign ends_at = block.settings.ends_at | strip
   assign ended_behavior = block.settings.ended_behavior
   assign ended_message = block.settings.ended_message | strip
-  assign background_color = block.settings.background_color
-  assign text_color = block.settings.text_color
+
+  assign link_https = link_url | slice: 0, 8 | downcase
+  assign link_http = link_url | slice: 0, 7 | downcase
+  assign link_lead = link_url | slice: 0, 2
+  assign link_first = link_lead | slice: 0
+  assign link_allowed = false
+  if link_https == 'https://' or link_http == 'http://'
+    assign link_allowed = true
+  elsif link_first == '/' and link_lead != '//'
+    assign link_allowed = true
+  endif
+  assign link_encoded = link_url | url_encode
+  if link_url contains ' ' or link_encoded contains '%5C'
+    assign link_allowed = false
+  endif
+  unless link_allowed
+    assign link_url = ''
+  endunless
 
   if ended_behavior == 'message' and ended_message == blank
     assign ended_behavior = 'hide'
@@ -20,7 +36,10 @@
     endif
   endif
 -%}
+{%- capture background_color -%}{%- render 'kc-hex-color', value: block.settings.background_color -%}{%- endcapture -%}
+{%- capture text_color -%}{%- render 'kc-hex-color', value: block.settings.text_color -%}{%- endcapture -%}
 {%- if message != blank -%}
+  {{ 'announcement-bar.css' | asset_url | stylesheet_tag }}
   <aside
     data-kc-announcement-bar
     aria-label="{{ 'announcement_bar.region' | t | escape }}"
@@ -60,7 +79,6 @@
   "name": "t:announcement_bar.name",
   "target": "body",
   "javascript": "announcement-bar.js",
-  "stylesheet": "announcement-bar.css",
   "settings": [
     {
       "type": "text",
