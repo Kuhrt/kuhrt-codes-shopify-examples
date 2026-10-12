@@ -6,5 +6,6 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "@shopify/polaris-types", "@shopify/app-bridge-types"],
     "rootDirs": [".", "./.react-router/types"]
-  }
+  },
+  "exclude": ["widget/**"]
 }
