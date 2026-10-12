@@ -11,8 +11,8 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - `.dev.vars.example`.
 
   Record the adapter chosen and why in design.md. Verify: under `shopify app dev`, a fresh install on `kuhrt-codes` completes OAuth, the App Home loads, and reloading the dev server doesn't force a reinstall. **Gate: if this isn't working after about half a day, stop and report to the user. Do not switch hosts.**
-- [ ] 1.3 Check the Liquid `date` filter on `kuhrt-codes`. Add a temporary embed that prints `"2026-11-27 00:00" | date: '%s'` and `'%z'`. Verify: the epoch matches 2026-11-27T05:00:00Z, which is −05:00, not today's −04:00. Record the result in design.md decision 4 and remove the temporary embed. If the result is wrong, switch decision 4 to the IANA-zone fallback before starting group 2.
-- [ ] 1.4 Confirm `shopify.app.extensions()` exists in the current App Bridge and returns theme embed activations with a status. Verify: log its output in the App Home on `kuhrt-codes`, before and after enabling a placeholder embed. Record the observed shape in design.md decision 8.
+- [x] 1.3 Check the Liquid `date` filter on `kuhrt-codes`. Add a temporary embed that prints `"2026-11-27 00:00" | date: '%s'` and `'%z'`. Verify: the epoch matches 2026-11-27T05:00:00Z, which is −05:00, not today's −04:00. Record the result in design.md decision 4 and remove the temporary embed. If the result is wrong, switch decision 4 to the IANA-zone fallback before starting group 2.
+- [x] 1.4 Confirm `shopify.app.extensions()` exists in the current App Bridge and returns theme embed activations with a status. Verify: log its output in the App Home on `kuhrt-codes`, before and after enabling a placeholder embed. Record the observed shape in design.md decision 8.
 
 ## 2. Widget core (`widget/`)
 
@@ -63,7 +63,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - a confirmation modal stating removal is permanent;
   - success and error toasts or banners.
 
-  Verify: component tests with mocked App Bridge cover each status state, the gating (disabled on inactive and on unknown), the deep link `href` structure, the confirmation being required before the action is submitted, and the re-check on focus. Assert by role and state, not copy.
+  Verify: component tests with mocked App Bridge cover each status state using the `extensions()` payload shape recorded in design.md decision 8. They cover a missing block entry, `unavailable`, and an `active` entry under a different block handle, none of which may pass the gate. Also cover the gating (disabled on inactive and on unknown), the deep link `href` structure, the confirmation being required before the action is submitted, and the re-check on focus. Assert by role and state, not copy.
 - [ ] 5.4 Manual check on `kuhrt-codes`: the console shows the embed status, the deep link opens the theme editor with the embed toggled on, the status refreshes after saving, and the empty script tag list shows as complete. Verify: checklist and screenshots in the PR description.
 
 ## 6. Install lifecycle
