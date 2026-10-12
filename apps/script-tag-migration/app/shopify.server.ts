@@ -1,11 +1,11 @@
-import { ApiVersion, AppDistribution, shopifyApp } from '@shopify/shopify-app-react-router/server';
+import { AppDistribution, shopifyApp } from '@shopify/shopify-app-react-router/server';
 import { DrizzleSessionStorageSQLite } from '@shopify/shopify-app-session-storage-drizzle';
 import { env } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
 
+import { apiVersion } from './api-version';
 import { sessionTable } from './db/schema';
 
-export const apiVersion = ApiVersion.October26;
 export const apiKey = env.SHOPIFY_API_KEY;
 
 const shopify = shopifyApp({

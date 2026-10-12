@@ -12,7 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (!isStringArray(payload.current)) {
     console.error(`Malformed ${topic} payload for ${shop}: current scopes is not a string array`);
-    return new Response(null, { status: 400 });
+    return new Response();
   }
 
   if (session) {
