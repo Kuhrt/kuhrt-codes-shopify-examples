@@ -244,3 +244,27 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - Replace the `https://example.com` placeholders in `shopify.app.toml` with the Worker URL. Check `redirect_urls` against `authPathPrefix` (`/auth`).
 - Check that `wrangler deploy` provisions the D1 database (no `database_id` is committed), then run `wrangler d1 migrations apply DB --remote` before the first install.
 - Set the three secrets with `wrangler secret put`.
+
+### Widget core (tasks 2.1–2.4)
+
+- **Type boundary.** The Workers runtime types (`worker-configuration.d.ts`) declare a global `Element` that conflicts with the DOM's. `widget/` is browser-only code, so it has its own `tsconfig.json` with DOM types, and the app tsconfig excludes it. `typecheck` runs both.
+- **Settings.** `widget/settings.ts` holds the setting IDs: `message`, `link_url`, `ends_at`, `ended_behavior`, `ended_message`, `dismissible`, `background_color` and `text_color`. The theme extension's `{% schema %}` IDs and the legacy query-string keys must use them unchanged.
+- **One serializer.** `toRawSettings(config)` is the exact inverse of `parseConfig`. `buildBar` uses it, and so will the legacy settings-URL code. `readRawSettings(root)` reads the same values back from markup.
+- **Markup contract for the Liquid block (task 3.1).** `buildBar()` produces:
+  - an `<aside data-kc-announcement-bar aria-label>` root;
+  - a `<p data-kc-text>`, holding an `<a href>` when a link is set;
+  - `<time data-kc-countdown datetime="<UTC ISO, whole seconds, Z>">`, only when there is an end time;
+  - `<button type="button" data-kc-dismiss aria-label>`, only when dismissible.
+- **Settings on the root.** The root also carries the normalized settings as `data-kc-<setting>` attributes, for example `data-kc-link-url`.
+  - Always present: `data-kc-message`, `data-kc-ended-behavior` and `data-kc-dismissible`.
+  - Present only when set: `data-kc-link-url`, `data-kc-ends-at` (epoch seconds), `data-kc-ended-message` (only when the behavior is `message`), `data-kc-background-color` and `data-kc-text-color`.
+  - Colors are also applied as the inline custom properties `--kc-bar-background` and `--kc-bar-color`.
+  - A test keeps the structural markers distinct from the setting attributes.
+- **Parsing rules.**
+  - An empty or whitespace value means "unset" and gives no warning. Only a non-empty invalid value warns.
+  - Links must be `http(s)` or site-relative. Any whitespace or control character inside the value is rejected, because browsers strip tabs and newlines, which would turn `/	/evil.com` into `//evil.com`. Relative links must also resolve to the same origin.
+  - The legacy ISO end time must use the ECMAScript date-time format (`T`, and `Z` or `±HH:MM`), so `Date.parse` behaves the same in every browser. Impossible dates are rejected.
+  - End times are floored to whole seconds, so epoch input (Liquid) and ISO input (legacy) give the same value and the same dismissal key.
+  - An empty ended message under the `message` behavior falls back to `hide`, with one warning.
+- **Countdown timing.** The countdown reschedules itself on second boundaries relative to the end time, so the ended transition fires on time. The stylesheet (task 3.1) should set `font-variant-numeric: tabular-nums` on the countdown so its width doesn't jitter.
+- **Removing the bar.** Ending with `hide`, dismissing, or a previously dismissed campaign removes the root. Focus moves to `body` (through a temporary `tabindex="-1"`) only when it was inside the bar.
