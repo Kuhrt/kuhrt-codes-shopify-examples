@@ -1,0 +1,58 @@
+{
+  "name": "script-tag-migration",
+  "private": true,
+  "scripts": {
+    "build": "react-router build",
+    "dev": "shopify app dev",
+    "config:link": "shopify app config link",
+    "generate": "shopify app generate",
+    "deploy": "shopify app deploy",
+    "config:use": "shopify app config use",
+    "env": "shopify app env",
+    "lint": "eslint .",
+    "shopify": "shopify",
+    "graphql-codegen": "graphql-codegen",
+    "vite": "vite",
+    "typecheck": "wrangler types --check && react-router typegen && tsc --noEmit",
+    "test": "vitest run",
+    "cf-typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "dependencies": {
+    "@react-router/fs-routes": "7.18.2",
+    "@shopify/app-bridge-react": "^4.2.4",
+    "@shopify/shopify-api": "^15.0.1",
+    "@shopify/shopify-app-react-router": "^3.0.0",
+    "@shopify/shopify-app-session-storage-drizzle": "^6.0.1",
+    "drizzle-orm": "^0.45.4",
+    "isbot": "^5.1.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router": "7.18.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.63.1",
+    "@react-router/dev": "7.18.2",
+    "@repo/config": "workspace:*",
+    "@shopify/api-codegen-preset": "^1.2.0",
+    "@shopify/app-bridge-types": "0.7.2",
+    "@shopify/cli": "4.9.3",
+    "@shopify/polaris-types": "^1.0.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.25",
+    "@types/react-dom": "^18.3.7",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "graphql-config": "^5.1.1",
+    "typescript": "6.0.3",
+    "vite": "^6.4.0",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0"
+  }
+}

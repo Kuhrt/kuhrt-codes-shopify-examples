@@ -4,8 +4,8 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 1. Spike: scaffold, Workers hosting, platform checks (gate)
 
-- [ ] 1.1 Install the Shopify CLI (`npm i -g @shopify/cli@latest`). Scaffold `apps/script-tag-migration` from `shopify-app-template-react-router`. Create the app in the Kuhrt.Codes Partner account, with `dev_store_url = "kuhrt-codes.myshopify.com"`, `scopes = "write_script_tags"`, and API version `2026-10`. Wire the app into the workspace (`lint`, `typecheck`, `test` scripts; extend `@repo/config`). Record the template's package versions in design.md. Verify: `pnpm check` passes with the untouched template, and `shopify app dev` installs it on `kuhrt-codes`.
-- [ ] 1.2 Move the app server to Cloudflare Workers (design decision 9):
+- [x] 1.1 Install the Shopify CLI (`npm i -g @shopify/cli@latest`). Scaffold `apps/script-tag-migration` from `shopify-app-template-react-router`. Create the app in the Kuhrt.Codes Partner account, with `dev_store_url = "kuhrt-codes.myshopify.com"`, `scopes = "write_script_tags"`, and API version `2026-10`. Wire the app into the workspace (`lint`, `typecheck`, `test` scripts; extend `@repo/config`). Record the template's package versions in design.md. Verify: `pnpm check` passes with the untouched template, and `shopify app dev` installs it on `kuhrt-codes`.
+- [x] 1.2 Move the app server to Cloudflare Workers (design decision 9):
   - `@cloudflare/vite-plugin`, the Shopify API's Cloudflare Worker adapter, and `wrangler.jsonc`;
   - an official Workers session storage adapter (D1 preferred, KV if D1 isn't official); remove Prisma;
   - `.dev.vars.example`.
@@ -69,7 +69,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 ## 6. Install lifecycle
 
 - [ ] 6.1 Make the `app/uninstalled` webhook delete all sessions for the shop from the Workers session store. Keep the template's HMAC verification. Verify: route tests cover a valid webhook (sessions deleted) and an invalid HMAC (401, nothing deleted). Run `shopify app webhook trigger --topic app/uninstalled` against dev.
-- [ ] 6.2 Add a scope-contract test: the scopes in `shopify.app.toml` equal the scopes table parsed from the README. Verify: the test passes, and adding a scope to either file alone fails it.
+- [ ] 6.2 Add a scope-contract test: the scopes in `shopify.app.toml` equal the scopes table parsed from the README. Also assert that `webhooks.api_version` in `shopify.app.toml` equals the app's `apiVersion`. Verify: the test passes, and adding a scope to either file alone fails it.
 
 ## 7. End-to-end
 

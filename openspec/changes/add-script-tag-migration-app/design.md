@@ -185,3 +185,62 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 - Worker hostname: a `*.workers.dev` URL or a custom subdomain such as `script-tag-migration.apps.kuhrt.codes`. Either works and nothing else depends on the choice. Pick at deploy time.
 - Whether the date-filter behavior in decision 4 holds. The spike task answers it, and both outcomes are already designed.
+
+## Implementation Notes
+
+### Template scaffold (task 1.1)
+
+- Scaffolded with Shopify CLI 4.9.3: `shopify app init --template reactRouter --flavor typescript -d pnpm`. The app was created in the Kuhrt.Codes organization with client ID `0537e606a33d34ab1c48033a40349773`. A client ID is public, not a secret.
+- Template versions kept as shipped:
+  - `react` and `react-dom` 18.3.1;
+  - `react-router` and `@react-router/*` 7.18.2;
+  - `@shopify/shopify-app-react-router` 3.0.2 (with `@shopify/shopify-api` 15.0.1);
+  - `@shopify/app-bridge-react` 4.2.13;
+  - `@shopify/polaris-types` 1.1.0;
+  - `vite` 6.4.4.
+- **API version.** The template ships `ApiVersion.July26` and webhooks on `2027-01`. Both are pinned to `2026-10` (`ApiVersion.October26`), the latest stable version.
+- **Workspace toolchain replaces the template's:**
+  - ESLint 8 with `.eslintrc.cjs` became ESLint 10 flat config extending `@repo/config`. It uses `eslint-plugin-react-hooks`, as the website repo does. `eslint-plugin-react` and `eslint-plugin-jsx-a11y` were dropped because neither declares ESLint 10 support.
+  - TypeScript 5.9 became 6.0.3. `tsconfig.json` extends `@repo/config/tsconfig.base.json`.
+  - The template's Prettier, its nested pnpm workspace, `.npmrc`, and its `shamefullyHoist` setting are removed.
+  - `@shopify/app-bridge-types` is now an explicit dev dependency. The template only reached it through hoisting, for the `s-app-nav` JSX types.
+  - `vite-tsconfig-paths` and `env.d.ts` are removed. No tsconfig declares `paths`, and the `@react-router/node` type reference no longer applies.
+- **Template code removed:**
+  - The product and metaobject demo, which needs scopes this app doesn't request: the `app._index` action, `app.additional`, and the `shopify.app.toml` metafield and metaobject definitions.
+  - Docker files and editor/agent config.
+  - The public shop-login index page. `/` now redirects admin requests (those with a `shop` parameter) to `/app` and otherwise shows a one-line notice.
+  - Unused `shopify.server` exports (`login`, `unauthenticated`, `registerWebhooks`, and the default export).
+- **Offline tokens expire.** The template enables `expiringOfflineAccessTokens`, so the stored offline session expires after one hour. `scripts/try-legacy-install.ts` (task 4.4) must refresh the token or ask the developer to reopen the app first.
+
+### Workers hosting (task 1.2)
+
+- **Session storage is `@shopify/shopify-app-session-storage-drizzle` (`DrizzleSessionStorageSQLite`) on D1, through `drizzle-orm/d1`.**
+  - Shopify publishes no D1-specific adapter, but the Drizzle adapter is official and accepts any `BaseSQLiteDatabase`, D1 included. That keeps decision 9's first choice, a strongly consistent store, without falling back to KV.
+  - `app/db/schema.ts` is the only definition of the session table. `pnpm db:generate` (`drizzle-kit generate`) writes `migrations/`, and wrangler applies those files.
+  - The table has all 17 columns the adapter's type declares, not the 8 in its README. The extra columns include `refreshToken` and `refreshTokenExpires`, which expiring offline tokens need. There is an index on `shop` for uninstall cleanup.
+- **No runtime adapter import.** Decision 9 named the Shopify API's Cloudflare Worker adapter, but `@shopify/shopify-app-react-router` already loads the equivalent `web-api` adapter itself.
+- **One way to read bindings.** Only `.server` modules read `env` from `cloudflare:workers`. `shopify.server.ts` exports what routes need, such as `apiKey`, so route modules never import `cloudflare:workers` and the Worker entry passes no load context.
+- **Credentials.**
+  - `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` and `SHOPIFY_APP_URL` are declared under `secrets.required` in `wrangler.jsonc`, which also drives `wrangler types`.
+  - In dev, the Cloudflare Vite plugin reads them from the process env that `shopify app dev` sets. In production they are set with `wrangler secret put`.
+  - The client ID is not duplicated in `wrangler.jsonc`.
+  - The `SCOPES` env var is dropped, because Shopify-managed installation takes scopes from `shopify.app.toml`.
+- **Generated types.** `worker-configuration.d.ts` is committed. `typecheck` runs `wrangler types --check`, so a binding change without `pnpm cf-typegen` fails CI.
+- **Test conventions.**
+  - `@cloudflare/vitest-pool-workers` requires vitest 4, so tests run under the workspace's vitest 5 in Node.
+  - Storage tests get a real local D1 from wrangler's `getPlatformProxy`, with `migrations/` applied.
+  - Route tests (tasks 5.2 and 6.1) mock `../shopify.server` with `vi.mock`, because it imports `cloudflare:workers` at module scope.
+- **Webhook failures surface.**
+  - `app/uninstalled` returns 500 if sessions can't be deleted, so Shopify retries instead of leaving tokens stored.
+  - `app/scopes_update` rejects a payload whose `current` isn't a string array, and returns 500 if the session can't be stored.
+- **Verified on `kuhrt-codes` under `shopify app dev` (workerd locally):**
+  - A fresh install stored an offline session in local D1, with the `write_script_tags` scope and a refresh token.
+  - The App Home loaded.
+  - The session survived a dev server restart, so no reinstall was needed.
+
+### Deploy checklist (for tasks 9.1 and 9.2)
+
+- Choose `AppDistribution` for custom distribution (check shopify.dev; the template ships `AppStore`).
+- Replace the `https://example.com` placeholders in `shopify.app.toml` with the Worker URL. Check `redirect_urls` against `authPathPrefix` (`/auth`).
+- Check that `wrangler deploy` provisions the D1 database (no `database_id` is committed), then run `wrangler d1 migrations apply DB --remote` before the first install.
+- Set the three secrets with `wrangler secret put`.

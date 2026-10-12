@@ -1,0 +1,4 @@
+# `shopify app dev` provides these automatically. Set them here only to run the Worker without the Shopify CLI.
+SHOPIFY_API_KEY=
+SHOPIFY_API_SECRET=
+SHOPIFY_APP_URL=
