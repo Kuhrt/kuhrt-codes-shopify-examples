@@ -2,8 +2,17 @@ import type { BarConfig, ConfigWarning } from './config';
 import { parseConfig } from './config';
 import { enhance } from './enhance';
 import { buildBar } from './render';
-import type { RawSettings } from './settings';
-import { readRawSettings, ROOT_ATTRIBUTE, SETTING } from './settings';
+import type { RawSettings, SettingName } from './settings';
+import {
+  COUNTDOWN_ATTRIBUTE,
+  DISMISS_ATTRIBUTE,
+  INVALID_ATTRIBUTE,
+  MESSAGE_ATTRIBUTE,
+  readRawSettings,
+  readSettings,
+  ROOT_ATTRIBUTE,
+  SETTING
+} from './settings';
 
 const LOG_PREFIX = '[kc-announcement-bar]';
 export const MOUNTED = Symbol.for('kc-announcement-bar.mounted');
@@ -24,8 +33,24 @@ function warn(message: string): void {
   console.warn(`${LOG_PREFIX} ${message}`);
 }
 
+function warnSetting({ setting, reason }: ConfigWarning): void {
+  warn(`${setting} ${reason}`);
+}
+
 function reportWarnings(warnings: ConfigWarning[]): void {
-  for (const { setting, reason } of warnings) warn(`${setting} ${reason}`);
+  warnings.forEach(warnSetting);
+}
+
+function isSettingName(value: string): value is SettingName {
+  return (Object.values(SETTING) as string[]).includes(value);
+}
+
+/** Warns once for each known setting the server-rendered markup reports as invalid. */
+function reportInvalidSettings(root: HTMLElement): void {
+  const listed = (root.getAttribute(INVALID_ATTRIBUTE) ?? '').split(/\s+/);
+  for (const setting of new Set(listed.filter(isSettingName))) {
+    warnSetting({ setting, reason: 'is invalid' });
+  }
 }
 
 function whenDomReady(doc: Document, run: () => void): void {
@@ -57,11 +82,7 @@ function readQuerySettings(scriptSrc: string | undefined): RawSettings | null {
     warn('the script URL is invalid, so no settings were read');
     return null;
   }
-  const raw: RawSettings = {};
-  for (const setting of Object.values(SETTING)) {
-    raw[setting] = params.get(setting) ?? undefined;
-  }
-  return raw;
+  return readSettings((setting) => params.get(setting));
 }
 
 function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
@@ -73,21 +94,47 @@ function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
   return config;
 }
 
-/** Enhances the server-rendered bar. Does nothing when the page has none. */
+/** The attribute of the last child the markup carries for `config`, in markup order. */
+function lastMarkerFor(config: BarConfig): string {
+  if (config.dismissible) return DISMISS_ATTRIBUTE;
+  if (config.endsAtMs !== undefined) return COUNTDOWN_ATTRIBUTE;
+  return MESSAGE_ATTRIBUTE;
+}
+
+/** Whether the parser is past every element the config expects, so enhancing now can't miss one. */
+function isRootComplete(root: HTMLElement): boolean {
+  const { config } = parseConfig(readRawSettings(root));
+  return !config || root.querySelector(`[${lastMarkerFor(config)}]`) !== null;
+}
+
+function enhanceEmbed(doc: Document): void {
+  if (isMounted(doc)) return;
+  const root = findRoot(doc);
+  if (!root) return;
+  markMounted(doc);
+  const { config, warnings } = parseConfig(readRawSettings(root));
+  reportInvalidSettings(root);
+  reportWarnings(warnings);
+  if (!config) {
+    root.remove();
+    warnMessageRequired();
+    return;
+  }
+  enhance(root, config);
+}
+
+/**
+ * Enhances the server-rendered bar, once per page. Does nothing when the page has none.
+ * While the document loads, a bar whose markup is already complete is enhanced at once
+ * so a dismissed or ended bar never flashes.
+ */
 export function mountEmbed(doc: Document): void {
-  whenDomReady(doc, () => {
-    const root = findRoot(doc);
-    if (!root) return;
-    markMounted(doc);
-    const { config, warnings } = parseConfig(readRawSettings(root));
-    reportWarnings(warnings);
-    if (!config) {
-      root.remove();
-      warnMessageRequired();
-      return;
-    }
-    enhance(root, config);
-  });
+  const root = findRoot(doc);
+  if (doc.readyState === 'loading' && !(root && isRootComplete(root))) {
+    doc.addEventListener('DOMContentLoaded', () => enhanceEmbed(doc), { once: true });
+    return;
+  }
+  enhanceEmbed(doc);
 }
 
 /**

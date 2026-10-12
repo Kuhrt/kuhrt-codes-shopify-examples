@@ -1,3 +1,5 @@
+import labels from '../extensions/announcement-bar/locales/en.default.json';
+
 export const SETTING = {
   message: 'message',
   linkUrl: 'link_url',
@@ -27,21 +29,27 @@ export const ENDED_ATTRIBUTE = 'data-kc-ended';
 export const BACKGROUND_PROPERTY = '--kc-bar-background';
 export const TEXT_PROPERTY = '--kc-bar-color';
 
-export const DEFAULT_LABELS = {
-  region: 'Announcement',
-  dismiss: 'Dismiss announcement'
-} as const;
+export const INVALID_ATTRIBUTE = 'data-kc-invalid';
+
+export const DEFAULT_LABELS = labels.announcement_bar;
 
 /** The root data attribute that carries a setting's value, e.g. `link_url` becomes `data-kc-link-url`. */
 export function dataAttributeFor(setting: SettingName): string {
   return `data-kc-${setting.replaceAll('_', '-')}`;
 }
 
-/** Reads the raw settings carried on a bar root. */
-export function readRawSettings(root: Element): RawSettings {
+/** Reads every known setting through `get`; a missing value is `undefined`. */
+export function readSettings(
+  get: (setting: SettingName) => string | null | undefined
+): RawSettings {
   const raw: RawSettings = {};
   for (const setting of Object.values(SETTING)) {
-    raw[setting] = root.getAttribute(dataAttributeFor(setting)) ?? undefined;
+    raw[setting] = get(setting) ?? undefined;
   }
   return raw;
+}
+
+/** Reads the raw settings carried on a bar root. */
+export function readRawSettings(root: Element): RawSettings {
+  return readSettings((setting) => root.getAttribute(dataAttributeFor(setting)));
 }

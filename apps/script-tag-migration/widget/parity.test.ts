@@ -15,7 +15,13 @@ import {
 } from './liquid-test-support';
 import { buildBar } from './render';
 import type { RawSettings } from './settings';
-import { ENDED_BEHAVIOR, ROOT_ATTRIBUTE, SETTING } from './settings';
+import {
+  ENDED_BEHAVIOR,
+  INVALID_ATTRIBUTE,
+  readRawSettings,
+  ROOT_ATTRIBUTE,
+  SETTING
+} from './settings';
 
 interface MerchantInput {
   message: string;
@@ -26,6 +32,8 @@ interface MerchantInput {
   dismissible?: boolean;
   backgroundColor?: string;
   textColor?: string;
+  /** Hands Liquid `null` rather than an empty string for unset colors. */
+  nullColors?: boolean;
 }
 
 interface NormalizedElement {
@@ -36,6 +44,8 @@ interface NormalizedElement {
 
 const STYLESHEET_ASSET = 'announcement-bar.css';
 const OFFSET_WITHOUT_COLON = /([+-]\d{2})(\d{2})$/;
+const REJECTED_END_TIME = 'not-an-end-time';
+const NON_BREAKING_SPACE = String.fromCharCode(0xa0);
 
 const CASES: Record<string, MerchantInput> = {
   minimal: { message: 'Sale' },
@@ -82,12 +92,31 @@ const CASES: Record<string, MerchantInput> = {
     endedBehavior: ENDED_BEHAVIOR.message,
     endedMessage: '   '
   },
+  'blank ended message without an end time': {
+    message: 'Sale',
+    endedBehavior: ENDED_BEHAVIOR.message,
+    endedMessage: ''
+  },
   'unparseable end time': { message: 'Sale', endsAt: 'soon' },
+  'unparseable end time with the message behavior': {
+    message: 'Sale',
+    endsAt: 'soon',
+    endedBehavior: ENDED_BEHAVIOR.message,
+    endedMessage: 'Sale is over'
+  },
+  'end time before 1970': { message: 'Sale', endsAt: '1969-12-31 00:00' },
+  'end time that is only a date': { message: 'Sale', endsAt: '2026-11-27' },
+  'end time written with a month name': { message: 'Sale', endsAt: 'Nov 27 2026' },
+  'end time with a zone suffix': { message: 'Sale', endsAt: '2026-11-27 00:00 PST' },
   'end time in the past': { message: 'Sale', endsAt: '2020-01-01 00:00' },
   'end time with trailing characters': { message: 'Sale', endsAt: '123abc' },
   'mailto link': { message: 'Sale', linkUrl: 'mailto:a@b.c' },
   'javascript link': { message: 'Sale', linkUrl: 'javascript:alert(1)' },
   'protocol-relative link': { message: 'Sale', linkUrl: '//evil.example' },
+  'http link without a host': { message: 'Sale', linkUrl: 'http://' },
+  'https link without a host': { message: 'Sale', linkUrl: 'https://' },
+  'link with a tab': { message: 'Sale', linkUrl: '/\t/evil.example' },
+  'link with a newline': { message: 'Sale', linkUrl: '/path\nwith-newline' },
   'link with a space': { message: 'Sale', linkUrl: '/path with space' },
   'link with a backslash after the slash': { message: 'Sale', linkUrl: '/\\evil.example' },
   'link with an uppercase scheme': { message: 'Sale', linkUrl: 'HTTPS://EXAMPLE.COM/x' },
@@ -95,8 +124,13 @@ const CASES: Record<string, MerchantInput> = {
   'rgba color': { message: 'Sale', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
   'named color': { message: 'Sale', textColor: 'red' },
   'five digit hex color': { message: 'Sale', backgroundColor: '#12345' },
-  'uppercase short hex color': { message: 'Sale', backgroundColor: '#ABC' }
+  'uppercase short hex color': { message: 'Sale', backgroundColor: '#ABC' },
+  'unset colors given to Liquid as null': { message: 'Sale', nullColors: true }
 };
+
+function unsetColor(input: MerchantInput): string | null {
+  return input.nullColors ? null : '';
+}
 
 function toLiquidSettings(input: MerchantInput): BlockSettings {
   return {
@@ -106,14 +140,14 @@ function toLiquidSettings(input: MerchantInput): BlockSettings {
     [SETTING.endedBehavior]: input.endedBehavior ?? ENDED_BEHAVIOR.hide,
     [SETTING.endedMessage]: input.endedMessage ?? '',
     [SETTING.dismissible]: input.dismissible ?? false,
-    [SETTING.backgroundColor]: input.backgroundColor ?? '',
-    [SETTING.textColor]: input.textColor ?? ''
+    [SETTING.backgroundColor]: input.backgroundColor ?? unsetColor(input),
+    [SETTING.textColor]: input.textColor ?? unsetColor(input)
   };
 }
 
 function toEpochSecondsText(endsAt: string): string {
   const parsed = parseLocalDateTime(endsAt);
-  return parsed ? String(parsed.epochSeconds) : endsAt;
+  return parsed ? String(parsed.epochSeconds) : REJECTED_END_TIME;
 }
 
 function toRawSettings(input: MerchantInput): RawSettings {
@@ -155,6 +189,7 @@ function normalizeText(text: string): string {
 function normalize(element: Element): NormalizedElement {
   const attributes: NormalizedElement['attributes'] = {};
   for (const { name, value } of Array.from(element.attributes)) {
+    if (name === INVALID_ATTRIBUTE) continue;
     attributes[name] = normalizeAttribute(name, value);
   }
   const children: NormalizedElement['children'] = [];
@@ -179,6 +214,16 @@ function findLiquidRoot(html: string): Element | null {
   return parseFragment(html).querySelector(`[${ROOT_ATTRIBUTE}]`);
 }
 
+function invalidSettingsOn(root: Element): string[] {
+  return (root.getAttribute(INVALID_ATTRIBUTE) ?? '').split(/\s+/).filter((id) => id !== '');
+}
+
+/** Every setting the embed path reports: what Liquid dropped, plus what `parseConfig` rejects on the rendered root. */
+function embedWarnedSettings(root: Element): Set<string> {
+  const { warnings } = parseConfig(readRawSettings(root));
+  return new Set([...invalidSettingsOn(root), ...warnings.map(({ setting }) => setting)]);
+}
+
 describe('Liquid block and buildBar parity', () => {
   it.each(Object.entries(CASES))('renders the same tree for: %s', (_name, input) => {
     const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
@@ -188,6 +233,61 @@ describe('Liquid block and buildBar parity', () => {
     expect(config).not.toBeNull();
     if (liquidRoot === null || config === null) return;
     expect(normalize(buildBar(config))).toEqual(normalize(liquidRoot));
+  });
+
+  it.each(Object.entries(CASES))(
+    'round-trips through the embed parser to the same config and warnings for: %s',
+    (_name, input) => {
+      const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
+      const legacy = parseConfig(toRawSettings(input));
+
+      expect(liquidRoot).not.toBeNull();
+      if (liquidRoot === null) return;
+      expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(legacy.config);
+      expect(embedWarnedSettings(liquidRoot)).toEqual(
+        new Set(legacy.warnings.map(({ setting }) => setting))
+      );
+    }
+  );
+
+  it('lists each dropped setting in the invalid attribute', () => {
+    const root = findLiquidRoot(
+      renderBlock(
+        toLiquidSettings({
+          message: 'Sale',
+          linkUrl: 'javascript:alert(1)',
+          endsAt: 'soon',
+          backgroundColor: 'red',
+          textColor: 'blue'
+        })
+      )
+    );
+
+    expect(root && new Set(invalidSettingsOn(root))).toEqual(
+      new Set([SETTING.linkUrl, SETTING.endsAt, SETTING.backgroundColor, SETTING.textColor])
+    );
+  });
+
+  it('leaves the invalid attribute off when every setting is valid', () => {
+    const root = findLiquidRoot(
+      renderBlock(
+        toLiquidSettings({ message: 'Sale', linkUrl: '/sale', endsAt: '2027-01-15 08:30' })
+      )
+    );
+
+    expect(root?.hasAttribute(INVALID_ATTRIBUTE)).toBe(false);
+  });
+
+  it('renders a link containing Unicode whitespace that only the embed parser rejects', () => {
+    const root = findLiquidRoot(
+      renderBlock(toLiquidSettings({ message: 'Sale', linkUrl: `/a${NON_BREAKING_SPACE}b` }))
+    );
+
+    expect(root).not.toBeNull();
+    if (root === null) return;
+    expect(root.hasAttribute(INVALID_ATTRIBUTE)).toBe(false);
+    expect(parseConfig(readRawSettings(root)).config?.linkUrl).toBeUndefined();
+    expect(embedWarnedSettings(root)).toEqual(new Set([SETTING.linkUrl]));
   });
 
   it('loads the stylesheet before the bar', () => {

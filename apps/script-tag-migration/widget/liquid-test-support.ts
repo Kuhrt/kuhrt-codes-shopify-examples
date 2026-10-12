@@ -19,6 +19,8 @@ const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
 const EPOCH_FORMAT = '%s';
 const ASSET_BASE_URL = 'https://cdn.example/assets/';
 const ISO_OFFSET_FORMAT = '%Y-%m-%dT%H:%M:%S%z';
+const STORE_OFFSET = '-05:00';
+const STORE_OFFSET_WITHOUT_COLON = STORE_OFFSET.replace(':', '');
 
 export interface BlockSchema {
   target: string;
@@ -26,7 +28,7 @@ export interface BlockSchema {
   settings: { id: string; type: string }[];
 }
 
-export type BlockSettings = Record<string, string | boolean | undefined>;
+export type BlockSettings = Record<string, string | boolean | null | undefined>;
 
 function readExtensionFile(path: string): string {
   return readFileSync(extensionPath(path), 'utf8');
@@ -57,21 +59,22 @@ function lookupTranslation(key: string): string {
 export interface LocalDateTime {
   /** The wall-clock time as ISO 8601 without an offset. */
   iso: string;
-  /** Epoch seconds, reading the wall-clock time as UTC. */
+  /** Epoch seconds, reading the wall-clock time in the store time zone. */
   epochSeconds: number;
 }
 
-/** Reads `YYYY-MM-DD HH:MM`, the shape of a merchant-entered end time, with the store time zone fixed to UTC. */
+/** Reads `YYYY-MM-DD HH:MM`, the shape of a merchant-entered end time, in the fixed store time zone (UTC-05:00). */
 export function parseLocalDateTime(input: string): LocalDateTime | undefined {
   const match = LOCAL_DATE_TIME.exec(input);
   if (!match) return undefined;
   const [, year, month, day, hour, minute] = match;
   const iso = `${year}-${month}-${day}T${hour}:${minute}:00`;
-  return { iso, epochSeconds: Date.parse(`${iso}Z`) / 1000 };
+  const epochSeconds = Date.parse(`${iso}${STORE_OFFSET}`) / 1000;
+  return Number.isNaN(epochSeconds) ? undefined : { iso, epochSeconds };
 }
 
 /**
- * Stands in for Shopify's `date` filter with the store time zone fixed to UTC.
+ * Stands in for Shopify's `date` filter with the store time zone fixed to UTC-05:00.
  * Understands inputs shaped `YYYY-MM-DD HH:MM` and the `%s` and `%Y-%m-%dT%H:%M:%S%z` formats only.
  * Like Liquid, an input it cannot parse is returned unchanged.
  */
@@ -79,7 +82,7 @@ function stubDate(input: unknown, format: string): unknown {
   const parsed = parseLocalDateTime(String(input));
   if (!parsed) return input;
   if (format === EPOCH_FORMAT) return String(parsed.epochSeconds);
-  if (format === ISO_OFFSET_FORMAT) return `${parsed.iso}+0000`;
+  if (format === ISO_OFFSET_FORMAT) return `${parsed.iso}${STORE_OFFSET_WITHOUT_COLON}`;
   throw new Error(`Unsupported date format: ${format}`);
 }
 

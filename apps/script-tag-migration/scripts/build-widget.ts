@@ -109,12 +109,13 @@ async function watchBundles(bundles: Bundle[]): Promise<void> {
   await Promise.all(contexts.map((ctx) => ctx.watch()));
 }
 
-async function main(args: string[]): Promise<void> {
+/** Builds `bundles` (watching with `--watch`). Sets a failing exit code when one is over budget. */
+export async function main(args: string[], bundles: Bundle[] = BUNDLES): Promise<void> {
   if (args.includes('--watch')) {
-    await watchBundles(BUNDLES);
+    await watchBundles(bundles);
     return;
   }
-  const sizes = await buildBundles(BUNDLES);
+  const sizes = await buildBundles(bundles);
   if (!reportSizes(sizes)) process.exitCode = 1;
 }
 

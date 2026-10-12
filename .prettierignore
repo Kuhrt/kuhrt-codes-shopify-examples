@@ -11,5 +11,5 @@ worker-configuration.d.ts
 openspec
 .claude
 migrations/meta
-**/extensions/*/assets/*.js
-**/public/legacy/
+apps/script-tag-migration/extensions/*/assets/*.js
+apps/script-tag-migration/public/legacy/

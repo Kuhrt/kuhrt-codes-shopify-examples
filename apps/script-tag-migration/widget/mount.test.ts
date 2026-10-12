@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { BarConfig } from './config';
 import { MOUNTED, mountEmbed, mountLegacy } from './mount';
 import { buildBar } from './render';
 import {
   dataAttributeFor,
   DISMISS_ATTRIBUTE,
   ENDED_BEHAVIOR,
+  INVALID_ATTRIBUTE,
   ROOT_ATTRIBUTE,
   SETTING
 } from './settings';
@@ -18,11 +20,14 @@ function legacySrc(params: Record<string, string>): string {
   return `https://app.example/legacy/announcement-bar.js?${new URLSearchParams(params)}`;
 }
 
-function embedRoot(): HTMLElement {
+const FAR_FUTURE_MS = Date.UTC(2999, 0, 1);
+
+function embedRoot(overrides: Partial<BarConfig> = {}): HTMLElement {
   const root = buildBar({
     message: 'Embedded',
     ended: { behavior: ENDED_BEHAVIOR.hide },
-    dismissible: true
+    dismissible: true,
+    ...overrides
   });
   document.body.appendChild(root);
   return root;
@@ -52,6 +57,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   document.body.replaceChildren();
   Reflect.deleteProperty(window, MOUNTED);
@@ -220,16 +226,113 @@ describe('mountEmbed', () => {
     expect(warningText(0)).toContain(SETTING.message);
   });
 
-  it('waits for DOMContentLoaded while the document is loading', () => {
+  it('enhances a complete root at once while the document is loading', () => {
     const embed = embedRoot();
     setReadyState('loading');
 
     mountEmbed(document);
+
+    dismiss(embed);
+    expect(bars()).toHaveLength(0);
+  });
+
+  it('waits for DOMContentLoaded when the root is missing its dismiss button', () => {
+    const embed = embedRoot();
+    const button = embed.querySelector(`[${DISMISS_ATTRIBUTE}]`);
+    button?.remove();
+    setReadyState('loading');
+
+    mountEmbed(document);
+    if (button) embed.appendChild(button);
     dismiss(embed);
     expect(bars()).toHaveLength(1);
 
     document.dispatchEvent(new Event('DOMContentLoaded'));
     dismiss(embed);
     expect(bars()).toHaveLength(0);
+  });
+
+  it('waits for DOMContentLoaded when the root is missing its countdown', () => {
+    const embed = embedRoot({ dismissible: false, endsAtMs: FAR_FUTURE_MS });
+    const countdown = embed.querySelector('[data-kc-countdown]');
+    countdown?.remove();
+    setReadyState('loading');
+    vi.useFakeTimers();
+
+    mountEmbed(document);
+    expect(vi.getTimerCount()).toBe(0);
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(vi.getTimerCount()).toBe(1);
+  });
+
+  it('waits for DOMContentLoaded when no root exists yet', () => {
+    setReadyState('loading');
+
+    mountEmbed(document);
+    const embed = embedRoot();
+    dismiss(embed);
+    expect(bars()).toHaveLength(1);
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    dismiss(embed);
+    expect(bars()).toHaveLength(0);
+  });
+
+  it('enhances once when mounted twice', () => {
+    const embed = embedRoot({ endsAtMs: FAR_FUTURE_MS });
+    const store = vi.spyOn(localStorage, 'setItem');
+    vi.useFakeTimers();
+
+    mountEmbed(document);
+    mountEmbed(document);
+    expect(vi.getTimerCount()).toBe(1);
+
+    dismiss(embed);
+    expect(store).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not enhance a bar a legacy script already built', () => {
+    const store = vi.spyOn(localStorage, 'setItem');
+    vi.useFakeTimers();
+    mountLegacy(
+      document,
+      legacySrc({
+        [SETTING.message]: 'Sale',
+        [SETTING.dismissible]: 'true',
+        [SETTING.endsAt]: String(FAR_FUTURE_MS / 1000)
+      })
+    );
+
+    mountEmbed(document);
+    expect(vi.getTimerCount()).toBe(1);
+
+    dismiss(bars()[0] as HTMLElement);
+    expect(store).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when the page is already marked as mounted', () => {
+    const embed = embedRoot();
+    Reflect.set(window, MOUNTED, true);
+
+    mountEmbed(document);
+
+    dismiss(embed);
+    expect(bars()).toEqual([embed]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns once for each known setting listed as invalid and ignores unknown ids', () => {
+    const embed = embedRoot();
+    embed.setAttribute(
+      INVALID_ATTRIBUTE,
+      `${SETTING.linkUrl} bogus ${SETTING.endsAt} ${SETTING.linkUrl}`
+    );
+
+    mountEmbed(document);
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warningText(0)).toContain(SETTING.linkUrl);
+    expect(warningText(1)).toContain(SETTING.endsAt);
   });
 });

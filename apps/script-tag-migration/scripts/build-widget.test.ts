@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Bundle } from './build-widget';
 import {
@@ -12,7 +12,8 @@ import {
   buildBundles,
   BUNDLES,
   GZIP_BUDGET_BYTES,
-  isEntryPoint
+  isEntryPoint,
+  main
 } from './build-widget';
 
 const MOUNT_MODULE = fileURLToPath(new URL('../widget/mount.ts', import.meta.url));
@@ -68,6 +69,34 @@ describe('widget bundles', () => {
     expect(failure).toContain('large.js');
     expect(failure).not.toContain('small.js');
     expect(budgetFailure(sizes, 100)).toBeUndefined();
+  });
+});
+
+describe('main', () => {
+  let exitCode: typeof process.exitCode;
+
+  beforeEach(() => {
+    exitCode = process.exitCode;
+    process.exitCode = undefined;
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.exitCode = exitCode;
+    vi.restoreAllMocks();
+  });
+
+  it('leaves the exit code alone when every bundle is within budget', async () => {
+    await main([], [inOutDir(BUNDLES[0] as Bundle, 'within-budget.js')]);
+
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('fails the process when a bundle is over budget', async () => {
+    await main([], [oversizedEntry()]);
+
+    expect(process.exitCode).toBe(1);
   });
 });
 
