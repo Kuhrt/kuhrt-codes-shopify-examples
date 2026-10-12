@@ -1,0 +1,10 @@
+{
+  "extends": "@repo/config/tsconfig.base.json",
+  "include": ["env.d.ts", "**/*.ts", "**/*.tsx", ".react-router/types/**/*"],
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "@shopify/polaris-types", "@shopify/app-bridge-types"],
+    "rootDirs": [".", "./.react-router/types"]
+  }
+}
