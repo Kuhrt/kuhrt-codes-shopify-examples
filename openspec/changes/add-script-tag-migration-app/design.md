@@ -185,3 +185,27 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 - Worker hostname: a `*.workers.dev` URL or a custom subdomain such as `script-tag-migration.apps.kuhrt.codes`. Either works and nothing else depends on the choice. Pick at deploy time.
 - Whether the date-filter behavior in decision 4 holds. The spike task answers it, and both outcomes are already designed.
+
+## Implementation Notes
+
+### Template scaffold (task 1.1)
+
+- Scaffolded with Shopify CLI 4.9.3: `shopify app init --template reactRouter --flavor typescript -d pnpm`. The app was created in the Kuhrt.Codes organization with client ID `0537e606a33d34ab1c48033a40349773`. A client ID is public, not a secret.
+- Template versions kept as shipped:
+  - `react` and `react-dom` 18.3.1;
+  - `react-router` and `@react-router/*` 7.18.2;
+  - `@shopify/shopify-app-react-router` 3.0.2 (with `@shopify/shopify-api` 15.0.1);
+  - `@shopify/app-bridge-react` 4.2.13;
+  - `@shopify/polaris-types` 1.1.0;
+  - `vite` 6.4.4.
+- **API version.** The template ships `ApiVersion.July26` and webhooks on `2027-01`. Both are pinned to `2026-10` (`ApiVersion.October26`), the latest stable version.
+- **Workspace toolchain replaces the template's:**
+  - ESLint 8 with `.eslintrc.cjs` became ESLint 10 flat config extending `@repo/config`. It uses `eslint-plugin-react-hooks`, as the website repo does. `eslint-plugin-react` and `eslint-plugin-jsx-a11y` were dropped because neither declares ESLint 10 support.
+  - TypeScript 5.9 became 6.0.3. `tsconfig.json` extends `@repo/config/tsconfig.base.json`.
+  - The template's Prettier, its nested pnpm workspace, `.npmrc`, and its `shamefullyHoist` setting are removed.
+  - `@shopify/app-bridge-types` is now an explicit dev dependency. The template only reached it through hoisting, for the `s-app-nav` JSX types.
+  - `vite-tsconfig-paths` pulls in `tsconfck`, which declares a `typescript ^5` peer. That leaves one peer warning under TypeScript 6, with no observed effect.
+- **Template code removed:**
+  - The product and metaobject demo, which needs scopes this app doesn't request: the `app._index` action, `app.additional`, and the `shopify.app.toml` metafield and metaobject definitions.
+  - Docker files and editor/agent config.
+- **Offline tokens expire.** The template enables `expiringOfflineAccessTokens`, so the stored offline session expires after one hour. `scripts/try-legacy-install.ts` (task 4.4) must refresh the token or ask the developer to reopen the app first.

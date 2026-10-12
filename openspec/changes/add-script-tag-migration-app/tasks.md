@@ -4,8 +4,8 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 1. Spike: scaffold, Workers hosting, platform checks (gate)
 
-- [ ] 1.1 Install the Shopify CLI (`npm i -g @shopify/cli@latest`). Scaffold `apps/script-tag-migration` from `shopify-app-template-react-router`. Create the app in the Kuhrt.Codes Partner account, with `dev_store_url = "kuhrt-codes.myshopify.com"`, `scopes = "write_script_tags"`, and API version `2026-10`. Wire the app into the workspace (`lint`, `typecheck`, `test` scripts; extend `@repo/config`). Record the template's package versions in design.md. Verify: `pnpm check` passes with the untouched template, and `shopify app dev` installs it on `kuhrt-codes`.
-- [ ] 1.2 Move the app server to Cloudflare Workers (design decision 9):
+- [x] 1.1 Install the Shopify CLI (`npm i -g @shopify/cli@latest`). Scaffold `apps/script-tag-migration` from `shopify-app-template-react-router`. Create the app in the Kuhrt.Codes Partner account, with `dev_store_url = "kuhrt-codes.myshopify.com"`, `scopes = "write_script_tags"`, and API version `2026-10`. Wire the app into the workspace (`lint`, `typecheck`, `test` scripts; extend `@repo/config`). Record the template's package versions in design.md. Verify: `pnpm check` passes with the untouched template, and `shopify app dev` installs it on `kuhrt-codes`.
+- [x] 1.2 Move the app server to Cloudflare Workers (design decision 9):
   - `@cloudflare/vite-plugin`, the Shopify API's Cloudflare Worker adapter, and `wrangler.jsonc`;
   - an official Workers session storage adapter (D1 preferred, KV if D1 isn't official); remove Prisma;
   - `.dev.vars.example`.
