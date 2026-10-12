@@ -98,8 +98,10 @@ apps/script-tag-migration/
 - Theme settings have no date picker. The setting is a `text` field with help text showing the format `YYYY-MM-DD HH:MM`, entered in store-local time.
 - Liquid converts it once with the `date` filter (`| date: '%s'`), which Shopify evaluates in the shop's timezone, and emits `data-ends-at="<epoch seconds>"`. JavaScript only ever compares epoch values.
 - This satisfies the cross-timezone scenario and handles DST correctly, as long as Shopify's date parsing applies the zone's offset *at the target date*, not today's offset.
-- **Verify in the spike task (1.3):** an end time in November must come out at −05:00 when rendered in October (−04:00).
-  - **Fallback if Liquid uses today's offset:** emit the raw string plus the shop's IANA zone and resolve it in JavaScript with `Intl.DateTimeFormat`. Choose this only if the spike fails.
+- **Verified on `kuhrt-codes` (task 1.3), rendered on 2026-10-12 with the store on Eastern time (−04:00 that day):**
+  - `'2026-11-27 00:00' | date: '%s'` gave `1795755600` (2026-11-27T05:00:00Z, −05:00).
+  - `'2026-10-15 00:00'` gave `1792036800` (−04:00).
+  - Liquid applies the offset at the target date, so the Liquid conversion stands and the IANA-zone fallback is not needed.
 - Legacy query-string configuration takes an ISO 8601 string with an explicit offset. The setting name is the same; only the input format differs. That difference is documented as part of the mapping in `MIGRATION.md`.
 
 ### 5. The legacy script configures itself from its own URL
@@ -122,7 +124,21 @@ apps/script-tag-migration/
 
 ### 8. Embed status comes from App Bridge; removal is gated client-side and re-validated server-side
 
-- The console calls `shopify.app.extensions()` and treats the embed as confirmed only when it reports an `active` activation. It re-checks on `visibilitychange` and `focus` (to satisfy "refreshes on return").
+- The console calls `shopify.app.extensions()`, finds the block entry by its block `handle`, and treats the embed as confirmed only when that entry's `status` is `active`. It re-checks on `visibilitychange` and `focus` (to satisfy "refreshes on return").
+- **Verified on `kuhrt-codes` (task 1.4):** `extensions()` returns `ExtensionInfo[]` (`@shopify/app-bridge-types`). The theme app extension entry looked like this:
+  ```text
+  { "handle": "<extension handle>", "type": "theme_app_extension",
+    "activations": [{ "target": "body", "handle": "<block handle>", "name": "<block name>",
+      "status": "active" | "available" | "unavailable",
+      "activations": [{ "target": "theme/<placement id>", "themeId": "gid://shopify/OnlineStoreTheme/<theme id>" }] }] }
+  ```
+  - `status` lives on the block entry; the inner activations carry no status. Only `themeId` identifies the theme; the `target` ID observed was a different number.
+  - With the embed off, the block reports `available` and an empty inner `activations` array. After it is enabled on the live theme and saved, it reports `active` with one activation whose `themeId` is the live theme.
+  - With the embed enabled only on an unpublished copy of the theme, it reports `available` and no activations. So `active` means "enabled on the published theme", and the gate needs no theme lookup.
+  - The extension-level `handle` came back as `theme-app-extension`, not the extension's `name` (`platform-probe`). The block `handle` is the block's filename. The console matches on the block handle, never the extension handle.
+  - The deep link `https://admin.shopify.com/store/<store>/themes/current/editor?context=apps&activateAppId={client_id}/{handle}` (the same path as in Context, under the store's admin root) opened the App embeds panel with the embed pre-toggled. Saving made it active.
+  - The Liquid `theme` object is empty inside an app embed block, so the block can't report which theme it is on.
+- **Status mapping:** `active` → active. `available` → inactive, with the enable action. `unavailable`, a missing block entry, or a failed call → unknown, with retry. Only active passes the removal gate.
 - **No `read_themes` scope:** the alternative, reading `config/settings_data.json` on the server, needs `read_themes`. That is one more scope to explain, and the data is less direct (an entry with `disabled: true` persists after an embed is turned off). Rejected.
 - **Consequence:** the server can't independently verify the embed. The removal gate is enforced in the UI. The server action re-queries `scriptTags` and deletes only an ID present in this app's own list, which blocks forged IDs.
 - **Accepted risk:** a merchant who bypasses the UI could delete a tag early. They can only harm their own store, and the confirmation explains that deletion can't be undone. This trade-off is recorded in `MIGRATION.md`.
@@ -163,7 +179,6 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 ## Risks / Trade-offs
 
 - [The React Router template on Workers is less trodden than Node] → Spike gate (decision 9), stop-and-ask on failure.
-- [Liquid's `date` filter applies today's UTC offset instead of the target date's] → Verified in the spike; JavaScript and IANA-zone fallback (decision 4).
 - [The removal gate is client-enforced] → The server re-validates ownership; the confirmation explains it's irreversible; recorded in `MIGRATION.md` (decision 8).
 - [Markup is duplicated between Liquid and `render.ts`] → The parity test fails on drift (decision 2).
 - [The legacy path can't be shown running on a real store] → The E2E harness runs it for real against the same scenarios, the recorded rejection proves the block, and `MIGRATION.md` says so plainly rather than faking a "before".
@@ -184,7 +199,6 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 ## Open Questions
 
 - Worker hostname: a `*.workers.dev` URL or a custom subdomain such as `script-tag-migration.apps.kuhrt.codes`. Either works and nothing else depends on the choice. Pick at deploy time.
-- Whether the date-filter behavior in decision 4 holds. The spike task answers it, and both outcomes are already designed.
 
 ## Implementation Notes
 
