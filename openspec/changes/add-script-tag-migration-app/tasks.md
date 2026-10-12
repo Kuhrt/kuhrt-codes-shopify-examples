@@ -16,10 +16,10 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 2. Widget core (`widget/`)
 
-- [ ] 2.1 Add setting-name constants and `parseConfig(raw)` → `{ config, warnings }`: message, link (http, https or relative only), end time (epoch, or ISO with offset), ended behavior, ended message, dismissible, and colors. Verify: unit tests cover each valid setting, an empty message, an unparseable end time, unsafe link schemes (`javascript:`, `data:`), unknown keys ignored, and one warning per invalid setting.
-- [ ] 2.2 Add `remaining(endsAt, now)` → parts or `'ended'`. Verify: unit tests cover 1d 2h 3m 4s, under one day (the days unit is dropped), exactly zero, the past, and a one-second tick.
-- [ ] 2.3 Add dismissal state, keyed by a hash of the message and end time, that degrades safely when storage throws. Verify: unit tests cover persist, a new campaign resets it, and `localStorage` throwing on get and on set.
-- [ ] 2.4 Add `buildBar(config)` and `enhance(root, config, clock)`. Verify: DOM tests with fake timers cover:
+- [x] 2.1 Add setting-name constants and `parseConfig(raw)` → `{ config, warnings }`: message, link (http, https or relative only), end time (epoch, or ISO with offset), ended behavior, ended message, dismissible, and colors. Verify: unit tests cover each valid setting, an empty message, an unparseable end time, unsafe link schemes (`javascript:`, `data:`), unknown keys ignored, and one warning per invalid setting.
+- [x] 2.2 Add `remaining(endsAt, now)` → parts or `'ended'`. Verify: unit tests cover 1d 2h 3m 4s, under one day (the days unit is dropped), exactly zero, the past, and a one-second tick.
+- [x] 2.3 Add dismissal state, keyed by a hash of the message and end time, that degrades safely when storage throws. Verify: unit tests cover persist, a new campaign resets it, and `localStorage` throwing on get and on set.
+- [x] 2.4 Add `buildBar(config)` and `enhance(root, config, clock)`. Verify: DOM tests with fake timers cover:
   - countdown ticks;
   - the transitions to "hide" and to "ended message";
   - a page loaded after the end time;

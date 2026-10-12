@@ -244,3 +244,22 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - Replace the `https://example.com` placeholders in `shopify.app.toml` with the Worker URL. Check `redirect_urls` against `authPathPrefix` (`/auth`).
 - Check that `wrangler deploy` provisions the D1 database (no `database_id` is committed), then run `wrangler d1 migrations apply DB --remote` before the first install.
 - Set the three secrets with `wrangler secret put`.
+
+### Widget core (tasks 2.1–2.4)
+
+- **Type boundary.** The Workers runtime types (`worker-configuration.d.ts`) declare a global `Element` that conflicts with the DOM's. `widget/` is browser-only code, so it has its own `tsconfig.json` with DOM types, and the app tsconfig excludes it. `typecheck` runs both.
+- **Settings.** `widget/settings.ts` holds the setting IDs: `message`, `link_url`, `ends_at`, `ended_behavior`, `ended_message`, `dismissible`, `background_color` and `text_color`. The theme extension's `{% schema %}` IDs and the legacy query-string keys must use them unchanged.
+- **Markup contract for the Liquid block (task 3.1).** `buildBar()` produces:
+  - an `<aside data-kc-announcement-bar aria-label>` root;
+  - a `<p data-kc-message>`, holding an `<a href>` when a link is set;
+  - `<time data-kc-countdown datetime="<UTC ISO, no milliseconds>">`, only when there is an end time;
+  - `<button type="button" data-kc-dismiss aria-label>`, only when dismissible.
+- **Settings on the root.** The root also carries the normalized settings as `data-*` attributes. The embed entry rebuilds its config with `parseConfig(readRawSettings(root))`.
+  - Always present: `data-message`, `data-ended-behavior` and `data-dismissible`.
+  - Present only when set: `data-link-url`, `data-ends-at` (epoch seconds), `data-ended-message` (only when the behavior is `message`), and the two color attributes.
+  - Colors are also applied as the inline custom properties `--kc-bar-background` and `--kc-bar-color`.
+- **Parsing rules.**
+  - An empty or whitespace value means "unset" and gives no warning. Only a non-empty invalid value warns.
+  - End times are floored to whole seconds, so epoch input (Liquid) and ISO input (legacy) give the same value and the same dismissal key.
+  - An empty ended message under the `message` behavior falls back to `hide`, with one warning.
+- **Ending and dismissal.** Ending with `hide`, or dismissing, removes the root from the DOM. Dismissal moves focus to `body` through a temporary `tabindex="-1"`, which is removed on blur.
