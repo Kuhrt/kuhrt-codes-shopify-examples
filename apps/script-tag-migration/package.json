@@ -2,7 +2,9 @@
   "name": "script-tag-migration",
   "private": true,
   "scripts": {
-    "build": "react-router build",
+    "build": "pnpm build:widget && react-router build",
+    "build:widget": "node scripts/build-widget.ts",
+    "dev:widget": "node scripts/build-widget.ts --watch",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
@@ -46,6 +48,7 @@
     "@types/react": "^18.3.25",
     "@types/react-dom": "^18.3.7",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "0.28.2",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",

@@ -27,7 +27,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - the region is a labelled landmark;
   - the countdown isn't a live region;
   - `<time datetime>` is present.
-- [ ] 2.5 Add `entry-embed.ts`, plus `entry-legacy.ts` with the single-instance guard (design decision 6). Add an esbuild build that writes `extensions/announcement-bar/assets/announcement-bar.js` and `public/legacy/announcement-bar.js` (both gitignored), and wire it into turbo `build` and `dev`. Add a gzip budget check (≤ 10 KB). Verify: DOM tests cover legacy loaded twice (one bar) and embed markup plus legacy (one bar, the embed's, one warning). `pnpm build` produces both files, and an oversized dummy import fails the budget.
+- [x] 2.5 Add `entry-embed.ts`, plus `entry-legacy.ts` with the single-instance guard (design decision 6). Add an esbuild build that writes `extensions/announcement-bar/assets/announcement-bar.js` and `public/legacy/announcement-bar.js` (both gitignored), and wire it into turbo `build` and `dev`. Add a gzip budget check (≤ 10 KB). Verify: DOM tests cover legacy loaded twice (one bar) and embed markup plus legacy (one bar, the embed's, one warning). `pnpm build` produces both files, and an oversized dummy import fails the budget.
 
 ## 3. Theme app extension (modern path)
 

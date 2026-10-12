@@ -11,3 +11,5 @@ worker-configuration.d.ts
 openspec
 .claude
 migrations/meta
+**/extensions/*/assets/announcement-bar.js
+**/public/legacy/announcement-bar.js
