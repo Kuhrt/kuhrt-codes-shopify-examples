@@ -1,0 +1,29 @@
+schema: spec-driven
+
+context: |
+  Portfolio sample apps for Kuhrt.Codes (shopify.kuhrt.codes/examples, Upwork, proposals).
+  The goal is proof of skill, not products: small, readable, well documented, each
+  explainable in a 60-second screen recording. Prefer the obvious implementation over the
+  clever one; a reviewer skimming the repo is the primary audience.
+
+  Development stores (Shopify Partner account "Kuhrt.Codes"):
+    - kuhrt-codes.myshopify.com: messy dev store, default target for `shopify app dev`. Safe to break.
+    - kuhrt-codes-demo.myshopify.com: demos and recordings only. Install finished builds only;
+      never point unfinished work at it.
+
+  Hard constraints:
+    - Request minimal access scopes; every app README lists each scope and why it is needed.
+    - No secrets, tokens, or client secrets in the repo or in specs. Use gitignored .env /
+      .dev.vars files or the Shopify CLI's own config.
+    - Every app README follows the template: problem sentence, GIF/video, Shopify features
+      shown, architecture, run locally in 5 commands or fewer, scopes and why, and a
+      "Need something like this built?" link to shopify.kuhrt.codes/work-with-me.
+    - Comments only where code cannot express intent, or for API docs. No ticket numbers,
+      dates, change names, or decision history in code comments.
+    - Shopify platform facts (API versions, deprecation dates, CLI behavior) change often.
+      Verify against shopify.dev at implementation time and record deviations in design.md.
+
+rules:
+  tasks:
+    - End every task with a "Verify:" clause naming the test, command, or observable outcome.
+    - Tests assert behavior, roles, structure, and state, never user-facing copy.
