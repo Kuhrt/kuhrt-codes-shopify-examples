@@ -8,8 +8,8 @@
 
 ## 2. CI and secret hygiene
 
-- [ ] 2.1 Add `.github/workflows/ci.yml`. It runs on `pull_request` and on `push` to `main`, with `contents: read` permissions and per-ref concurrency cancellation. It sets up Node from `.nvmrc` and pnpm from `packageManager`, then runs `pnpm install --frozen-lockfile` and `pnpm check`. Verify: the workflow passes `actionlint` locally (or on the first PR run). A pushed branch with a failing test shows a red check.
-- [ ] 2.2 Add a gitleaks step to CI using the default ruleset. Confirm that the default rules match Shopify token prefixes. Verify: a scratch branch containing a fake `shpat_` + 32-hex string fails the scan, naming the file and line. Delete the branch afterwards; never merge it.
+- [x] 2.1 Add `.github/workflows/ci.yml`. It runs on `pull_request` and on `push` to `main`, with `contents: read` permissions and per-ref concurrency cancellation. It sets up Node from `.nvmrc` and pnpm from `packageManager`, then runs `pnpm install --frozen-lockfile` and `pnpm check`. Verify: the workflow passes `actionlint` locally (or on the first PR run). A pushed branch with a failing test shows a red check.
+- [x] 2.2 Add a gitleaks step to CI using the default ruleset. Confirm that the default rules match Shopify token prefixes. Verify: a scratch branch containing a fake `shpat_` + 32-hex string fails the scan, naming the file and line. Delete the branch afterwards; never merge it.
 
 ## 3. Documentation
 
