@@ -1,0 +1,116 @@
+{%- liquid
+  assign message = block.settings.message | strip
+  assign link_url = block.settings.link_url
+  assign ends_at = block.settings.ends_at | strip
+  assign ended_behavior = block.settings.ended_behavior
+  assign ended_message = block.settings.ended_message | strip
+  assign background_color = block.settings.background_color
+  assign text_color = block.settings.text_color
+
+  if ended_behavior == 'message' and ended_message == blank
+    assign ended_behavior = 'hide'
+  endif
+
+  assign ends_at_epoch = ''
+  if ends_at != blank
+    assign ends_at_epoch = ends_at | date: '%s'
+    assign ends_at_check = ends_at_epoch | plus: 0 | append: ''
+    if ends_at_check != ends_at_epoch
+      assign ends_at_epoch = ''
+    endif
+  endif
+-%}
+{%- if message != blank -%}
+  <aside
+    data-kc-announcement-bar
+    aria-label="{{ 'announcement_bar.region' | t | escape }}"
+    data-kc-message="{{ message | escape }}"
+    data-kc-ended-behavior="{{ ended_behavior | escape }}"
+    data-kc-dismissible="{{ block.settings.dismissible }}"
+    {%- if link_url != blank %} data-kc-link-url="{{ link_url | escape }}"{% endif %}
+    {%- if ends_at_epoch != blank %} data-kc-ends-at="{{ ends_at_epoch }}"{% endif %}
+    {%- if ended_behavior == 'message' %} data-kc-ended-message="{{ ended_message | escape }}"{% endif %}
+    {%- if background_color != blank %} data-kc-background-color="{{ background_color }}"{% endif %}
+    {%- if text_color != blank %} data-kc-text-color="{{ text_color }}"{% endif %}
+    {%- if background_color != blank or text_color != blank %}
+      style="
+        {%- if background_color != blank %}--kc-bar-background: {{ background_color }};{% endif %}
+        {%- if text_color != blank %}--kc-bar-color: {{ text_color }};{% endif -%}
+      "
+    {%- endif %}
+  >
+    <p data-kc-text>
+      {%- if link_url != blank -%}
+        <a href="{{ link_url | escape }}">{{ message | escape }}</a>
+      {%- else -%}
+        {{ message | escape }}
+      {%- endif -%}
+    </p>
+    {%- if ends_at_epoch != blank -%}
+      <time data-kc-countdown datetime="{{ ends_at | date: '%Y-%m-%dT%H:%M:%S%z' }}"></time>
+    {%- endif -%}
+    {%- if block.settings.dismissible -%}
+      <button type="button" data-kc-dismiss aria-label="{{ 'announcement_bar.dismiss' | t | escape }}">&times;</button>
+    {%- endif -%}
+  </aside>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:announcement_bar.name",
+  "target": "body",
+  "javascript": "announcement-bar.js",
+  "stylesheet": "announcement-bar.css",
+  "settings": [
+    {
+      "type": "text",
+      "id": "message",
+      "label": "t:announcement_bar.settings.message.label",
+      "default": "Free shipping on every order this week"
+    },
+    {
+      "type": "url",
+      "id": "link_url",
+      "label": "t:announcement_bar.settings.link_url.label"
+    },
+    {
+      "type": "text",
+      "id": "ends_at",
+      "label": "t:announcement_bar.settings.ends_at.label",
+      "info": "t:announcement_bar.settings.ends_at.info"
+    },
+    {
+      "type": "select",
+      "id": "ended_behavior",
+      "label": "t:announcement_bar.settings.ended_behavior.label",
+      "options": [
+        { "value": "hide", "label": "t:announcement_bar.settings.ended_behavior.options.hide" },
+        { "value": "message", "label": "t:announcement_bar.settings.ended_behavior.options.message" }
+      ],
+      "default": "hide"
+    },
+    {
+      "type": "text",
+      "id": "ended_message",
+      "label": "t:announcement_bar.settings.ended_message.label",
+      "info": "t:announcement_bar.settings.ended_message.info"
+    },
+    {
+      "type": "checkbox",
+      "id": "dismissible",
+      "label": "t:announcement_bar.settings.dismissible.label",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:announcement_bar.settings.background_color.label"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:announcement_bar.settings.text_color.label"
+    }
+  ]
+}
+{% endschema %}
