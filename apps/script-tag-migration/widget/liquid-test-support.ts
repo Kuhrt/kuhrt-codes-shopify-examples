@@ -104,7 +104,7 @@ class SchemaTag extends Tag {
 }
 
 function createEngine(): Liquid {
-  const engine = new Liquid({ partials: extensionPath('snippets'), extname: '.liquid' });
+  const engine = new Liquid();
   engine.registerTag('schema', SchemaTag);
   engine.registerFilter('t', lookupTranslation);
   engine.registerFilter('date', stubDate);

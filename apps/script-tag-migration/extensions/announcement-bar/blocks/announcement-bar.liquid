@@ -35,9 +35,25 @@
       assign ends_at_epoch = ''
     endif
   endif
+
+  comment
+    Colors render only as #rgb or #rrggbb. Snippets can't share this check because
+    Shopify wraps rendered app snippet output in HTML comments.
+  endcomment
+  assign background_color = block.settings.background_color | append: '' | strip
+  assign background_lead = background_color | slice: 0
+  assign background_size = background_color | size
+  unless background_lead == '#' and background_size == 4 or background_lead == '#' and background_size == 7
+    assign background_color = ''
+  endunless
+
+  assign text_color = block.settings.text_color | append: '' | strip
+  assign text_lead = text_color | slice: 0
+  assign text_size = text_color | size
+  unless text_lead == '#' and text_size == 4 or text_lead == '#' and text_size == 7
+    assign text_color = ''
+  endunless
 -%}
-{%- capture background_color -%}{%- render 'kc-hex-color', value: block.settings.background_color -%}{%- endcapture -%}
-{%- capture text_color -%}{%- render 'kc-hex-color', value: block.settings.text_color -%}{%- endcapture -%}
 {%- if message != blank -%}
   {{ 'announcement-bar.css' | asset_url | stylesheet_tag }}
   <aside

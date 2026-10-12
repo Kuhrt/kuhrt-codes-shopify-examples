@@ -293,15 +293,17 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - an end time that `date` can't parse (the filter returns the input unchanged) emits no `data-kc-ends-at` and no countdown. The check is that `| plus: 0` round-trips the `'%s'` output.
 - **The block validates what it renders.** `enhance()` never touches the link or the inline style, so Liquid can't rely on JavaScript to drop an invalid value. The block mirrors `parseConfig`'s rules:
   - a link renders only when it is `http(s)://` or starts with a single `/`, and contains no space or backslash;
-  - a color renders only as `#rgb` or `#rrggbb` (the `kc-hex-color` snippet).
+  - a color renders only as `#rgb` or `#rrggbb`. The check is inlined once per color. Shopify wraps every rendered app snippet in `<!-- BEGIN app snippet -->` comments, so a captured snippet can't return a value. A shared snippet broke both colors on `kuhrt-codes`, and liquidjs doesn't reproduce the wrapping.
 
   The Liquid checks are coarser than `parseConfig`, which also rejects control characters and cross-origin relative links. The parity table pins down the cases both must agree on.
 - **No console warning for an unparseable end time on the embed path.** Liquid drops it before JavaScript sees it. The merchant typing it in the theme editor is the only one who could cause it, and the missing countdown in the preview shows it.
 - **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block instead emits the `<link>` in the body, just before the bar, so it blocks only the bar and not the page. The legacy path can serve the same file.
 - **Theme Check.** `pnpm exec shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension` passes. The deploy build runs the same checks, including the 10 KB JavaScript limit.
-- **To confirm on a real storefront (task 3.3):**
-  - Shopify wraps the embed in its own element. Check that the bar still renders correctly inside it.
-  - A `color` setting is expected to print as `#rrggbb`. A value with alpha would still apply inline, but `parseConfig` would warn and drop it.
-  - Editing a setting in the theme editor re-renders the embed markup without re-running the script. Check whether the new bar gets its countdown and dismiss button. If it doesn't, re-mount on the theme editor's section events.
+- **Checked on `kuhrt-codes` (task 3.3)** on Horizon and `debut-vintage-theme`, both as previews:
+  - the embed appears under App embeds;
+  - the bar, the countdown, the ended message and dismissal work;
+  - editing a setting updates the preview, and the countdown and dismiss button keep working;
+  - disabling the embed removes the bar;
+  - colors print as lowercase `#rrggbb`.
 - **Gap: the legacy bar has no stylesheet.** `announcement-bar.css` ships only with the embed, so the legacy bundle builds an unstyled bar. Group 4 must serve the same stylesheet next to the legacy script, or have the legacy entry inject it.
 - **Parity test.** `widget/parity.test.ts` renders the block with liquidjs, using stubs for `t` and `date` (in a UTC store timezone) from `widget/liquid-test-support.ts`. It then compares normalized trees with `buildBar` across one table of cases. Widget source typechecks without Node types. A separate `widget/tsconfig.test.json` adds them for the tests that read the extension files. The test needs the built embed asset, which turbo's `test` task builds first.
