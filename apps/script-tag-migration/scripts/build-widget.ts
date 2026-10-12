@@ -3,10 +3,11 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
-import type { BuildOptions, Plugin } from 'esbuild';
+import type { BuildContext, BuildOptions, Plugin } from 'esbuild';
 import { build, context } from 'esbuild';
 
 export const GZIP_BUDGET_BYTES = 10 * 1024;
+export const RAW_LIMIT_BYTES = 10_000;
 
 export interface Bundle {
   entry: string;
@@ -15,8 +16,20 @@ export interface Bundle {
 
 export interface BundleSize {
   outfile: string;
+  rawBytes: number;
   gzipBytes: number;
 }
+
+export interface SizeLimit {
+  label: string;
+  measure: (size: BundleSize) => number;
+  limit: number;
+}
+
+export const SIZE_LIMITS: SizeLimit[] = [
+  { label: 'gzip budget', measure: ({ gzipBytes }) => gzipBytes, limit: GZIP_BUDGET_BYTES },
+  { label: 'raw size limit', measure: ({ rawBytes }) => rawBytes, limit: RAW_LIMIT_BYTES }
+];
 
 function appPath(relative: string): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', relative);
@@ -52,37 +65,47 @@ function optionsFor(
   };
 }
 
-/** Gzipped size of each written bundle. */
+/** Raw and gzipped size of each written bundle. */
 export function measureBundles(bundles: Bundle[]): BundleSize[] {
-  return bundles.map(({ outfile }) => ({
-    outfile,
-    gzipBytes: gzipSync(readFileSync(outfile), { level: 9 }).byteLength
-  }));
+  return bundles.map(({ outfile }) => {
+    const contents = readFileSync(outfile);
+    return {
+      outfile,
+      rawBytes: contents.byteLength,
+      gzipBytes: gzipSync(contents, { level: 9 }).byteLength
+    };
+  });
 }
 
 function describeSizes(sizes: BundleSize[]): string {
   return sizes
-    .map(({ outfile, gzipBytes }) => `  ${outfile}: ${gzipBytes} bytes gzipped`)
+    .map(
+      ({ outfile, rawBytes, gzipBytes }) =>
+        `  ${outfile}: ${rawBytes} bytes raw, ${gzipBytes} bytes gzipped`
+    )
     .join('\n');
 }
 
-/** Describes every bundle over budget, or `undefined` when all are within it. */
+/** Describes every bundle over any limit, or `undefined` when all are within them. */
 export function budgetFailure(
   sizes: BundleSize[],
-  budgetBytes: number = GZIP_BUDGET_BYTES
+  limits: SizeLimit[] = SIZE_LIMITS
 ): string | undefined {
-  const over = sizes.filter(({ gzipBytes }) => gzipBytes > budgetBytes);
-  if (over.length === 0) return undefined;
-  return `Widget bundle exceeds the ${budgetBytes} byte gzip budget:\n${describeSizes(over)}`;
+  const failures = limits.flatMap(({ label, measure, limit }) => {
+    const over = sizes.filter((size) => measure(size) > limit);
+    if (over.length === 0) return [];
+    return [`Widget bundle exceeds the ${limit} byte ${label}:\n${describeSizes(over)}`];
+  });
+  return failures.length === 0 ? undefined : failures.join('\n');
 }
 
-/** Bundles every entry and returns the gzipped sizes. */
+/** Bundles every entry and returns the raw and gzipped sizes. */
 export async function buildBundles(bundles: Bundle[]): Promise<BundleSize[]> {
   await Promise.all(bundles.map((bundle) => build(optionsFor(bundle))));
   return measureBundles(bundles);
 }
 
-/** Logs the sizes, or the budget failure. Returns whether every bundle is within budget. */
+/** Logs the sizes, or the limit failures. Returns whether every bundle is within its limits. */
 function reportSizes(sizes: BundleSize[]): boolean {
   const failure = budgetFailure(sizes);
   if (failure) console.error(failure);
@@ -92,24 +115,37 @@ ${describeSizes(sizes)}`);
   return failure === undefined;
 }
 
-function reporter(bundle: Bundle): Plugin {
+function reporter(bundle: Bundle, onReport: (withinLimits: boolean) => void): Plugin {
   return {
     name: 'budget-report',
     setup: (b) =>
       b.onEnd((result) => {
-        if (result.errors.length === 0) reportSizes(measureBundles([bundle]));
+        onReport(result.errors.length === 0 && reportSizes(measureBundles([bundle])));
       })
   };
 }
 
-async function watchBundles(bundles: Bundle[]): Promise<void> {
-  const contexts = await Promise.all(
-    bundles.map((bundle) => context(optionsFor(bundle, [reporter(bundle)])))
-  );
-  await Promise.all(contexts.map((ctx) => ctx.watch()));
+export interface Watch {
+  contexts: BuildContext[];
+  /** Resolves once every bundle has finished its first build, with whether each succeeded within its limits. */
+  firstBuilds: Promise<boolean[]>;
 }
 
-/** Builds `bundles` (watching with `--watch`). Sets a failing exit code when one is over budget. */
+/** Starts watching `bundles`; the caller disposes the returned contexts. */
+export async function watchBundles(bundles: Bundle[]): Promise<Watch> {
+  const firstBuilds: Promise<boolean>[] = [];
+  const contexts = await Promise.all(
+    bundles.map((bundle) => {
+      let onFirstBuild: (withinLimits: boolean) => void = () => {};
+      firstBuilds.push(new Promise((resolve) => (onFirstBuild = resolve)));
+      return context(optionsFor(bundle, [reporter(bundle, onFirstBuild)]));
+    })
+  );
+  await Promise.all(contexts.map((ctx) => ctx.watch()));
+  return { contexts, firstBuilds: Promise.all(firstBuilds) };
+}
+
+/** Builds `bundles` (watching with `--watch`). Sets a failing exit code when one is over a limit. */
 export async function main(args: string[], bundles: Bundle[] = BUNDLES): Promise<void> {
   if (args.includes('--watch')) {
     await watchBundles(bundles);

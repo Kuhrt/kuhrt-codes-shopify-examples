@@ -11,7 +11,7 @@
     "deploy": "pnpm build:widget && shopify app deploy",
     "config:use": "shopify app config use",
     "env": "shopify app env",
-    "lint": "eslint .",
+    "lint": "eslint . && shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension --fail-level info",
     "shopify": "shopify",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",

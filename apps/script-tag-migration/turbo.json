@@ -9,6 +9,9 @@
         "public/legacy/announcement-bar.js"
       ]
     },
+    "lint": {
+      "dependsOn": ["$TURBO_EXTENDS$", "build"]
+    },
     "dev": {
       "with": ["dev:widget"]
     },

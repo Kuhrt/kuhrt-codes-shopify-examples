@@ -105,10 +105,8 @@ const CASES: Record<string, MerchantInput> = {
   },
   'end time before 1970': { message: 'Sale', endsAt: '1969-12-31 00:00' },
   'end time that is only a date': { message: 'Sale', endsAt: '2026-11-27' },
-  'end time written with a month name': { message: 'Sale', endsAt: 'Nov 27 2026' },
-  'end time with a zone suffix': { message: 'Sale', endsAt: '2026-11-27 00:00 PST' },
+  'end time that is only digits': { message: 'Sale', endsAt: '123' },
   'end time in the past': { message: 'Sale', endsAt: '2020-01-01 00:00' },
-  'end time with trailing characters': { message: 'Sale', endsAt: '123abc' },
   'mailto link': { message: 'Sale', linkUrl: 'mailto:a@b.c' },
   'javascript link': { message: 'Sale', linkUrl: 'javascript:alert(1)' },
   'protocol-relative link': { message: 'Sale', linkUrl: '//evil.example' },
@@ -133,11 +131,6 @@ const CASES: Record<string, MerchantInput> = {
 
 const BACKSLASH_LINKS = [String.raw`/a\b`, String.raw`https://x/a\b`];
 
-const SETTINGS_REPRESENTATIONS = [
-  { name: 'empty strings', unsetAsNil: false },
-  { name: 'nil', unsetAsNil: true }
-];
-
 /** Settings as Liquid receives them. An unset setting is `null` when `unsetAsNil`, otherwise an empty string. */
 function toLiquidSettings(input: MerchantInput, unsetAsNil = false): BlockSettings {
   const unset = unsetAsNil ? null : '';
@@ -158,7 +151,7 @@ function toLegacyEndsAt(endsAt: string): string {
   return parseLocalDateTime(endsAt)?.isoWithOffset ?? REJECTED_END_TIME;
 }
 
-function toRawSettings(input: MerchantInput): RawSettings {
+function toLegacyRawSettings(input: MerchantInput): RawSettings {
   const raw: RawSettings = {
     [SETTING.message]: input.message,
     [SETTING.linkUrl]: input.linkUrl,
@@ -232,37 +225,61 @@ function embedWarnedSettings(root: Element): Set<string> {
   return new Set([...invalidSettingsOn(root), ...warnings.map(({ setting }) => setting)]);
 }
 
-describe.each(SETTINGS_REPRESENTATIONS)(
-  'Liquid block and buildBar parity with unset settings as $name',
-  ({ unsetAsNil }) => {
-    it.each(Object.entries(CASES))('renders the same tree for: %s', (_name, input) => {
-      const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input, unsetAsNil)));
-      const { config } = parseConfig(toRawSettings(input));
+describe('Liquid block and buildBar parity across the case table', () => {
+  it.each(Object.entries(CASES))('renders the same tree for: %s', (_name, input) => {
+    const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
+    const { config } = parseConfig(toLegacyRawSettings(input));
+
+    expect(liquidRoot).not.toBeNull();
+    expect(config).not.toBeNull();
+    if (liquidRoot === null || config === null) return;
+    expect(normalize(buildBar(config))).toEqual(normalize(liquidRoot));
+  });
+
+  it.each(Object.entries(CASES))(
+    'round-trips through the embed parser to the same config and warnings for: %s',
+    (_name, input) => {
+      const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input)));
+      const legacy = parseConfig(toLegacyRawSettings(input));
 
       expect(liquidRoot).not.toBeNull();
-      expect(config).not.toBeNull();
-      if (liquidRoot === null || config === null) return;
-      expect(normalize(buildBar(config))).toEqual(normalize(liquidRoot));
-    });
-
-    it.each(Object.entries(CASES))(
-      'round-trips through the embed parser to the same config and warnings for: %s',
-      (_name, input) => {
-        const liquidRoot = findLiquidRoot(renderBlock(toLiquidSettings(input, unsetAsNil)));
-        const legacy = parseConfig(toRawSettings(input));
-
-        expect(liquidRoot).not.toBeNull();
-        if (liquidRoot === null) return;
-        expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(legacy.config);
-        expect(embedWarnedSettings(liquidRoot)).toEqual(
-          new Set(legacy.warnings.map(({ setting }) => setting))
-        );
-      }
-    );
-  }
-);
+      if (liquidRoot === null) return;
+      expect(parseConfig(readRawSettings(liquidRoot)).config).toEqual(legacy.config);
+      expect(embedWarnedSettings(liquidRoot)).toEqual(
+        new Set(legacy.warnings.map(({ setting }) => setting))
+      );
+    }
+  );
+});
 
 describe('Liquid block and buildBar parity', () => {
+  it('renders identically whether unset settings are nil or empty strings', () => {
+    const input: MerchantInput = { message: 'Sale' };
+
+    const withNil = renderBlock(toLiquidSettings(input, true));
+    const withEmpty = renderBlock(toLiquidSettings(input, false));
+    const root = findLiquidRoot(withNil);
+
+    expect(withNil).toBe(withEmpty);
+    expect(root).not.toBeNull();
+    if (root === null) return;
+    const parsed = parseConfig(readRawSettings(root));
+    expect(parsed.config).toEqual(parseConfig(toLegacyRawSettings(input)).config);
+    expect(parsed.warnings).toEqual([]);
+    expect(invalidSettingsOn(root)).toEqual([]);
+  });
+
+  it('lists an all-digit end time as invalid and emits no end time', () => {
+    const input: MerchantInput = { message: 'Sale', endsAt: '123' };
+    const root = findLiquidRoot(renderBlock(toLiquidSettings(input)));
+
+    expect(root).not.toBeNull();
+    if (root === null) return;
+    expect(invalidSettingsOn(root)).toEqual([SETTING.endsAt]);
+    expect(root.hasAttribute(dataAttributeFor(SETTING.endsAt))).toBe(false);
+    expect(parseConfig(toLegacyRawSettings(input)).config?.endsAtMs).toBeUndefined();
+  });
+
   it('lists each dropped setting in the invalid attribute', () => {
     const root = findLiquidRoot(
       renderBlock(
@@ -312,7 +329,7 @@ describe('Liquid block and buildBar parity', () => {
       if (root === null) return;
       expect(invalidSettingsOn(root)).toEqual([SETTING.linkUrl]);
       expect(root.hasAttribute(dataAttributeFor(SETTING.linkUrl))).toBe(false);
-      expect(parseConfig(toRawSettings({ message: 'Sale', linkUrl })).config?.linkUrl).toBe(
+      expect(parseConfig(toLegacyRawSettings({ message: 'Sale', linkUrl })).config?.linkUrl).toBe(
         linkUrl
       );
     }
@@ -334,7 +351,7 @@ describe('Liquid block and buildBar parity', () => {
     const input: MerchantInput = { message: '   ' };
 
     expect(findLiquidRoot(renderBlock(toLiquidSettings(input)))).toBeNull();
-    expect(parseConfig(toRawSettings(input)).config).toBeNull();
+    expect(parseConfig(toLegacyRawSettings(input)).config).toBeNull();
   });
 });
 

@@ -17,6 +17,7 @@ export function extensionPath(relativePath: string): string {
 const SCHEMA_BLOCK = /\{%-?\s*schema\s*-?%\}([\s\S]*?)\{%-?\s*endschema\s*-?%\}/;
 const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
 const EPOCH_SECONDS = /^\d+$/;
+const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const EPOCH_FORMAT = '%s';
 const LOCAL_FORMAT = '%Y-%m-%d %H:%M';
 const ASSET_BASE_URL = 'https://cdn.example/assets/';
@@ -94,14 +95,15 @@ function formatEpoch(epochSeconds: number, format: string): string {
 /**
  * Stands in for Shopify's `date` filter with the store time zone fixed to UTC-05:00.
  * An all-digit input is epoch seconds and `YYYY-MM-DD HH:MM` is a store-local time, where
- * an out-of-range day or month rolls over. Any other input is returned unchanged, as Liquid does.
+ * an out-of-range day or month rolls over. `YYYY-MM-DD` is store-local midnight. Any other
+ * input is returned unchanged, as Liquid does.
  * Formats: `%s`, `%Y-%m-%d %H:%M` and `%Y-%m-%dT%H:%M:%S%z`.
  */
 function stubDate(input: unknown, format: string): unknown {
   const text = String(input);
   const epochSeconds = EPOCH_SECONDS.test(text)
     ? Number(text)
-    : parseLocalDateTime(text)?.epochSeconds;
+    : parseLocalDateTime(LOCAL_DATE.test(text) ? `${text} 00:00` : text)?.epochSeconds;
   return epochSeconds === undefined ? input : formatEpoch(epochSeconds, format);
 }
 

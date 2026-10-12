@@ -288,12 +288,13 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 ### Delivery bundles and theme extension (tasks 2.5–3.3)
 
-- **Bundles.** `scripts/build-widget.ts` (esbuild, IIFE, ES2020) writes the embed and legacy bundles, and the build fails when either goes over 10 KB gzipped. Both are about 2–3 KB. The script runs as part of:
+- **Bundles.** `scripts/build-widget.ts` (esbuild, IIFE, ES2020) writes the embed and legacy bundles. The build fails when either goes over 10 KB gzipped, which is the spec's budget, or over 10,000 bytes raw, which is Theme Check's `AssetSizeAppBlockJavaScript` limit. Both are about 6–7 KB raw and 3 KB gzipped. The script runs as part of:
   - `build`, before `react-router build`, because the legacy bundle ships from `public/`;
   - `deploy`, so the extension never ships a stale bundle;
   - `predev`, once.
 
   `turbo run dev` also runs it in watch mode. Under turbo, the `predev` build and the first watch build write the same files. That is redundant but harmless, and it is the only build when `pnpm dev` runs in the app directly.
+- **No layout shift from the countdown.** The countdown keeps a fixed-width box, `16ch` of tabular numerals that stays hidden rather than collapsed until it is filled. `formatCountdown` zero-pads hours, minutes and seconds, so the width changes only when the day count gains or loses a digit.
 - **Loading order.** Shopify injects an embed's `javascript` asset as `<script async>` in `<head>`, so it can run while the page is still parsing.
   - `mountEmbed` enhances the bar immediately once the root and every child the markup contract expects for its config have been parsed. A dismissed or ended bar is then removed without waiting for `DOMContentLoaded`. Otherwise it waits.
   - The legacy entry always waits, so the embed's markup is in place when the single-instance guard runs.
@@ -307,12 +308,12 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
   Each check is inlined. Shopify wraps rendered app snippet output in `<!-- BEGIN app snippet -->` comments, so a captured snippet can't return a value. A shared color snippet broke both colors on `kuhrt-codes`.
 - **Warnings hold on both paths.** Every rejected setting is listed, space-separated, in `data-kc-invalid` on the root. `mountEmbed` warns once for each, so the spec's "one warning naming the setting" applies to the embed path too. The setting's own `data-kc-*` attribute is omitted rather than carrying the raw value: an all-digit entry such as `123` would otherwise read as a valid epoch.
-- **Known divergences in link checking.** Only the merchant can enter a link, so neither divergence is a security issue.
-  - Liquid can't detect Unicode whitespace in a link, for example U+00A0. `parseConfig` rejects such a link, but the embed still renders it. A browser keeps the character inside the URL rather than stripping it.
-  - Liquid rejects a backslash anywhere in a link. `parseConfig` rejects one only where it would change the origin. So the embed is stricter for a link like `/a`.
+- **Known divergences in link checking.** Liquid checks the link's shape, not whether it is a valid URL. Only the merchant can enter a link, so neither direction is a security issue.
+  - **Liquid keeps links that `parseConfig` rejects:** a malformed host (`https://[`, `http://a@`), Unicode whitespace, or a C1 control character. The embed renders the link, and `mountEmbed` warns about it.
+  - **Liquid drops links that `parseConfig` accepts:** a backslash anywhere (`/a`), and scheme-relative forms like `https:x.com`.
 - **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block emits the `<link>` just before the bar instead, so it should block only the bar. Where it lands in the live page source has not been inspected.
 - **Labels have one source.** `DEFAULT_LABELS` is read from the extension's `locales/en.default.json`, so both paths use the same strings.
-- **Theme Check.** `pnpm exec shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension` passes. The deploy build runs the same checks, including the 10 KB JavaScript limit.
+- **Theme Check** runs as part of the app's `lint`, which depends on `build`, so CI enforces it. It is `shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension`, and the deploy build runs the same checks.
 - **Checked on `kuhrt-codes` (task 3.3)** on Horizon and `debut-vintage-theme`, both as previews:
   - the embed appears under App embeds;
   - the bar, the countdown, the ended message and dismissal work;
@@ -326,5 +327,5 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - the Liquid output parses back to the same config;
   - both paths warn about the same settings.
 
-  The stubs can't reproduce Shopify's lenient date parsing or the snippet wrapping. Those are covered by the manual check and the e2e harness. Widget source typechecks without Node types; `widget/tsconfig.test.json` adds them for tests.
+  The stubs can't fully reproduce Shopify's lenient date parsing or the snippet wrapping. Only the manual check on a real store covers those; the e2e harness uses the same stubs. Widget source typechecks without Node types; `widget/tsconfig.test.json` adds them for tests.
 - **The legacy bar has no stylesheet yet.** Task 4.2 serves `announcement-bar.css` next to the legacy script.

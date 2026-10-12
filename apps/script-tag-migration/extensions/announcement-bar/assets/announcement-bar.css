@@ -25,11 +25,13 @@
 }
 
 [data-kc-announcement-bar] [data-kc-countdown] {
+  min-inline-size: 16ch;
   font-variant-numeric: tabular-nums;
+  text-align: start;
 }
 
 [data-kc-announcement-bar] [data-kc-countdown]:empty {
-  display: none;
+  visibility: hidden;
 }
 
 [data-kc-announcement-bar] [data-kc-dismiss] {

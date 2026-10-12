@@ -85,13 +85,21 @@ function readQuerySettings(scriptSrc: string | undefined): RawSettings | null {
   return readSettings((setting) => params.get(setting));
 }
 
-function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
-  const raw = readQuerySettings(scriptSrc);
-  if (raw === null) return null;
-  const { config, warnings } = parseConfig(raw);
+/** Reports the parse warnings, and that the message is required when there is no config. */
+function reportParse({ config, warnings }: ParseResult): BarConfig | null {
   reportWarnings(warnings);
   if (!config) warnMessageRequired();
   return config;
+}
+
+function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
+  const raw = readQuerySettings(scriptSrc);
+  return raw === null ? null : reportParse(parseConfig(raw));
+}
+
+function mountBar(doc: Document, root: HTMLElement, config: BarConfig): void {
+  markMounted(doc);
+  enhance(root, config);
 }
 
 /** The attribute of the last child the markup carries for `config`, in markup order. */
@@ -110,17 +118,16 @@ function parseRoot(root: HTMLElement): ParseResult {
   return parseConfig(readRawSettings(root));
 }
 
-function enhanceRoot(doc: Document, root: HTMLElement, { config, warnings }: ParseResult): void {
+function enhanceRoot(doc: Document, root: HTMLElement, parsed: ParseResult): void {
   if (isMounted(doc)) return;
-  markMounted(doc);
   reportInvalidSettings(root);
-  reportWarnings(warnings);
-  if (!config) {
+  const config = reportParse(parsed);
+  if (config) {
+    mountBar(doc, root, config);
+  } else {
+    markMounted(doc);
     root.remove();
-    warnMessageRequired();
-    return;
   }
-  enhance(root, config);
 }
 
 function enhanceEmbed(doc: Document): void {
@@ -154,7 +161,6 @@ export function mountLegacy(doc: Document, scriptSrc: string | undefined): void 
     if (!config) return;
     const root = buildBar(config);
     doc.body.appendChild(root);
-    markMounted(doc);
-    enhance(root, config);
+    mountBar(doc, root, config);
   });
 }
