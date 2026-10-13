@@ -39,5 +39,13 @@ When the app is uninstalled, the app SHALL delete every session and any other da
 - **THEN** all stored data for that shop is deleted
 
 #### Scenario: Unverified webhook
-- **WHEN** a request to the webhook endpoint fails HMAC verification
+- **WHEN** a request to the webhook endpoint carries a signature that does not match its body
 - **THEN** it is rejected with a 401 and no data is deleted
+
+#### Scenario: Malformed webhook
+- **WHEN** a request to the webhook endpoint is missing the signature or another required Shopify webhook header
+- **THEN** it is rejected with a 400 and no data is deleted
+
+#### Scenario: Deletion fails
+- **WHEN** a verified uninstall webhook arrives but the stored sessions can't be deleted
+- **THEN** the endpoint responds with a server error, so Shopify retries the delivery

@@ -387,3 +387,15 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - the empty script tag list showed the cleanup step as complete.
 
   The user waived the screenshots. The confirmation modal and the remove buttons can't be exercised on a real store, because Shopify blocks script tag creation, so the component tests are their only coverage.
+
+### Install lifecycle (tasks 6.1–6.2)
+
+- **Uninstall tests run real HMAC verification.** `cloudflare:workers` is mocked with fake credentials and a real local D1. The real route and `shopify.server` are imported, and requests are signed with the fake secret.
+  - A valid webhook deletes every session for its shop and leaves other shops' sessions alone.
+  - A shop with no sessions still returns 200, because `deleteSessions([])` returns `true`. A 500 there would make Shopify retry forever.
+  - A tampered body or a wrong-secret signature returns 401 and deletes nothing.
+- **A missing required header returns 400, not 401.** `@shopify/shopify-api` checks the required webhook headers (signature, topic, shop domain, API version, webhook ID) before verifying anything, and reports any that are missing as `MissingHeaders`. Only `InvalidHmac`, a signature that doesn't match the body, maps to 401. Nothing is deleted either way. The spec now covers both cases.
+- **A failed deletion returns 500.** The Drizzle adapter's `deleteSessions` returns `false` on any error. The route then logs the failure and responds 500, so Shopify retries the delivery. A test covers this.
+- **Session fixtures expire in 2100.** `authenticate.webhook` refreshes an offline token that expires within five minutes, which would call Shopify from a test.
+- **The scope contract** reads `shopify.app.toml` with `smol-toml` and compares its scopes, as a set, with the first column of the README's "Access scopes" table. A second test checks that `webhooks.api_version` equals the app's `apiVersion`. `app/db/d1-test-support.ts` is the one local D1 setup shared by the storage and webhook tests.
+- **Triggered against dev.** `shopify app webhook trigger --topic app/uninstalled --api-version 2026-10 --delivery-method http` to the local route reported a successful delivery, so the CLI-signed request passed real verification. The sample payload names a shop other than `kuhrt-codes`, so it took the no-sessions path, and the `kuhrt-codes` dev session was untouched.
