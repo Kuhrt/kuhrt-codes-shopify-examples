@@ -48,10 +48,14 @@ apps/script-tag-migration/
 │   ├── install.server.ts         createLegacyScriptTag(admin, settings) → Result
 │   └── settings-url.ts           settings → script src query string (inverse of entry-legacy parsing)
 ├── public/legacy/announcement-bar.js    ← built from widget/entry-legacy.ts (gitignored), served as a Worker static asset
+├── public/legacy/announcement-bar.css   ← copied from the extension by the widget build (gitignored)
+├── public/_headers               cache header for /legacy/*
 ├── app/                          React Router app (from template)
 │   ├── routes/app._index.tsx     Migration console (Polaris web components)
 │   ├── routes/webhooks.app.uninstalled.tsx
 │   ├── services/script-tags.server.ts   listOwnedScriptTags / deleteOwnedScriptTag → Result
+│   ├── lib/result.ts             Result<T> and the failure kinds
+│   ├── lib/admin-graphql.server.ts      AdminClient · adminGraphql (transport and top-level error mapping)
 │   └── shopify.server.ts         shopifyApp({ sessionStorage: <Workers adapter>, scopes })
 ├── scripts/build-widget.ts      esbuild bundles for both paths + gzip budget and the embed's raw size limit
 ├── scripts/try-legacy-install.ts dev-only: runs legacy/install against kuhrt-codes, prints the response
@@ -121,7 +125,7 @@ apps/script-tag-migration/
 
 ### 7. Legacy install code returns a `Result`; it is never wired into install
 
-- `createLegacyScriptTag(admin, settings)` returns `{ ok: true, scriptTag } | { ok: false, kind: 'user-error' | 'graphql-error' | 'network', message, field? }`. The same `Result` shape is used by `services/script-tags.server.ts`. It is a local type, not a library.
+- `createLegacyScriptTag(admin, settings)` returns `{ ok: true, scriptTag } | { ok: false, kind: 'user-error' | 'graphql-error' | 'http' | 'network', message, field? }`, where `http` failures also carry the response `status`. The same `Result` shape is used by `services/script-tags.server.ts`. It is a local type, not a library.
 - It is not called from `afterAuth`. The only callers are unit tests (with a mocked admin client) and `scripts/try-legacy-install.ts`. That script is a dev-only command that hard-refuses any store other than `kuhrt-codes`. It prints the raw API response for `MIGRATION.md`.
   - How the script gets a token: it reads the offline session from local dev session storage after `shopify app dev` has installed the app on `kuhrt-codes`. The spike task confirms this works. If it is awkward, use `shopify app execute`, if the CLI offers it.
 
@@ -330,4 +334,27 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - both paths warn about the same settings.
 
   The stubs can't fully reproduce Shopify's lenient date parsing or the snippet wrapping. Only the manual check on a real store covers those; the e2e harness uses the same stubs. Widget source typechecks without Node types; `widget/tsconfig.test.json` adds them for tests.
-- **The legacy bar has no stylesheet yet.** Task 4.2 serves `announcement-bar.css` next to the legacy script.
+
+### Legacy reference path (tasks 4.1–4.4)
+
+- **Settings URL.** `toQuery` builds the query from `toRawSettings`, the serializer the parity tests already use. `readSearchParams` in `widget/settings.ts` is the one reader, used by `mountLegacy` and by the round-trip test. `legacyScriptUrl` throws unless the app URL is https, because a bad URL is a programming error, not an API outcome.
+- **Serving.** React Router's client build copies `public/` to `build/client`, which the Cloudflare Vite plugin serves as Workers static assets before the Worker runs.
+  - Workers assets serve `.js` as `text/javascript; charset=utf-8` and `.css` as `text/css; charset=utf-8` by default. `public/_headers` only adds the cache header.
+  - Under `vite preview` (the built Worker in workerd), both files returned 200 with both headers. `vite dev` ignores `_headers` unless the plugin's experimental dev-mode option is on, and it isn't.
+- **Cache lifetime is one day, not a year.** The spec asks for a lifetime "suitable for a versioned asset", but this URL isn't versioned. Settings live in the query string, and the path stays the same across deploys. `Cache-Control: public, max-age=86400` limits how long a storefront runs stale code after a deploy. Versioning the path would mean updating every script tag's `src` on each deploy. That is the `scriptTagUpdate` chore `MIGRATION.md` uses as an argument for theme settings.
+- **Stylesheet.** The widget build copies the extension's `announcement-bar.css` next to the legacy bundle, in watch mode too. `mountLegacy` adds one `<link rel="stylesheet">`, resolved next to its own URL without the query. It does so only when it builds a bar, and only if the page doesn't already link the file.
+- **`Result` and the Admin client.** `AdminClient` is the `graphql` method of the app's admin context, and the real `AdminApiContext` is assignable to it. `adminGraphql` maps every outcome, so nothing is thrown:
+  - a thrown `GraphqlQueryError`, or `errors` in the body, becomes `graphql-error`. `admin.graphql` throws that error for GraphQL errors on a 200 response;
+  - a non-2xx response, or a thrown `HttpResponseError` (the library's error for one), becomes `http` with the status;
+  - fetch failures, other throws (including `HttpMaxRetriesError`, which carries no status) and unparseable bodies become `network`.
+
+  `createLegacyScriptTag` sends `scriptTagCreate` with `{ src, displayScope: ONLINE_STORE, cache: true }`, where `ONLINE_STORE` is the enum's only value. It maps the first `userErrors` entry, with its `field`, to `user-error`. An import-guard test fails if anything under `app/` or `workers/` imports it.
+- **`scripts/try-legacy-install.ts`** (`pnpm legacy:try-install`):
+  - It refuses any shop other than exactly `kuhrt-codes.myshopify.com` before touching storage or the network.
+  - It reads the offline session from local D1 through `getPlatformProxy`, with no env files. It sends the mutation with `fetch` and the session token, so it never imports `shopify.server.ts`, which imports `cloudflare:workers`.
+  - Offline tokens expire after about an hour, and only the app can refresh them. A stale session exits with a prompt to open the app under `pnpm dev` first.
+  - The `src` uses a placeholder app origin, because `application_url` is still a placeholder and Shopify rejects the call either way.
+  - It prints the raw response body, the API version and the time, and exits 0 whenever Shopify answers, including with an HTTP error. It exits 1 for a refusal, no usable session or a network failure.
+  - It imports modules that Node can't load directly, such as `widget/settings.ts`, which imports JSON without an import attribute. So the package script bundles it with esbuild (packages external) before running it. Scripts that Node runs directly import local files with their `.ts` extension, which the app's `allowImportingTsExtensions` permits.
+- **The captured rejection** is in `legacy/fixtures/script-tag-create-rejection.json` (the 4.3 user-error fixture). It was captured on `kuhrt-codes` with API version `2026-10` at 2026-10-13T17:16:35Z. HTTP 200, with `scriptTag: null` and one user error, `field: null`: "This app can't create or update script tags. Use theme app extensions instead." It maps to `{ ok: false, kind: 'user-error', message }` with no `field`. The spec's "message and field" scenario holds with an absent field.
+- **The legacy bar is styled in a browser.** Under `pnpm dev`, the legacy script loaded on the app's origin rendered the bar fixed to the bottom with the extension's styles.
