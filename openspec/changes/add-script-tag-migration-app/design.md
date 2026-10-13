@@ -417,3 +417,11 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **Focus after keyboard dismissal.** The harness pages have a link ahead of the bar. After Enter or Space on the dismiss button, `body:focus` must match and the next Tab must reach that link. `document.activeElement` alone can't show this, because it is `body` whenever the focused node is removed.
 - **Running it.** The app's `test` script is `vitest run && playwright test`, so `turbo test` and `pnpm check` run both. Running `playwright test` outside turbo uses whichever bundles were last built, so run `pnpm build:widget` first; the server refuses to start when a bundle is missing. Locally, install Chromium once with `pnpm exec playwright install chromium`. CI installs it with system dependencies before `pnpm check`. Turbo's strict env mode passes through what Playwright needs (`CI`, `HOME`, `LOCALAPPDATA`). Setting `PLAYWRIGHT_BROWSERS_PATH` would need `passThroughEnv` on the app's `test` task.
 - **`widget/settings.ts` imports its locale JSON `with { type: 'json' }`**, because Playwright loads specs as native ESM and Node requires the attribute there.
+
+### Documentation (tasks 8.1–8.2)
+
+- **Sources.** Dates and platform behaviour in `MIGRATION.md` come from the shopify.dev Storefront script tags page and the deprecation changelog post (checked 2026-10-13). The guide also links the Order status page schedule, which differs, without restating its dates.
+- **Store checker.** The site's checker lives at `/tools/checker`. The guide uses it in two places: for merchants who can't query another app's tags (audit), and in the closing call to action.
+- **Links are checked by a one-off script**, not a repository tool: relative files and heading anchors, and every external URL fetched, with shopify.dev anchors matched against the page's `id`s. A committed link checker would hit the network in `pnpm check`.
+- **Run locally from a fresh clone** uses `pnpm config:link`, because the committed `shopify.app.toml` names this repository's app; another developer creates their own app there. `pnpm dev --store` overrides the committed `dev_store_url`.
+- **The README's demo section** holds a placeholder until task 9.3 records the media on `kuhrt-codes-demo`.
