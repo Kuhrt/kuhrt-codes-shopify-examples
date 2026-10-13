@@ -4,6 +4,7 @@
   "scripts": {
     "build": "pnpm build:widget && react-router build",
     "build:widget": "node scripts/build-widget.ts",
+    "legacy:try-install": "esbuild scripts/try-legacy-install.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=build/try-legacy-install.mjs && node build/try-legacy-install.mjs",
     "dev:widget": "node scripts/build-widget.ts --watch",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
