@@ -1,5 +1,6 @@
 import type { AdminClient } from '../app/lib/admin-graphql.server';
 import { adminGraphql } from '../app/lib/admin-graphql.server';
+import { malformedPayload, payloadOf, userErrorFailure } from '../app/lib/mutation-payload';
 import type { Result } from '../app/lib/result';
 import type { BarConfig } from '../widget/config';
 import { legacyScriptUrl } from './settings-url';
@@ -14,15 +15,12 @@ export interface CreatedScriptTag {
   src: string;
 }
 
-interface UserError {
-  message: string;
-  field?: string[] | null;
-}
-
 interface ScriptTagCreatePayload {
   scriptTag?: CreatedScriptTag | null;
   userErrors?: unknown;
 }
+
+const OPERATION = 'scriptTagCreate';
 
 export const SCRIPT_TAG_CREATE = `#graphql
   mutation ScriptTagCreate($input: ScriptTagInput!) {
@@ -38,22 +36,6 @@ export const SCRIPT_TAG_CREATE = `#graphql
     }
   }
 `;
-
-function payloadOf(data: unknown): ScriptTagCreatePayload | undefined {
-  if (typeof data !== 'object' || data === null) return undefined;
-  const payload = (data as { scriptTagCreate?: unknown }).scriptTagCreate;
-  return typeof payload === 'object' && payload !== null
-    ? (payload as ScriptTagCreatePayload)
-    : undefined;
-}
-
-function malformed(): Result<never> {
-  return {
-    ok: false,
-    kind: 'graphql-error',
-    message: 'The scriptTagCreate response had an unexpected shape'
-  };
-}
 
 /**
  * Creates a script tag that loads the legacy announcement bar configured by `settings`.
@@ -73,19 +55,11 @@ export async function createLegacyScriptTag(
   const response = await adminGraphql(admin, SCRIPT_TAG_CREATE, { input });
   if (!response.ok) return response;
 
-  const payload = payloadOf(response.data);
-  if (payload === undefined) return malformed();
+  const payload = payloadOf(response.data, OPERATION) as ScriptTagCreatePayload | undefined;
+  if (payload === undefined) return malformedPayload(OPERATION);
 
-  if (payload.userErrors !== undefined && !Array.isArray(payload.userErrors)) return malformed();
-  const [userError] = (payload.userErrors ?? []) as UserError[];
-  if (userError !== undefined) {
-    return {
-      ok: false,
-      kind: 'user-error',
-      message: userError.message,
-      ...(userError.field ? { field: userError.field } : {})
-    };
-  }
-  if (!payload.scriptTag) return malformed();
+  const userError = userErrorFailure(payload, OPERATION);
+  if (userError) return userError;
+  if (!payload.scriptTag) return malformedPayload(OPERATION);
   return { ok: true, scriptTag: { id: payload.scriptTag.id, src: payload.scriptTag.src } };
 }
