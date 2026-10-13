@@ -10,7 +10,7 @@ This app shows the whole path: the old implementation, the new one built from th
 
 ## Demo
 
-A recording of the storefront, the theme editor and the console is added once the app is deployed to the demo store.
+![The announcement bar counting down and being dismissed on the storefront, its message edited live in the theme editor, then the migration console showing the embed active and no legacy script tags](docs/demo.gif)
 
 ## Shopify features shown
 

@@ -100,7 +100,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - the spec acceptance holds: the bar works and its settings are editable in the theme editor;
   - the console shows the embed active and no legacy tags;
   - Lighthouse shows no CLS from the bar.
-- [ ] 9.3 Record a 30–60s GIF or video (storefront → theme editor → console) and embed it in the README. Verify: the README renders the media on GitHub.
+- [x] 9.3 Record a 30–60s GIF or video (storefront → theme editor → console) and embed it in the README. Verify: the README renders the media on GitHub.
 
 ## Workflow follow-up
 

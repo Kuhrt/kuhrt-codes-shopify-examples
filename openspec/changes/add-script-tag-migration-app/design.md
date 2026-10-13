@@ -421,7 +421,7 @@ Done; "Acceptance deploy" records how each item was resolved. The production URL
 - **Store checker.** The site's checker lives at `/tools/checker`. The guide uses it in two places: for merchants who can't query another app's tags (audit), and in the closing call to action.
 - **Links are checked by a one-off script**, not a repository tool: relative files and heading anchors, and every external URL fetched, with shopify.dev anchors matched against the page's `id`s. A committed link checker would hit the network in `pnpm check`.
 - **Run locally from a fresh clone** uses `pnpm config:link`, because the committed `shopify.app.toml` names this repository's app; another developer creates their own app there. `pnpm dev --store` overrides the committed `dev_store_url`.
-- **The README's demo section** holds a placeholder until task 9.3 records the media on `kuhrt-codes-demo`.
+- **The README demo** (`docs/demo.gif`) was recorded on `kuhrt-codes-demo` with Claude in Chrome's GIF recorder in the signed-in browser: storefront, theme editor (an edit shown in the preview, then undone without saving), console. The admin preview bar was hidden for the storefront scene, because it covers the bottom of the viewport where the bar sits.
 
 ### Acceptance deploy (tasks 9.1–9.2)
 
