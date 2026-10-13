@@ -2,6 +2,7 @@ import { Session } from '@shopify/shopify-api';
 import { describe, expect, it, vi } from 'vitest';
 
 import { apiVersion } from '../app/api-version';
+import rejection from '../legacy/fixtures/script-tag-create-rejection.json';
 import { SCRIPT_TAG_CREATE } from '../legacy/install.server';
 import {
   ALLOWED_SHOP,
@@ -30,9 +31,7 @@ function session(overrides: Partial<ConstructorParameters<typeof Session>[0]> = 
   });
 }
 
-const REJECTION_BODY = JSON.stringify({
-  data: { scriptTagCreate: { scriptTag: null, userErrors: [{ field: ['input'], message: 'no' }] } }
-});
+const REJECTION_BODY = JSON.stringify(rejection);
 
 function dependencies(overrides: Partial<Dependencies> = {}) {
   const output: string[] = [];
@@ -97,6 +96,12 @@ describe('requireUsableSession', () => {
 
   it('rejects a missing session', () => {
     expect(() => requireUsableSession(undefined, NOW)).toThrow(SessionUnavailableError);
+  });
+
+  it('rejects a session with an empty token', () => {
+    expect(() => requireUsableSession(session({ accessToken: '' }), NOW)).toThrow(
+      SessionUnavailableError
+    );
   });
 
   it('rejects an expired session', () => {
@@ -186,11 +191,31 @@ describe('run', () => {
     expect(output()).not.toContain(ACCESS_TOKEN);
   });
 
-  it('exits non-zero when the request itself fails', async () => {
+  it('refuses an empty-string token before any request', async () => {
     const { deps } = dependencies({
+      loadOfflineSession: vi.fn(() => Promise.resolve(session({ accessToken: '' })))
+    });
+
+    expect(await run([], deps)).toBe(1);
+    expect(deps.fetch).not.toHaveBeenCalled();
+  });
+
+  it('exits 0 when Shopify answers with an HTTP error, and still prints it', async () => {
+    const { deps, output } = dependencies({
+      fetch: vi.fn(() => Promise.resolve(new Response('Unauthorized', { status: 401 })))
+    });
+
+    expect(await run([], deps)).toBe(0);
+    expect(output()).toContain('Unauthorized');
+    expect(output()).not.toContain(ACCESS_TOKEN);
+  });
+
+  it('exits 1 when the request itself fails', async () => {
+    const { deps, output } = dependencies({
       fetch: vi.fn(() => Promise.reject(new TypeError('fetch failed')))
     });
 
-    expect(await run([], deps)).not.toBe(0);
+    expect(await run([], deps)).toBe(1);
+    expect(output()).not.toContain(ACCESS_TOKEN);
   });
 });

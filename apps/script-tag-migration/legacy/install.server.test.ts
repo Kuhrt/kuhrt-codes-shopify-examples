@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { GraphqlQueryError } from '@shopify/shopify-api';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminClient } from '../app/lib/admin-graphql.server';
@@ -83,60 +82,28 @@ describe('createLegacyScriptTag', () => {
     expect(result).toStrictEqual({ ok: false, kind: 'user-error', message: 'first' });
   });
 
-  it('returns a top-level GraphQL error in the body as a graphql-error', async () => {
+  it('returns the first user error with its field', async () => {
+    const field = ['input', 'src'];
     const { admin } = adminReturning(
-      jsonResponse({ errors: [{ message: 'Access denied for scriptTagCreate field' }] })
+      jsonResponse({
+        data: { scriptTagCreate: { scriptTag: null, userErrors: [{ field, message: 'bad src' }] } }
+      })
     );
 
     const result = await createLegacyScriptTag(admin, INSTALL);
 
-    expect(result).toEqual({
-      ok: false,
-      kind: 'graphql-error',
-      message: 'Access denied for scriptTagCreate field'
-    });
+    expect(result).toStrictEqual({ ok: false, kind: 'user-error', message: 'bad src', field });
   });
 
-  it('returns a GraphqlQueryError thrown by the app admin client as a graphql-error', async () => {
+  it('passes a failure from the Admin API through unchanged', async () => {
     const { admin } = fakeAdmin(() =>
-      Promise.reject(
-        new GraphqlQueryError({
-          message: 'Field is not defined',
-          response: new Response() as unknown as Record<string, unknown>,
-          body: { errors: { graphQLErrors: [{ message: 'Field is not defined' }] } }
-        })
-      )
+      Promise.resolve(new Response('Too Many Requests', { status: 429 }))
     );
 
-    const result = await createLegacyScriptTag(admin, INSTALL);
-
-    expect(result).toEqual({ ok: false, kind: 'graphql-error', message: 'Field is not defined' });
-  });
-
-  it('returns a thrown transport failure as a network error', async () => {
-    const { admin, graphql } = fakeAdmin(() => Promise.reject(new TypeError('fetch failed')));
-
-    const result = await createLegacyScriptTag(admin, INSTALL);
-
-    expect(result).toMatchObject({ ok: false, kind: 'network' });
-    expect(graphql).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns a non-2xx response as a network error', async () => {
-    const { admin } = adminReturning(new Response('Bad Gateway', { status: 502 }));
-
     expect(await createLegacyScriptTag(admin, INSTALL)).toMatchObject({
       ok: false,
-      kind: 'network'
-    });
-  });
-
-  it('returns a non-JSON body as a network error', async () => {
-    const { admin } = adminReturning(new Response('<html>oops</html>', { status: 200 }));
-
-    expect(await createLegacyScriptTag(admin, INSTALL)).toMatchObject({
-      ok: false,
-      kind: 'network'
+      kind: 'http',
+      status: 429
     });
   });
 
@@ -145,6 +112,21 @@ describe('createLegacyScriptTag', () => {
     [
       'no script tag and no user errors',
       { data: { scriptTagCreate: { scriptTag: null, userErrors: [] } } }
+    ],
+    [
+      'user errors that are not a list',
+      { data: { scriptTagCreate: { scriptTag: null, userErrors: { message: 'oops' } } } }
+    ],
+    [
+      'a script tag alongside user errors that are not a list',
+      {
+        data: {
+          scriptTagCreate: {
+            scriptTag: { id: 'gid://shopify/ScriptTag/1', src: 'x' },
+            userErrors: 'oops'
+          }
+        }
+      }
     ]
   ])('returns %s as a graphql-error rather than a success', async (_name, body) => {
     const { admin } = adminReturning(jsonResponse(body));

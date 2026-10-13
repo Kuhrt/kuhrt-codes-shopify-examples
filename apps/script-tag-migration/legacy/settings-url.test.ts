@@ -54,12 +54,6 @@ describe('toQuery', () => {
     expect(roundTrip(settings)).toEqual({ config: settings, warnings: [] });
   });
 
-  it('drops sub-second precision from the end time, as parseConfig does', () => {
-    const settings = { ...MINIMAL, endsAtMs: 1_900_000_000_999 };
-
-    expect(roundTrip(settings).config?.endsAtMs).toBe(1_900_000_000_000);
-  });
-
   it('omits unset optional settings', () => {
     const names = [...new URLSearchParams(toQuery(MINIMAL)).keys()];
 

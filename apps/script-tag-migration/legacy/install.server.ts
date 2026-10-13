@@ -21,7 +21,7 @@ interface UserError {
 
 interface ScriptTagCreatePayload {
   scriptTag?: CreatedScriptTag | null;
-  userErrors?: UserError[];
+  userErrors?: unknown;
 }
 
 export const SCRIPT_TAG_CREATE = `#graphql
@@ -59,6 +59,7 @@ function malformed(): Result<never> {
  * Creates a script tag that loads the legacy announcement bar configured by `settings`.
  * Shopify rejects script tag creation, which arrives as a `user-error`. Reference code only:
  * nothing in the app calls it.
+ * @throws {TypeError} If `appUrl` is not an https URL.
  */
 export async function createLegacyScriptTag(
   admin: AdminClient,
@@ -75,7 +76,8 @@ export async function createLegacyScriptTag(
   const payload = payloadOf(response.data);
   if (payload === undefined) return malformed();
 
-  const [userError] = payload.userErrors ?? [];
+  if (payload.userErrors !== undefined && !Array.isArray(payload.userErrors)) return malformed();
+  const [userError] = (payload.userErrors ?? []) as UserError[];
   if (userError !== undefined) {
     return {
       ok: false,

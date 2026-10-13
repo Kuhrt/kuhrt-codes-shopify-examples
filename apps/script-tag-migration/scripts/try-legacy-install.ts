@@ -59,7 +59,7 @@ export type UsableSession = Session & { accessToken: string };
 /** The stored offline session, provided it exists, has a token, and has not expired. */
 export function requireUsableSession(session: Session | undefined, now: Date): UsableSession {
   const expired = session?.expires !== undefined && session.expires.getTime() <= now.getTime();
-  if (session === undefined || session.accessToken === undefined || expired) {
+  if (session === undefined || !session.accessToken || expired) {
     throw new SessionUnavailableError(
       `No usable offline session for ${ALLOWED_SHOP}; run \`pnpm dev\` and open the app there first`
     );
