@@ -8,7 +8,15 @@ The same storefront announcement bar delivered two ways: as a legacy script tag 
 
 - React Router app from Shopify's app template, running on Cloudflare Workers
 - Sessions in Cloudflare D1 through Shopify's Drizzle session storage adapter
-- Admin API `2026-10`; one access scope, `write_script_tags`
+- Admin API `2026-10`
+
+## Access scopes
+
+| Scope               | Why                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `write_script_tags` | The console lists and removes the app's own script tags (it also grants read access) |
+
+No theme, product, customer or order scopes are requested.
 
 ## Run locally
 
