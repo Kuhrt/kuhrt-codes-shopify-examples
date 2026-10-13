@@ -6,7 +6,6 @@ import { campaignKey, createDismissalStore } from './dismissal';
 import { MOUNTED, mountEmbed, mountLegacy } from './mount';
 import { buildBar } from './render';
 import {
-  COUNTDOWN_ATTRIBUTE,
   dataAttributeFor,
   DESIGN_MODE_ATTRIBUTE,
   DISMISS_ATTRIBUTE,
@@ -309,53 +308,7 @@ describe('mountEmbed', () => {
     expect(bars()).toHaveLength(0);
   });
 
-  it('waits for DOMContentLoaded when the root is missing its dismiss button', () => {
-    const embed = embedRoot();
-    const button = embed.querySelector(`[${DISMISS_ATTRIBUTE}]`);
-    button?.remove();
-    setReadyState('loading');
-    closeRoot();
-
-    mountEmbed(document);
-    if (button) embed.appendChild(button);
-    dismiss(embed);
-    expect(bars()).toHaveLength(1);
-
-    document.dispatchEvent(new Event('DOMContentLoaded'));
-    dismiss(embed);
-    expect(bars()).toHaveLength(0);
-  });
-
-  it('waits for DOMContentLoaded when the root is missing its countdown', () => {
-    const embed = embedRoot({ dismissible: false, endsAtMs: FAR_FUTURE_MS });
-    const countdown = embed.querySelector('[data-kc-countdown]');
-    countdown?.remove();
-    setReadyState('loading');
-    closeRoot();
-    vi.useFakeTimers();
-
-    mountEmbed(document);
-    expect(vi.getTimerCount()).toBe(0);
-
-    document.dispatchEvent(new Event('DOMContentLoaded'));
-    expect(vi.getTimerCount()).toBe(1);
-  });
-
-  it('waits for DOMContentLoaded when the dismiss button is parsed but the countdown is not', () => {
-    const embed = embedRoot({ endsAtMs: FAR_FUTURE_MS });
-    embed.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.remove();
-    setReadyState('loading');
-    closeRoot();
-    vi.useFakeTimers();
-
-    mountEmbed(document);
-    expect(vi.getTimerCount()).toBe(0);
-
-    document.dispatchEvent(new Event('DOMContentLoaded'));
-    expect(vi.getTimerCount()).toBe(1);
-  });
-
-  it('enhances at once a root that has all of its markers while the document is loading', () => {
+  it('starts the countdown at once while the document is loading', () => {
     embedRoot({ endsAtMs: FAR_FUTURE_MS });
     setReadyState('loading');
     closeRoot();
@@ -459,21 +412,6 @@ describe('mountEmbed', () => {
       expect(bars()).toHaveLength(1);
 
       closeRoot();
-      await flushObserver();
-
-      expect(bars()).toHaveLength(0);
-    });
-
-    it('enhances a present root once a missing marker arrives', async () => {
-      createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
-      const embed = embedRoot(EMBED_CONFIG);
-      const button = embed.querySelector(`[${DISMISS_ATTRIBUTE}]`);
-      button?.remove();
-      closeRoot();
-      mountEmbed(document);
-      expect(bars()).toHaveLength(1);
-
-      if (button) embed.appendChild(button);
       await flushObserver();
 
       expect(bars()).toHaveLength(0);

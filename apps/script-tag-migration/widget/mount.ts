@@ -5,11 +5,8 @@ import { enhance } from './enhance';
 import { buildBar } from './render';
 import type { RawSettings, SettingName } from './settings';
 import {
-  COUNTDOWN_ATTRIBUTE,
   DESIGN_MODE_ATTRIBUTE,
-  DISMISS_ATTRIBUTE,
   INVALID_ATTRIBUTE,
-  MESSAGE_ATTRIBUTE,
   readRawSettings,
   readSettings,
   ROOT_ATTRIBUTE,
@@ -107,23 +104,9 @@ function mountBar(doc: Document, root: HTMLElement, config: BarConfig): void {
   enhance(root, config, { store });
 }
 
-/** The attributes of every child the markup carries for `config`. */
-function markersFor(config: BarConfig): string[] {
-  const markers = [MESSAGE_ATTRIBUTE];
-  if (config.endsAtMs !== undefined) markers.push(COUNTDOWN_ATTRIBUTE);
-  if (config.dismissible) markers.push(DISMISS_ATTRIBUTE);
-  return markers;
-}
-
-/**
- * Whether the parser has produced every element the config expects, so enhancing now can't miss one.
- * A following node means the parser has closed the root.
- */
-function isRootParsed(root: HTMLElement, config: BarConfig | null): boolean {
-  if (root.nextSibling === null) return false;
-  return (
-    !config || markersFor(config).every((marker) => root.querySelector(`[${marker}]`) !== null)
-  );
+/** Whether the parser has closed the root, so all of its children exist. A following node means it has. */
+function isRootParsed(root: HTMLElement): boolean {
+  return root.nextSibling !== null;
 }
 
 function parseRoot(root: HTMLElement): ParseResult {
@@ -180,7 +163,7 @@ function rootAddedBy(records: MutationRecord[]): HTMLElement | null {
 
 /** Enhances `found` if the parser has finished it, and reports whether it did. */
 function enhanceIfParsed(doc: Document, found: FoundRoot | null): boolean {
-  if (!found || !isRootParsed(found.root, found.parsed.config)) return false;
+  if (!found || !isRootParsed(found.root)) return false;
   enhanceRoot(doc, found.root, found.parsed);
   return true;
 }

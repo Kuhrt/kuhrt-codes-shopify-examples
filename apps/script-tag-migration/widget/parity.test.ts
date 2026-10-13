@@ -13,7 +13,7 @@ import {
   readBlockSchema,
   renderBlock
 } from './liquid-test-support';
-import { LOG_PREFIX, MOUNTED, mountEmbed } from './mount';
+import { MOUNTED, mountEmbed } from './mount';
 import { buildBar } from './render';
 import type { RawSettings } from './settings';
 import {
@@ -234,8 +234,12 @@ afterEach(() => {
   Reflect.deleteProperty(window, MOUNTED);
 });
 
+const SETTING_IDS: readonly string[] = Object.values(SETTING);
+
+/** The setting a warning names, wherever its id appears as a word in the text. */
 function warnedSettingId(call: unknown[]): string {
-  return String(call[0]).slice(LOG_PREFIX.length).trim().split(' ')[0] ?? '';
+  const words = String(call[0]).split(/[\s,:]+/);
+  return words.find((word) => SETTING_IDS.includes(word)) ?? '';
 }
 
 /** The setting ids, sorted, that the embed warns about when it enhances the rendered block. */

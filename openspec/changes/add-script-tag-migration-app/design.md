@@ -297,7 +297,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **No layout shift from the countdown.** The countdown keeps a fixed-width box, `16ch` of tabular numerals that stays hidden rather than collapsed until it is filled. `formatCountdown` zero-pads hours, minutes and seconds, so the text stays inside the box unless the day count needs four or more digits. When the countdown ends with the `message` behavior, its text is cleared rather than the element removed, so the box stays reserved and the message doesn't move.
 - **The theme editor never stores a dismissal.** In the editor, the block marks the root with `data-kc-design-mode`. The widget then uses a dismissal store that neither reads nor writes `localStorage`. Clicking × hides the bar in the preview without hiding it for every later edit.
 - **Loading order.** Shopify injects an embed's `javascript` asset as `<script async>` in `<head>`, so it can run while the page is still parsing.
-  - While the page is parsing, `mountEmbed` watches for the bar with a `MutationObserver`. It enhances the bar as soon as the root, every child the markup contract expects for its config, and a node after the root (so the `<aside>` is closed) have been parsed. A dismissed or ended bar is therefore removed before it paints, even when a cached script runs before `<body>` exists. `DOMContentLoaded` is the fallback.
+  - While the page is parsing, `mountEmbed` watches for the bar with a `MutationObserver`. It enhances the bar as soon as a node after the root has been parsed. That node means the parser has closed the `<aside>`, so all of its children exist. A dismissed or ended bar is therefore removed before it paints, even when a cached script runs before `<body>` exists. `DOMContentLoaded` is the fallback.
   - The legacy entry always waits, so the embed's markup is in place when the single-instance guard runs.
   - Each path enhances a bar once. `mountEmbed` skips a page that is already mounted.
 - **`datetime` differs by path.** Liquid's `date` filter formats only in the shop's timezone, so the block emits `2026-11-27T00:00:00-0500`, while `buildBar` emits UTC `…Z`. Both are valid HTML global date-times for the same instant. JavaScript reads only `data-kc-ends-at`, and the parity test compares `datetime` as an instant.
@@ -321,7 +321,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - editing a setting updates the preview, and the countdown and dismiss button keep working;
   - disabling the embed removes the bar;
   - colors print as lowercase `#rrggbb`;
-  - the end-time round trip works on Shopify: a valid time a few minutes ahead counts down, and `2026-02-30 10:00` renders no countdown and logs one `ends_at is invalid` warning. So Shopify's `date` reads an all-digit string as epoch seconds.
+  - the end-time round trip works on Shopify. A valid time a few minutes ahead counts down, so Shopify's `date` reads an all-digit string as epoch seconds. `2026-02-30 10:00` renders no countdown and logs one `ends_at is invalid` warning.
 
   The user waived the screenshots, and the stylesheet's placement in the page source was not checked.
 - **Parity test.** `widget/parity.test.ts` renders the block with liquidjs, from `widget/liquid-test-support.ts`. The `t` and `date` filters are stubbed, and `date` runs in a fixed −05:00 store timezone. One table of cases checks three things:
