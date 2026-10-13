@@ -44,12 +44,12 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 4. Legacy reference path
 
-- [ ] 4.1 Add `legacy/settings-url.ts` (settings → query string). Verify: a round-trip unit test gives `parseConfig(parse(toQuery(s))) ≡ s` for representative settings, including unicode and characters that need URL encoding.
-- [ ] 4.2 Serve `public/legacy/announcement-bar.js` as a Workers static asset with a JavaScript content type and long-cache headers. Also serve the extension's `announcement-bar.css` next to it, from the same source file, and have the legacy entry load it. Verify: a request against the local Worker returns 200, `text/javascript`, and the cache header. The stylesheet is served the same way, and a legacy-rendered bar is styled.
-- [ ] 4.3 Add `legacy/install.server.ts` with `createLegacyScriptTag(admin, settings)` → `Result` (design decision 7). It is not referenced from `afterAuth` or any route. Verify:
+- [x] 4.1 Add `legacy/settings-url.ts` (settings → query string). Verify: a round-trip unit test gives `parseConfig(parse(toQuery(s))) ≡ s` for representative settings, including unicode and characters that need URL encoding.
+- [x] 4.2 Serve `public/legacy/announcement-bar.js` as a Workers static asset with a JavaScript content type and long-cache headers. Also serve the extension's `announcement-bar.css` next to it, from the same source file, and have the legacy entry load it. Verify: a request against the local Worker returns 200, `text/javascript`, and the cache header. The stylesheet is served the same way, and a legacy-rendered bar is styled.
+- [x] 4.3 Add `legacy/install.server.ts` with `createLegacyScriptTag(admin, settings)` → `Result` (design decision 7). It is not referenced from `afterAuth` or any route. Verify:
   - unit tests with a mocked admin client cover success, a user error (with a fixture of the real rejection once 4.4 captures it), a top-level GraphQL error, and a network failure;
   - a test asserts that no app route or auth hook imports the module.
-- [ ] 4.4 Add `scripts/try-legacy-install.ts`. It refuses any store except `kuhrt-codes`, calls `createLegacyScriptTag` with the dev offline session, and prints the raw response. Run it once. Verify: the refusal for `kuhrt-codes-demo` is unit tested. The captured rejection (response, API version, date) is saved as the 4.3 test fixture and quoted in `MIGRATION.md` (group 8).
+- [x] 4.4 Add `scripts/try-legacy-install.ts`. It refuses any store except `kuhrt-codes`, calls `createLegacyScriptTag` with the dev offline session, and prints the raw response. Run it once. Verify: the refusal for `kuhrt-codes-demo` is unit tested. The captured rejection (response, API version, date) is saved as the 4.3 test fixture and quoted in `MIGRATION.md` (group 8).
 
 ## 5. Migration console (App Home)
 
