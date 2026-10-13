@@ -78,7 +78,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 8. Documentation
 
-- [ ] 8.1 Write `MIGRATION.md` to the `migration-guide` spec:
+- [x] 8.1 Write `MIGRATION.md` to the `migration-guide` spec:
   - audit (the `scriptTags` query, plus the store checker);
   - mapping (a side-by-side table linking the legacy and modern files for injection, configuration, rendering, and removal; analytics-only scripts point to web pixels);
   - ship;
