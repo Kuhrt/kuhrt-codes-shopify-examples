@@ -45,6 +45,8 @@
     "@shopify/app-bridge-types": "0.7.2",
     "@shopify/cli": "4.9.3",
     "@shopify/polaris-types": "^1.0.1",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/react": "16.3.2",
     "@types/node": "^24.0.0",
     "@types/react": "^18.3.25",
     "@types/react-dom": "^18.3.7",
