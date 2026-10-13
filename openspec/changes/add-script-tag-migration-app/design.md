@@ -320,7 +320,8 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - the bar, the countdown, the ended message and dismissal work;
   - editing a setting updates the preview, and the countdown and dismiss button keep working;
   - disabling the embed removes the bar;
-  - colors print as lowercase `#rrggbb`.
+  - colors print as lowercase `#rrggbb`;
+  - the end-time round trip works on Shopify: a valid time a few minutes ahead counts down, and `2026-02-30 10:00` renders no countdown and logs one `ends_at is invalid` warning. So Shopify's `date` reads an all-digit string as epoch seconds.
 
   The user waived the screenshots, and the stylesheet's placement in the page source was not checked.
 - **Parity test.** `widget/parity.test.ts` renders the block with liquidjs, from `widget/liquid-test-support.ts`. The `t` and `date` filters are stubbed, and `date` runs in a fixed −05:00 store timezone. One table of cases checks three things:
