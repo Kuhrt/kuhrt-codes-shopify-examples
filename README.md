@@ -4,9 +4,9 @@ Small, readable Shopify apps that show how common merchant problems get solved o
 
 ## Examples
 
-| App                                                           | What it shows                                                                                                              | Status      |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| [Script Tag → App Embed](apps/script-tag-migration/README.md) | The same storefront widget built twice, as a legacy script tag and as a theme app extension embed, with a migration guide. | In progress |
+| App                                                           | What it shows                                                                                                              | Status |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------ |
+| [Script Tag → App Embed](apps/script-tag-migration/README.md) | The same storefront widget built twice, as a legacy script tag and as a theme app extension embed, with a migration guide. | Live   |
 
 ## Prerequisites
 
