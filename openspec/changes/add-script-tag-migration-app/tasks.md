@@ -68,7 +68,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 6. Install lifecycle
 
-- [ ] 6.1 Make the `app/uninstalled` webhook delete all sessions for the shop from the Workers session store. Keep the template's HMAC verification. Verify: route tests cover a valid webhook (sessions deleted) and an invalid HMAC (401, nothing deleted). Run `shopify app webhook trigger --topic app/uninstalled` against dev.
+- [x] 6.1 Make the `app/uninstalled` webhook delete all sessions for the shop from the Workers session store. Keep the template's HMAC verification. Verify: route tests cover a valid webhook (sessions deleted) and an invalid HMAC (401, nothing deleted). Run `shopify app webhook trigger --topic app/uninstalled` against dev.
 - [x] 6.2 Add a scope-contract test: the scopes in `shopify.app.toml` equal the scopes table parsed from the README. Also assert that `webhooks.api_version` in `shopify.app.toml` equals the app's `apiVersion`. Verify: the test passes, and adding a scope to either file alone fails it.
 
 ## 7. End-to-end
