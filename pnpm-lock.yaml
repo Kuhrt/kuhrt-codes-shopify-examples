@@ -245,6 +245,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@7.2.0)
@@ -260,6 +263,9 @@ importers:
       happy-dom:
         specifier: ^20.14.5
         version: 20.14.6
+      liquidjs:
+        specifier: 10.29.0
+        version: 10.29.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2663,6 +2669,10 @@ packages:
   colorette@2.0.20:
     resolution: {integrity: sha512-IfEDxwoWIjkeXL1eXcDiow4UbKjhLdq6/EuSVR9GMN7KVH3r9gQ83e73hsz1Nd1T3ijd5xv1wcWRYO+D6kCI2w==}
 
+  commander@10.0.1:
+    resolution: {integrity: sha512-y4Mg2tXshplEbSGzx7amzPwKKOCGuoSRP/CjEdwwk0FOGlUbq6lKuoyDZTNZkmxHdJtp54hdfY/JUrdL7Xfdug==}
+    engines: {node: '>=14'}
+
   common-tags@1.8.2:
     resolution: {integrity: sha512-gk/Z852D2Wtb//0I+kRFNKKE9dIIVirjoqPoA1wJU+XePVXZfGeBpk45+A1rKO4Q43prqWBNY/MiIeRLbPWUaA==}
     engines: {node: '>=4.0.0'}
@@ -3591,6 +3601,11 @@ packages:
 
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
+
+  liquidjs@10.29.0:
+    resolution: {integrity: sha512-pCVOhs6FLAR8su3ItJ07diN26t6W5dHQRnmTMy8HPyTFuv1+oSCVJIGp5pGjfQyOZfh50KswvKtMTp6p4JEIdw==}
+    engines: {node: '>=16'}
+    hasBin: true
 
   listr2@4.0.5:
     resolution: {integrity: sha512-juGHV1doQdpNT3GSTs9IUN43QJb7KHdF9uqg7Vufs/tG9VTzpFphqF4pm/ICdAABGQxsyNn9CiYA3StkI6jpwA==}
@@ -6888,6 +6903,8 @@ snapshots:
 
   colorette@2.0.20: {}
 
+  commander@10.0.1: {}
+
   common-tags@1.8.2: {}
 
   compare-versions@6.1.1: {}
@@ -7832,6 +7849,10 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.33.0
 
   lines-and-columns@1.2.4: {}
+
+  liquidjs@10.29.0:
+    dependencies:
+      commander: 10.0.1
 
   listr2@4.0.5:
     dependencies:

@@ -1,0 +1,24 @@
+{
+  "announcement_bar": {
+    "name": "Announcement bar",
+    "settings": {
+      "message": { "label": "Message" },
+      "link_url": { "label": "Link" },
+      "ends_at": {
+        "label": "End time",
+        "info": "Store time, as YYYY-MM-DD HH:MM (24-hour), for example 2026-11-27 00:00. Leave empty for no countdown."
+      },
+      "ended_behavior": {
+        "label": "When the countdown ends",
+        "options": { "hide": "Hide the bar", "message": "Show the ended message" }
+      },
+      "ended_message": {
+        "label": "Ended message",
+        "info": "Shown after the end time when the bar is set to show the ended message."
+      },
+      "dismissible": { "label": "Shoppers can dismiss the bar" },
+      "background_color": { "label": "Background color" },
+      "text_color": { "label": "Text color" }
+    }
+  }
+}

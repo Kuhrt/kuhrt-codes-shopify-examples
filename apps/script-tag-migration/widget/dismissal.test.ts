@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { campaignKey, createDismissalStore } from './dismissal';
+import { campaignKey, createDismissalStore, createEphemeralDismissalStore } from './dismissal';
 import { blockedStorage } from './test-support';
 
 afterEach(() => {
@@ -84,5 +84,23 @@ describe('createDismissalStore', () => {
     const store = createDismissalStore();
     store.dismiss('abc');
     expect(store.isDismissed('abc')).toBe(true);
+  });
+});
+
+describe('createEphemeralDismissalStore', () => {
+  it('never reports a dismissal, even after one is made', () => {
+    const store = createEphemeralDismissalStore();
+
+    store.dismiss('key');
+
+    expect(store.isDismissed('key')).toBe(false);
+  });
+
+  it('does not write to storage', () => {
+    const write = vi.spyOn(localStorage, 'setItem');
+
+    createEphemeralDismissalStore().dismiss('key');
+
+    expect(write).not.toHaveBeenCalled();
   });
 });

@@ -27,13 +27,17 @@ export function remaining(endsAtMs: number, nowMs: number): CountdownParts | 'en
   };
 }
 
-/** Compact text such as `1d 2h 3m 4s`; the days unit is omitted when zero. */
+function twoDigits(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/** Compact text such as `1d 02h 03m 04s`; the days unit is omitted when zero and the others are zero-padded to a fixed width. */
 export function formatCountdown(parts: CountdownParts): string {
   const units = [
     parts.days > 0 ? `${parts.days}d` : null,
-    `${parts.hours}h`,
-    `${parts.minutes}m`,
-    `${parts.seconds}s`
+    `${twoDigits(parts.hours)}h`,
+    `${twoDigits(parts.minutes)}m`,
+    `${twoDigits(parts.seconds)}s`
   ];
   return units.filter((unit) => unit !== null).join(' ');
 }

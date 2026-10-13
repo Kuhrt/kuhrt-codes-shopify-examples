@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": [
+        "$TURBO_EXTENDS$",
+        "extensions/announcement-bar/assets/announcement-bar.js",
+        "public/legacy/announcement-bar.js"
+      ]
+    },
+    "lint": {
+      "dependsOn": ["$TURBO_EXTENDS$", "build"]
+    },
+    "dev": {
+      "with": ["dev:widget"]
+    },
+    "dev:widget": { "cache": false, "persistent": true }
+  }
+}

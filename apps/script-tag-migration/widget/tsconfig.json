@@ -1,6 +1,7 @@
 {
   "extends": "@repo/config/tsconfig.base.json",
   "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts", "liquid-test-support.ts"],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "types": []

@@ -35,12 +35,14 @@ apps/script-tag-migration/
 │   ├── dismissal.ts              storage-safe dismissed-state, keyed by campaign hash
 │   ├── render.ts                 buildBar(config) → HTMLElement   (legacy path only)
 │   ├── enhance.ts                enhance(root, config, clock)     (countdown + dismiss on existing markup)
-│   ├── entry-embed.ts            reads data-* from Liquid-rendered root → enhance()
-│   └── entry-legacy.ts           single-instance guard → reads own script URL → buildBar() → enhance()
+│   ├── mount.ts                  mountEmbed (reads data-* from the Liquid-rendered root → enhance) · mountLegacy (single-instance guard → reads own script URL → buildBar → enhance)
+│   ├── entry-embed.ts            mountEmbed(document)
+│   ├── entry-legacy.ts           mountLegacy(document, currentScript.src)
+│   └── parity.test.ts            Liquid block vs buildBar(), via liquidjs
 ├── extensions/announcement-bar/  Theme app extension ("modern/")
 │   ├── blocks/announcement-bar.liquid   app embed, target "body", settings schema, server-rendered markup
 │   ├── assets/announcement-bar.js       ← built from widget/entry-embed.ts (gitignored)
-│   ├── assets/announcement-bar.css      hand-written; shared by both paths
+│   ├── assets/announcement-bar.css      hand-written; also served next to the legacy script
 │   └── locales/en.default.json
 ├── legacy/                       Reference implementation ("legacy/")
 │   ├── install.server.ts         createLegacyScriptTag(admin, settings) → Result
@@ -51,6 +53,7 @@ apps/script-tag-migration/
 │   ├── routes/webhooks.app.uninstalled.tsx
 │   ├── services/script-tags.server.ts   listOwnedScriptTags / deleteOwnedScriptTag → Result
 │   └── shopify.server.ts         shopifyApp({ sessionStorage: <Workers adapter>, scopes })
+├── scripts/build-widget.ts      esbuild bundles for both paths + gzip budget and the embed's raw size limit
 ├── scripts/try-legacy-install.ts dev-only: runs legacy/install against kuhrt-codes, prints the response
 ├── e2e/                          Playwright harness: embed page vs legacy page, same scenarios
 ├── shopify.app.toml · wrangler.jsonc · README.md · MIGRATION.md
@@ -82,7 +85,7 @@ apps/script-tag-migration/
 
 ### 2. The embed renders markup in Liquid; JavaScript only enhances
 
-- The Liquid block renders the full bar (message, link, `<time datetime>`, dismiss button) into the first HTML response. `entry-embed.ts` adds the ticking countdown and dismissal.
+- The Liquid block renders the full bar (message, link, `<time datetime>`, dismiss button) into the first HTML response. `mountEmbed` (loaded by `entry-embed.ts`) adds the ticking countdown and dismissal.
 - This is the main technical upgrade over a script tag. The bar exists before JavaScript runs, so it works without JavaScript and doesn't pop in late. It is also a talking point for `MIGRATION.md`.
 - **Cost:** the markup exists twice, in `announcement-bar.liquid` and in `render.ts` (legacy). A **parity test** renders the Liquid block with `liquidjs` (with Shopify filters stubbed) and the TS `buildBar()` with the same settings. It compares their normalized DOM structure (roles, data attributes, element tree). That makes drift a test failure instead of a code-review job.
 - **Alternative considered:** JavaScript renders in both paths, and Liquid emits only a config `<script type="application/json">`. That is DRY by construction, but it throws away server rendering, which is the best argument for the embed. Rejected.
@@ -96,7 +99,7 @@ apps/script-tag-migration/
 ### 4. End time: store-local input, converted to an epoch in Liquid
 
 - Theme settings have no date picker. The setting is a `text` field with help text showing the format `YYYY-MM-DD HH:MM`, entered in store-local time.
-- Liquid converts it once with the `date` filter (`| date: '%s'`), which Shopify evaluates in the shop's timezone, and emits `data-ends-at="<epoch seconds>"`. JavaScript only ever compares epoch values.
+- Liquid converts it once with the `date` filter (`| date: '%s'`), which Shopify evaluates in the shop's timezone, and emits `data-kc-ends-at="<epoch seconds>"`. JavaScript only ever compares epoch values.
 - This satisfies the cross-timezone scenario and handles DST correctly, as long as Shopify's date parsing applies the zone's offset *at the target date*, not today's offset.
 - **Verified on `kuhrt-codes` (task 1.3), rendered on 2026-10-12 with the store on Eastern time (−04:00 that day):**
   - `'2026-11-27 00:00' | date: '%s'` gave `1795755600` (2026-11-27T05:00:00Z, −05:00).
@@ -106,13 +109,13 @@ apps/script-tag-migration/
 
 ### 5. The legacy script configures itself from its own URL
 
-- `entry-legacy.ts` reads `document.currentScript.src` and parses its query string through `parseConfig`. `legacy/settings-url.ts` is the exact inverse, and a round-trip unit test ties the two together.
+- `entry-legacy.ts` passes `document.currentScript.src` to `mountLegacy`, which parses its query string through `parseConfig`. `legacy/settings-url.ts` is the exact inverse, and a round-trip unit test ties the two together.
 - Historically, changing a setting meant `scriptTagUpdate` with a new `src`. `MIGRATION.md` uses this to show why theme settings are the better home for configuration.
 - **Alternative considered:** the script fetches its config from an app backend endpoint, keyed by shop. That is more realistic for large apps, but it adds a storage model, an endpoint, CORS and caching just for reference code. Rejected; `MIGRATION.md` mentions it as the other common pattern.
 
 ### 6. Single-instance guard: the embed wins
 
-- Both roots carry `data-kc-announcement-bar`. `entry-legacy.ts` exits, with one `console.warn`, if that element already exists or if a `window`-scoped "mounted" symbol is set.
+- Both roots carry `data-kc-announcement-bar`. `mountLegacy` (loaded by `entry-legacy.ts`) exits, with one `console.warn`, if that element already exists or if a `window`-scoped "mounted" symbol is set.
 - Because the embed's markup is server-rendered, it always exists before the deferred legacy script runs, so "embed wins" holds without any race.
 - **Alternative considered:** no guard. It's the typical real-world bug, but the guard *is* the migration-safety lesson. Keep it.
 
@@ -154,8 +157,8 @@ apps/script-tag-migration/
   - If only a KV adapter is officially maintained, use KV and accept KV's eventual consistency, because a just-written session can briefly read as missing. Mitigate this with the adapter's own guidance, and record the choice here.
   - Remove Prisma entirely.
 - **Deploy:** two manual commands, documented in the README:
-  - `wrangler deploy`, for the app server and the legacy asset;
-  - `shopify app deploy`, for the app config and theme extension.
+  - `pnpm build && pnpm exec wrangler deploy`, for the app server and the legacy asset;
+  - `pnpm run app:deploy`, for the app config and theme extension. It builds the widget first. Plain `shopify app deploy` would ship a missing or stale bundle, and `pnpm deploy` is pnpm's own command.
   - Secrets (`SHOPIFY_API_SECRET`) live in `wrangler secret`, and locally in `.dev.vars`.
   - **Alternative considered:** SST, as the website uses. One Worker and one D1 database don't justify it. Plain `wrangler.jsonc` is easier for a reviewer to read. Rejected.
 - **Local dev:** `shopify.web.toml` runs the Vite dev server with the Cloudflare plugin (workerd locally). The Shopify CLI tunnels it as usual.
@@ -170,7 +173,7 @@ apps/script-tag-migration/
 | Parity | Vitest + liquidjs | Liquid-rendered markup ≡ `buildBar()` markup for the same settings; the `{% schema %}` setting IDs ≡ the widget's setting-name constants |
 | Route | Vitest | Console loader and action with a mocked admin client: list, empty, query failure, gated delete, forged ID, delete user error; the uninstall webhook deletes sessions |
 | E2E | Playwright + axe | A local harness with two pages: the Liquid-rendered embed, and a page loading the legacy bundle through its query string. Both run the same scenario suite with `page.clock`: countdown, ended, dismiss persistence, storage blocked, JavaScript disabled (embed only), the double-load page, and axe |
-| Budget | build step | gzip size of the embed JS ≤ 10 KB, or the build fails |
+| Budget | build step | each bundle ≤ 10 KB gzipped, and the embed bundle ≤ 10,000 bytes raw (Theme Check's limit), or the build fails |
 | Theme | Theme Check | `extensions/announcement-bar` lints clean |
 | Manual | checklist in tasks | Horizon on `kuhrt-codes-demo`, `debut-vintage-theme` on `kuhrt-codes`, the theme editor deep link, the console on a real install |
 
@@ -189,8 +192,8 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 1. Develop entirely against `kuhrt-codes`.
 2. Once acceptance is checked there:
-   - `wrangler deploy`;
-   - `shopify app deploy`;
+   - `pnpm build && pnpm exec wrangler deploy`;
+   - `pnpm run app:deploy`;
    - install on `kuhrt-codes-demo`;
    - enable the embed on Horizon.
 3. Record the README GIF on `kuhrt-codes-demo`.
@@ -282,3 +285,49 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - An empty ended message under the `message` behavior falls back to `hide`, with one warning.
 - **Countdown timing.** The countdown reschedules itself on second boundaries relative to the end time, so the ended transition fires on time. The stylesheet (task 3.1) should set `font-variant-numeric: tabular-nums` on the countdown so its width doesn't jitter.
 - **Removing the bar.** Ending with `hide`, dismissing, or a previously dismissed campaign removes the root. Focus moves to `body` (through a temporary `tabindex="-1"`) only when it was inside the bar.
+
+### Delivery bundles and theme extension (tasks 2.5–3.3)
+
+- **Bundles.** `scripts/build-widget.ts` (esbuild, IIFE, ES2020) writes the embed and legacy bundles. The build fails when either goes over 10 KB gzipped, which is the spec's budget. It also fails when the embed bundle goes over 10,000 bytes raw, which is Theme Check's `AssetSizeAppBlockJavaScript` limit for app-block JavaScript. The embed bundle is about 6 KB raw and the legacy bundle about 7.5 KB; both are about 3 KB gzipped. The script runs as part of:
+  - `build`, before `react-router build`, because the legacy bundle ships from `public/`;
+  - `app:deploy`, so the extension never ships a stale bundle;
+  - `predev`, once.
+
+  `turbo run dev` also runs it in watch mode. Under turbo, the `predev` build and the first watch build write the same files. That is redundant but harmless, and it is the only build when `pnpm dev` runs in the app directly.
+- **No layout shift from the countdown.** The countdown keeps a fixed-width box, `16ch` of tabular numerals that stays hidden rather than collapsed until it is filled. `formatCountdown` zero-pads hours, minutes and seconds, so the text stays inside the box unless the day count needs four or more digits. When the countdown ends with the `message` behavior, its text is cleared rather than the element removed, so the box stays reserved and the message doesn't move.
+- **The theme editor never stores a dismissal.** In the editor, the block marks the root with `data-kc-design-mode`. The widget then uses a dismissal store that neither reads nor writes `localStorage`. Clicking × hides the bar in the preview without hiding it for every later edit.
+- **Loading order.** Shopify injects an embed's `javascript` asset as `<script async>` in `<head>`, so it can run while the page is still parsing.
+  - While the page is parsing, `mountEmbed` watches for the bar with a `MutationObserver`. It enhances the bar once a node follows the root and every child the markup contract expects for its config is present. A following node alone doesn't prove the `<aside>` is closed: another script can append to `<body>` while the parser is inside it, and a theme that leaves a `<table>` open makes the parser foster-parent the `<aside>` in front of it. A dismissed or ended bar is therefore removed before it paints, even when a cached script runs before `<body>` exists. `DOMContentLoaded` is the fallback.
+  - The legacy entry always waits, so the embed's markup is in place when the single-instance guard runs.
+  - Each path enhances a bar once. `mountEmbed` skips a page that is already mounted.
+- **`datetime` differs by path.** Liquid's `date` filter formats only in the shop's timezone, so the block emits `2026-11-27T00:00:00-0500`, while `buildBar` emits UTC `…Z`. Both are valid HTML global date-times for the same instant. JavaScript reads only `data-kc-ends-at`, and the parity test compares `datetime` as an instant.
+- **The block renders only valid values.** `enhance()` never touches the link or the inline style, so Liquid has to drop invalid values itself. It mirrors `parseConfig`'s rules:
+  - **link:** `http(s)://` followed by a host character other than `/`, `?`, `#` or `:`, or a single leading `/`. It must contain no space, backslash, DEL or C0 control character, which is checked through `url_encode`.
+  - **end time:** converted with `date: '%s'`, then formatted back with `date: '%Y-%m-%d %H:%M'`. It is rejected unless the result is a non-negative number and the round trip reproduces the input exactly. That one check enforces the help-text format. It also rejects impossible dates that `date` would roll over (`2026-02-30` becoming 2 March), lenient input such as `Nov 27`, and local times inside a spring-forward gap.
+  - **colors:** `#` followed by 3 or 6 characters, and escaped. Shopify's picker emits only lowercase hex, so the hex digits themselves aren't checked.
+  - **ended message:** the `message` behavior with a blank ended message renders as `hide`.
+
+  Each check is inlined. Shopify wraps rendered app snippet output in `<!-- BEGIN app snippet -->` comments, so a captured snippet can't return a value. A shared color snippet broke both colors on `kuhrt-codes`.
+- **Warnings hold on both paths.** Every rejected setting is listed, space-separated, in `data-kc-invalid` on the root. `mountEmbed` warns once for each, so the spec's "one warning naming the setting" applies to the embed path too. The setting's own `data-kc-*` attribute is omitted rather than carrying the raw value: an all-digit entry such as `123` would otherwise read as a valid epoch.
+- **Known divergences in link checking.** Liquid checks the link's shape, not whether it is a valid URL. Only the merchant can enter a link, so neither direction is a security issue.
+  - **Liquid keeps links that `parseConfig` rejects:** a malformed host (`https://[`, `http://a@`), Unicode whitespace, or a C1 control character. The embed renders the link, and `mountEmbed` warns about it.
+  - **Liquid drops links that `parseConfig` accepts:** a backslash anywhere (`/a\b`), and scheme-relative forms like `https:x.com`.
+- **The stylesheet loads from the block, not the schema.** A schema `stylesheet` becomes a render-blocking `<link>` in `<head>`. The block emits the `<link>` just before the bar instead, so content above the bar renders without waiting for it. It still delays parser-inserted scripts that come after it, and therefore `DOMContentLoaded`, until the 1 KB file loads. Where it lands in the live page source has not been inspected.
+- **Labels have one source.** `DEFAULT_LABELS` is read from the extension's `locales/en.default.json`, so both paths use the same strings.
+- **Theme Check** runs as part of the app's `lint`, which depends on `build` (the only task that writes the bundles), so CI enforces it. It is `shopify theme check --path extensions/announcement-bar -C theme-check:theme-app-extension`, and the deploy build runs the same checks.
+- **Checked on `kuhrt-codes` (task 3.3)** on Horizon and `debut-vintage-theme`, both as previews:
+  - the embed appears under App embeds;
+  - the bar, the countdown, the ended message and dismissal work;
+  - editing a setting updates the preview, and the countdown and dismiss button keep working;
+  - disabling the embed removes the bar;
+  - colors print as lowercase `#rrggbb`;
+  - the end-time round trip works on Shopify. A valid time a few minutes ahead counts down, so Shopify's `date` reads an all-digit string as epoch seconds. `2026-02-30 10:00` renders no countdown and logs one `ends_at is invalid` warning.
+
+  The user waived the screenshots, and the stylesheet's placement in the page source was not checked.
+- **Parity test.** `widget/parity.test.ts` renders the block with liquidjs, from `widget/liquid-test-support.ts`. The `t` and `date` filters are stubbed, and `date` runs in a fixed −05:00 store timezone. One table of cases checks three things:
+  - the normalized trees match `buildBar`;
+  - the Liquid output parses back to the same config;
+  - both paths warn about the same settings.
+
+  The stubs can't fully reproduce Shopify's lenient date parsing or the snippet wrapping. Only the manual check on a real store covers those; the e2e harness uses the same stubs. Widget source typechecks without Node types; `widget/tsconfig.test.json` adds them for tests.
+- **The legacy bar has no stylesheet yet.** Task 4.2 serves `announcement-bar.css` next to the legacy script.

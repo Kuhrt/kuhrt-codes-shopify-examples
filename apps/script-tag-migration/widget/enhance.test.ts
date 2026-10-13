@@ -153,7 +153,7 @@ describe('when the countdown ends', () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it('swaps in the ended message with no countdown for "message"', () => {
+  it('swaps in the ended message and empties the countdown for "message"', () => {
     const config: BarConfig = {
       ...BASE,
       endsAtMs,
@@ -164,7 +164,7 @@ describe('when the countdown ends', () => {
     vi.advanceTimersByTime(3 * SECOND);
     expect(root.isConnected).toBe(true);
     expect(root.querySelector(`[${MESSAGE_ATTRIBUTE}]`)?.textContent).toBe('Over');
-    expect(root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)).toBeNull();
+    expect(countdownText(root)).toBe('');
     expect(root.hasAttribute(ENDED_ATTRIBUTE)).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -224,7 +224,7 @@ describe('page loaded after the end time', () => {
     const root = mount(config);
     enhance(root, config);
     expect(root.querySelector(`[${MESSAGE_ATTRIBUTE}]`)?.textContent).toBe('Over');
-    expect(root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)).toBeNull();
+    expect(countdownText(root)).toBe('');
     expect(vi.getTimerCount()).toBe(0);
   });
 });

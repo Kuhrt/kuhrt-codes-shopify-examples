@@ -3,5 +3,5 @@ roles = ["frontend", "backend"]
 webhooks_path = "/webhooks/app/uninstalled"
 
 [commands]
-predev = "pnpm exec wrangler d1 migrations apply DB --local"
+predev = "pnpm build:widget && pnpm exec wrangler d1 migrations apply DB --local"
 dev = "pnpm exec react-router dev"

@@ -58,12 +58,26 @@ describe('remaining', () => {
 
 describe('formatCountdown', () => {
   it('includes the days unit when days are present', () => {
-    const text = formatCountdown({ days: 1, hours: 2, minutes: 3, seconds: 4 });
-    expect(text).toBe('1d 2h 3m 4s');
+    expect(formatCountdown({ days: 3, hours: 5, minutes: 9, seconds: 3 })).toBe('3d 05h 09m 03s');
   });
 
   it('omits the days unit when days are zero', () => {
-    const text = formatCountdown({ days: 0, hours: 5, minutes: 0, seconds: 9 });
-    expect(text).toBe('5h 0m 9s');
+    expect(formatCountdown({ days: 0, hours: 0, minutes: 0, seconds: 9 })).toBe('00h 00m 09s');
+  });
+
+  it('leaves multi-digit days and two-digit units as they are', () => {
+    expect(formatCountdown({ days: 12, hours: 23, minutes: 59, seconds: 59 })).toBe(
+      '12d 23h 59m 59s'
+    );
+  });
+
+  it('keeps the same width for every value below a day', () => {
+    const widths = [
+      { days: 0, hours: 0, minutes: 0, seconds: 1 },
+      { days: 0, hours: 9, minutes: 8, seconds: 7 },
+      { days: 0, hours: 23, minutes: 59, seconds: 59 }
+    ].map((parts) => formatCountdown(parts).length);
+
+    expect(new Set(widths).size).toBe(1);
   });
 });

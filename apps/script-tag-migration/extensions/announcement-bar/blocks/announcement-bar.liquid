@@ -1,0 +1,175 @@
+{%- liquid
+  assign message = block.settings.message | strip
+  assign link_url = block.settings.link_url | append: '' | strip
+  assign ends_at = block.settings.ends_at | strip
+  assign ended_behavior = block.settings.ended_behavior
+  assign ended_message = block.settings.ended_message | strip
+  assign invalid_settings = ''
+
+  if link_url != blank
+    assign link_https = link_url | slice: 0, 8 | downcase
+    assign link_http = link_url | slice: 0, 7 | downcase
+    assign link_lead = link_url | slice: 0, 2
+    assign link_first = link_lead | slice: 0
+    assign link_host_first = ''
+    if link_https == 'https://'
+      assign link_host_first = link_url | slice: 8
+    elsif link_http == 'http://'
+      assign link_host_first = link_url | slice: 7
+    endif
+    assign link_allowed = false
+    if link_host_first != blank
+      assign link_allowed = true
+      if link_host_first == '/' or link_host_first == '?' or link_host_first == '#' or link_host_first == ':'
+        assign link_allowed = false
+      endif
+    elsif link_first == '/' and link_lead != '//'
+      assign link_allowed = true
+    endif
+    assign link_encoded = link_url | url_encode
+    if link_encoded contains '+' or link_encoded contains '%5C' or link_encoded contains '%7F'
+      assign link_allowed = false
+    elsif link_encoded contains '%0' or link_encoded contains '%1'
+      assign link_allowed = false
+    endif
+    unless link_allowed
+      assign link_url = ''
+      assign invalid_settings = invalid_settings | append: ' link_url'
+    endunless
+  endif
+
+  assign ends_at_epoch = ''
+  if ends_at != blank
+    assign ends_at_epoch = ends_at | date: '%s'
+    assign ends_at_number = ends_at_epoch | plus: 0 | append: ''
+    assign ends_at_sign = ends_at_epoch | slice: 0
+    assign ends_at_round_trip = ends_at_epoch | date: '%Y-%m-%d %H:%M'
+    if ends_at_number != ends_at_epoch or ends_at_sign == '-' or ends_at_round_trip != ends_at
+      assign ends_at_epoch = ''
+      assign invalid_settings = invalid_settings | append: ' ends_at'
+    endif
+  endif
+
+  if ended_behavior == 'message' and ended_message == blank
+    assign ended_behavior = 'hide'
+    assign invalid_settings = invalid_settings | append: ' ended_message'
+  endif
+
+  assign background_color = block.settings.background_color | append: '' | strip
+  if background_color != blank
+    assign background_lead = background_color | slice: 0
+    assign background_size = background_color | size
+    unless background_lead == '#' and background_size == 4 or background_lead == '#' and background_size == 7
+      assign background_color = ''
+      assign invalid_settings = invalid_settings | append: ' background_color'
+    endunless
+  endif
+
+  assign text_color = block.settings.text_color | append: '' | strip
+  if text_color != blank
+    assign text_lead = text_color | slice: 0
+    assign text_size = text_color | size
+    unless text_lead == '#' and text_size == 4 or text_lead == '#' and text_size == 7
+      assign text_color = ''
+      assign invalid_settings = invalid_settings | append: ' text_color'
+    endunless
+  endif
+
+  assign invalid_settings = invalid_settings | strip
+-%}
+{%- if message != blank -%}
+  {{ 'announcement-bar.css' | asset_url | stylesheet_tag }}
+  <aside
+    data-kc-announcement-bar
+    aria-label="{{ 'announcement_bar.region' | t | escape }}"
+    data-kc-message="{{ message | escape }}"
+    data-kc-ended-behavior="{{ ended_behavior | escape }}"
+    data-kc-dismissible="{{ block.settings.dismissible }}"
+    {%- if link_url != blank %} data-kc-link-url="{{ link_url | escape }}"{% endif %}
+    {%- if ends_at_epoch != blank %} data-kc-ends-at="{{ ends_at_epoch }}"{% endif %}
+    {%- if ended_behavior == 'message' %} data-kc-ended-message="{{ ended_message | escape }}"{% endif %}
+    {%- if background_color != blank %} data-kc-background-color="{{ background_color | escape }}"{% endif %}
+    {%- if text_color != blank %} data-kc-text-color="{{ text_color | escape }}"{% endif %}
+    {%- if invalid_settings != blank %} data-kc-invalid="{{ invalid_settings }}"{% endif %}
+    {%- if request.design_mode %} data-kc-design-mode{% endif %}
+    {%- if background_color != blank or text_color != blank %}
+      style="
+        {%- if background_color != blank %}--kc-bar-background: {{ background_color | escape }};{% endif %}
+        {%- if text_color != blank %}--kc-bar-color: {{ text_color | escape }};{% endif -%}
+      "
+    {%- endif %}
+  >
+    <p data-kc-text>
+      {%- if link_url != blank -%}
+        <a href="{{ link_url | escape }}">{{ message | escape }}</a>
+      {%- else -%}
+        {{ message | escape }}
+      {%- endif -%}
+    </p>
+    {%- if ends_at_epoch != blank -%}
+      <time data-kc-countdown datetime="{{ ends_at | date: '%Y-%m-%dT%H:%M:%S%z' }}"></time>
+    {%- endif -%}
+    {%- if block.settings.dismissible -%}
+      <button type="button" data-kc-dismiss aria-label="{{ 'announcement_bar.dismiss' | t | escape }}">&times;</button>
+    {%- endif -%}
+  </aside>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:announcement_bar.name",
+  "target": "body",
+  "javascript": "announcement-bar.js",
+  "settings": [
+    {
+      "type": "text",
+      "id": "message",
+      "label": "t:announcement_bar.settings.message.label",
+      "default": "Free shipping on every order this week"
+    },
+    {
+      "type": "url",
+      "id": "link_url",
+      "label": "t:announcement_bar.settings.link_url.label"
+    },
+    {
+      "type": "text",
+      "id": "ends_at",
+      "label": "t:announcement_bar.settings.ends_at.label",
+      "info": "t:announcement_bar.settings.ends_at.info"
+    },
+    {
+      "type": "select",
+      "id": "ended_behavior",
+      "label": "t:announcement_bar.settings.ended_behavior.label",
+      "options": [
+        { "value": "hide", "label": "t:announcement_bar.settings.ended_behavior.options.hide" },
+        { "value": "message", "label": "t:announcement_bar.settings.ended_behavior.options.message" }
+      ],
+      "default": "hide"
+    },
+    {
+      "type": "text",
+      "id": "ended_message",
+      "label": "t:announcement_bar.settings.ended_message.label",
+      "info": "t:announcement_bar.settings.ended_message.info"
+    },
+    {
+      "type": "checkbox",
+      "id": "dismissible",
+      "label": "t:announcement_bar.settings.dismissible.label",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "t:announcement_bar.settings.background_color.label"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:announcement_bar.settings.text_color.label"
+    }
+  ]
+}
+{% endschema %}

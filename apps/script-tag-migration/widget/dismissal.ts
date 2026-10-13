@@ -49,3 +49,11 @@ export function createDismissalStore(
     }
   };
 }
+
+/** A store that never reports a dismissal and never keeps one, so a preview always shows the bar. */
+export function createEphemeralDismissalStore(): DismissalStore {
+  return {
+    isDismissed: () => false,
+    dismiss: () => {}
+  };
+}

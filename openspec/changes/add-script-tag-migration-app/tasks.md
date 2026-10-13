@@ -27,25 +27,25 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - the region is a labelled landmark;
   - the countdown isn't a live region;
   - `<time datetime>` is present.
-- [ ] 2.5 Add `entry-embed.ts`, plus `entry-legacy.ts` with the single-instance guard (design decision 6). Add an esbuild build that writes `extensions/announcement-bar/assets/announcement-bar.js` and `public/legacy/announcement-bar.js` (both gitignored), and wire it into turbo `build` and `dev`. Add a gzip budget check (≤ 10 KB). Verify: DOM tests cover legacy loaded twice (one bar) and embed markup plus legacy (one bar, the embed's, one warning). `pnpm build` produces both files, and an oversized dummy import fails the budget.
+- [x] 2.5 Add `entry-embed.ts`, plus `entry-legacy.ts` with the single-instance guard (design decision 6). Add an esbuild build that writes `extensions/announcement-bar/assets/announcement-bar.js` and `public/legacy/announcement-bar.js` (both gitignored), and wire it into turbo `build` and `dev`. Add a gzip budget check (≤ 10 KB). Verify: DOM tests cover legacy loaded twice (one bar) and embed markup plus legacy (one bar, the embed's, one warning). `pnpm build` produces both files, and an oversized dummy import fails the budget.
 
 ## 3. Theme app extension (modern path)
 
-- [ ] 3.1 Generate the theme extension `announcement-bar`. Write `blocks/announcement-bar.liquid`:
+- [x] 3.1 Generate the theme extension `announcement-bar`. Write `blocks/announcement-bar.liquid`:
   - `target: "body"`;
   - a settings schema whose IDs equal the widget constants;
   - the help text showing the end-time format;
   - server-rendered markup;
-  - `data-ends-at` produced through the decision 4 conversion.
+  - `data-kc-ends-at` produced through the decision 4 conversion.
 
   Write `assets/announcement-bar.css` (fixed to the bottom, honors `prefers-reduced-motion`) and `locales/en.default.json`. Verify: Theme Check passes on the extension, and the embed shows up in the theme editor's App embeds panel on `kuhrt-codes`.
-- [ ] 3.2 Add parity tests (design decision 2). Render the block with liquidjs (Shopify filters stubbed) and `buildBar()` with the same settings; assert the normalized DOM trees match. Assert the `{% schema %}` setting IDs equal the widget constants. Verify: both tests pass, and renaming a data attribute in either file fails them.
-- [ ] 3.3 Manual check on `kuhrt-codes`. Enable the embed on Horizon (unpublished preview) and on `debut-vintage-theme` (preview), and check the bar, the countdown, editing a setting in the theme editor, and disabling the embed. Verify: record a short checklist result with screenshots in the PR description.
+- [x] 3.2 Add parity tests (design decision 2). Render the block with liquidjs (Shopify filters stubbed) and `buildBar()` with the same settings; assert the normalized DOM trees match. Assert the `{% schema %}` setting IDs equal the widget constants. Verify: both tests pass, and renaming a data attribute in either file fails them.
+- [x] 3.3 Manual check on `kuhrt-codes`. Enable the embed on Horizon (unpublished preview) and on `debut-vintage-theme` (preview), and check the bar, the countdown, editing a setting in the theme editor, and disabling the embed. Verify: record a short checklist result with screenshots in the PR description. (The user waived the screenshots; the checklist result is in PR #5.)
 
 ## 4. Legacy reference path
 
 - [ ] 4.1 Add `legacy/settings-url.ts` (settings → query string). Verify: a round-trip unit test gives `parseConfig(parse(toQuery(s))) ≡ s` for representative settings, including unicode and characters that need URL encoding.
-- [ ] 4.2 Serve `public/legacy/announcement-bar.js` as a Workers static asset with a JavaScript content type and long-cache headers. Verify: a request against the local Worker returns 200, `text/javascript`, and the cache header.
+- [ ] 4.2 Serve `public/legacy/announcement-bar.js` as a Workers static asset with a JavaScript content type and long-cache headers. Also serve the extension's `announcement-bar.css` next to it, from the same source file, and have the legacy entry load it. Verify: a request against the local Worker returns 200, `text/javascript`, and the cache header. The stylesheet is served the same way, and a legacy-rendered bar is styled.
 - [ ] 4.3 Add `legacy/install.server.ts` with `createLegacyScriptTag(admin, settings)` → `Result` (design decision 7). It is not referenced from `afterAuth` or any route. Verify:
   - unit tests with a mocked admin client cover success, a user error (with a fixture of the real rejection once 4.4 captures it), a top-level GraphQL error, and a network failure;
   - a test asserts that no app route or auth hook imports the module.
@@ -96,7 +96,7 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 ## 9. Acceptance on the demo store
 
 - [ ] 9.1 Confirm in the Partner Dashboard that the app can be installed on both `kuhrt-codes` and `kuhrt-codes-demo` (distribution setting), and pick the Worker hostname (design.md, Open Questions). Verify: the setting and hostname are recorded in design.md.
-- [ ] 9.2 Deploy with `wrangler deploy` and `shopify app deploy`. Install on `kuhrt-codes-demo`, enable the embed on Horizon, and configure a realistic campaign. Verify:
+- [ ] 9.2 Deploy with `pnpm build && pnpm exec wrangler deploy` and `pnpm run app:deploy`, which builds the widget first. Install on `kuhrt-codes-demo`, enable the embed on Horizon, and configure a realistic campaign. Verify:
   - the spec acceptance holds: the bar works and its settings are editable in the theme editor;
   - the console shows the embed active and no legacy tags;
   - Lighthouse shows no CLS from the bar.

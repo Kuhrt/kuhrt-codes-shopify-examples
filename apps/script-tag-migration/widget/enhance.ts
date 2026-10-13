@@ -36,7 +36,8 @@ function removeBar(root: HTMLElement): void {
 function showEndedMessage(root: HTMLElement, message: string): void {
   const messageElement = root.querySelector(`[${MESSAGE_ATTRIBUTE}]`);
   if (messageElement) messageElement.textContent = message;
-  root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.remove();
+  const countdown = root.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`);
+  if (countdown) countdown.textContent = '';
   root.setAttribute(ENDED_ATTRIBUTE, '');
 }
 
