@@ -11,13 +11,15 @@ import {
   INVALID_ATTRIBUTE,
   MESSAGE_ATTRIBUTE,
   readRawSettings,
-  readSettings,
+  readSearchParams,
   ROOT_ATTRIBUTE,
   SETTING
 } from './settings';
 
 export const LOG_PREFIX = '[kc-announcement-bar]';
 export const MOUNTED = Symbol.for('kc-announcement-bar.mounted');
+/** Served next to the legacy script; the widget build copies it from the theme extension. */
+export const STYLESHEET_FILE = 'announcement-bar.css';
 
 type MountedWindow = Window & { [MOUNTED]?: true };
 
@@ -84,7 +86,7 @@ function readQuerySettings(scriptSrc: string | undefined): RawSettings | null {
     warn('the script URL is invalid, so no settings were read');
     return null;
   }
-  return readSettings((setting) => params.get(setting));
+  return readSearchParams(params);
 }
 
 /** Reports the parse warnings, and that the message is required when there is no config. */
@@ -224,6 +226,22 @@ export function mountEmbed(doc: Document): void {
   );
 }
 
+function linksTo(doc: Document, href: string): boolean {
+  return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].some(
+    (link) => link.href === href
+  );
+}
+
+/** Links the stylesheet served next to the script, unless the page already does. */
+function loadStylesheet(doc: Document, scriptSrc: string): void {
+  const href = new URL(STYLESHEET_FILE, scriptSrc).href;
+  if (linksTo(doc, href)) return;
+  const link = doc.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  doc.head.appendChild(link);
+}
+
 /**
  * Builds a bar from the script URL's query string, unless the page already has one:
  * the embed's bar always wins.
@@ -235,7 +253,8 @@ export function mountLegacy(doc: Document, scriptSrc: string | undefined): void 
       return;
     }
     const config = readLegacyConfig(scriptSrc);
-    if (!config) return;
+    if (!config || scriptSrc === undefined) return;
+    loadStylesheet(doc, scriptSrc);
     const root = buildBar(config);
     doc.body.appendChild(root);
     mountBar(doc, root, config);

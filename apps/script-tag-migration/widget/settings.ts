@@ -57,3 +57,8 @@ export function readSettings(
 export function readRawSettings(root: Element): RawSettings {
   return readSettings((setting) => root.getAttribute(dataAttributeFor(setting)));
 }
+
+/** Reads the raw settings carried in a URL query string. */
+export function readSearchParams(params: URLSearchParams): RawSettings {
+  return readSettings((setting) => params.get(setting));
+}

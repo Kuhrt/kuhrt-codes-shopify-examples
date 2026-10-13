@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
+// @vitest-environment-options { "settings": { "disableCSSFileLoading": true, "handleDisabledFileLoadingAsSuccess": true } }
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BarConfig } from './config';
 import { campaignKey, createDismissalStore } from './dismissal';
-import { MOUNTED, mountEmbed, mountLegacy } from './mount';
+import { MOUNTED, mountEmbed, mountLegacy, STYLESHEET_FILE } from './mount';
 import { buildBar } from './render';
 import {
   COUNTDOWN_ATTRIBUTE,
@@ -41,6 +42,10 @@ function embedRoot(overrides: Partial<BarConfig> = {}): HTMLElement {
 
 function bars(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>(ROOT)];
+}
+
+function stylesheetLinks(): HTMLLinkElement[] {
+  return [...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')];
 }
 
 function dismiss(root: HTMLElement): void {
@@ -87,6 +92,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   document.body.replaceChildren();
+  document.head.replaceChildren();
   Reflect.deleteProperty(window, MOUNTED);
 });
 
@@ -211,6 +217,58 @@ describe('mountLegacy', () => {
 
     document.dispatchEvent(new Event('DOMContentLoaded'));
     expect(bars()).toHaveLength(1);
+  });
+});
+
+describe('mountLegacy stylesheet', () => {
+  it('links the stylesheet served next to the script, without its query string', () => {
+    mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale' }));
+
+    const [link, ...rest] = stylesheetLinks();
+    expect(rest).toHaveLength(0);
+    expect(link?.href).toBe(`https://app.example/legacy/${STYLESHEET_FILE}`);
+    expect(link?.parentElement).toBe(document.head);
+  });
+
+  it('links the stylesheet once when the script is loaded twice', () => {
+    const src = legacySrc({ [SETTING.message]: 'Sale' });
+
+    mountLegacy(document, src);
+    mountLegacy(document, src);
+
+    expect(stylesheetLinks()).toHaveLength(1);
+  });
+
+  it('does not add a second link when the page already links the stylesheet', () => {
+    const src = legacySrc({ [SETTING.message]: 'Sale' });
+    mountLegacy(document, src);
+    document.body.replaceChildren();
+    Reflect.deleteProperty(window, MOUNTED);
+
+    mountLegacy(document, src);
+
+    expect(bars()).toHaveLength(1);
+    expect(stylesheetLinks()).toHaveLength(1);
+  });
+
+  it('links nothing when the message is missing', () => {
+    mountLegacy(document, legacySrc({ [SETTING.dismissible]: 'true' }));
+
+    expect(stylesheetLinks()).toHaveLength(0);
+  });
+
+  it('links nothing when the embed already put a bar on the page', () => {
+    embedRoot();
+
+    mountLegacy(document, legacySrc({ [SETTING.message]: 'Legacy' }));
+
+    expect(stylesheetLinks()).toHaveLength(0);
+  });
+
+  it.each([undefined, 'not a url'])('links nothing for the script URL %s', (src) => {
+    mountLegacy(document, src);
+
+    expect(stylesheetLinks()).toHaveLength(0);
   });
 });
 

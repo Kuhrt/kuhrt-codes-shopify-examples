@@ -1,11 +1,20 @@
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { STYLESHEET_FILE } from '../widget/mount';
 import type { Bundle, SizeLimit } from './build-widget';
 import {
   budgetFailure,
@@ -15,13 +24,13 @@ import {
   EMBED_LIMITS,
   GZIP_BUDGET_BYTES,
   GZIP_LIMIT,
-  isEntryPoint,
   LEGACY_LIMITS,
   main,
   measureBundles,
   RAW_LIMIT,
   RAW_LIMIT_BYTES,
   run,
+  stylesheetOutfile,
   watchBundles
 } from './build-widget';
 
@@ -155,6 +164,68 @@ describe('widget bundles', () => {
   });
 });
 
+describe('stylesheet', () => {
+  const legacyBundle = BUNDLES.find(({ stylesheet }) => stylesheet !== undefined) as Bundle;
+
+  function withStylesheet(content: string): Bundle {
+    const stylesheet = join(outDir, 'source', 'bar.css');
+    mkdirSync(dirname(stylesheet), { recursive: true });
+    writeFileSync(stylesheet, content);
+    return { ...inOutDir(legacyBundle, 'legacy.js'), stylesheet };
+  }
+
+  it('is copied unchanged next to the bundle it belongs to', async () => {
+    const source = readFileSync(legacyBundle.stylesheet as string, 'utf8');
+    const bundle = inOutDir(legacyBundle, 'legacy.js');
+    const destination = stylesheetOutfile(bundle) as string;
+
+    await buildBundles([bundle], SILENT);
+
+    expect(dirname(destination)).toBe(dirname(bundle.outfile));
+    expect(readFileSync(destination, 'utf8')).toBe(source);
+  });
+
+  it('is named the file the legacy script links to', () => {
+    expect(basename(stylesheetOutfile(legacyBundle) as string)).toBe(STYLESHEET_FILE);
+  });
+
+  it('is written only for bundles that have one', async () => {
+    const bundle = inOutDir(BUNDLES[0] as Bundle, 'embed.js');
+
+    await buildBundles([bundle], SILENT);
+
+    expect(stylesheetOutfile(bundle)).toBeUndefined();
+    expect(readdirSync(outDir)).toEqual(['embed.js']);
+  });
+
+  it('is copied when its source changes while watching', async () => {
+    const bundle = withStylesheet('a {}');
+    const { contexts, stylesheetWatchers, firstBuilds } = await watchBundles([bundle], SILENT);
+    const destination = stylesheetOutfile(bundle) as string;
+
+    try {
+      await firstBuilds;
+      expect(readFileSync(destination, 'utf8')).toBe('a {}');
+
+      writeFileSync(bundle.stylesheet as string, 'b {}');
+      await vi.waitFor(() => expect(readFileSync(destination, 'utf8')).toBe('b {}'));
+    } finally {
+      stylesheetWatchers.forEach((watcher) => watcher.close());
+      await Promise.all(contexts.map((ctx) => ctx.dispose()));
+    }
+  });
+
+  it('fails the process when the source is missing', async () => {
+    const bundle = withStylesheet('a {}');
+    rmSync(bundle.stylesheet as string);
+
+    await run([], [bundle], SILENT);
+
+    expect(process.exitCode).toBe(1);
+    expect(existsSync(stylesheetOutfile(bundle) as string)).toBe(false);
+  });
+});
+
 describe('main', () => {
   it('leaves the exit code alone when every bundle is within its limits', async () => {
     await main([], [inOutDir(BUNDLES[0] as Bundle, 'within-budget.js')], SILENT);
@@ -224,22 +295,5 @@ describe('watchBundles', () => {
     } finally {
       await Promise.all(contexts.map((ctx) => ctx.dispose()));
     }
-  });
-});
-
-describe('isEntryPoint', () => {
-  const modulePath = resolve(tmpdir(), 'scripts', 'build-widget.ts');
-  const moduleUrl = pathToFileURL(modulePath).href;
-
-  it('matches the path node was started with, even when written differently', () => {
-    expect(isEntryPoint(modulePath, moduleUrl)).toBe(true);
-    expect(
-      isEntryPoint(join(tmpdir(), 'scripts', '..', 'scripts', 'build-widget.ts'), moduleUrl)
-    ).toBe(true);
-  });
-
-  it('does not match another script or a missing path', () => {
-    expect(isEntryPoint(join(tmpdir(), 'scripts', 'other.ts'), moduleUrl)).toBe(false);
-    expect(isEntryPoint(undefined, moduleUrl)).toBe(false);
   });
 });

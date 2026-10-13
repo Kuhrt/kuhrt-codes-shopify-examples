@@ -4,6 +4,7 @@
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
     "types": ["vite/client", "@shopify/polaris-types", "@shopify/app-bridge-types"],
     "rootDirs": [".", "./.react-router/types"]
   },

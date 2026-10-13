@@ -1,10 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import type { FSWatcher } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, watch } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 
 import type { BuildContext, BuildOptions, LogLevel, Plugin } from 'esbuild';
 import { build, context } from 'esbuild';
+
+import { isEntryPoint } from './entry-point.ts';
 
 export const GZIP_BUDGET_BYTES = 10 * 1024;
 export const RAW_LIMIT_BYTES = 10_000;
@@ -19,6 +22,8 @@ export interface Bundle {
   entry: string;
   outfile: string;
   limits: SizeLimit[];
+  /** A stylesheet copied unchanged into the directory of `outfile`. */
+  stylesheet?: string;
 }
 
 export interface BundleSize {
@@ -59,7 +64,8 @@ export const BUNDLES: Bundle[] = [
   {
     entry: appPath('widget/entry-legacy.ts'),
     outfile: appPath('public/legacy/announcement-bar.js'),
-    limits: LEGACY_LIMITS
+    limits: LEGACY_LIMITS,
+    stylesheet: appPath('extensions/announcement-bar/assets/announcement-bar.css')
   }
 ];
 
@@ -81,6 +87,18 @@ function optionsFor(
     logLevel,
     plugins
   };
+}
+
+/** Where `bundle`'s stylesheet is written, or `undefined` when it has none. */
+export function stylesheetOutfile({ stylesheet, outfile }: Bundle): string | undefined {
+  return stylesheet === undefined ? undefined : join(dirname(outfile), basename(stylesheet));
+}
+
+function copyStylesheet(bundle: Bundle): void {
+  const destination = stylesheetOutfile(bundle);
+  if (bundle.stylesheet === undefined || destination === undefined) return;
+  mkdirSync(dirname(destination), { recursive: true });
+  copyFileSync(bundle.stylesheet, destination);
 }
 
 /** Raw and gzipped size of each written bundle. */
@@ -125,6 +143,7 @@ export async function buildBundles(
   logLevel: LogLevel = DEFAULT_LOG_LEVEL
 ): Promise<BundleSize[]> {
   await Promise.all(bundles.map((bundle) => build(optionsFor(bundle, logLevel))));
+  bundles.forEach(copyStylesheet);
   return measureBundles(bundles);
 }
 
@@ -148,8 +167,29 @@ function reporter(bundle: Bundle, onReport: (withinLimits: boolean) => void): Pl
   };
 }
 
+/** Copies the stylesheet now and again whenever it changes. The caller closes the watcher. */
+function watchStylesheet(bundle: Bundle): FSWatcher[] {
+  const { stylesheet } = bundle;
+  if (stylesheet === undefined) return [];
+  const copy = () => {
+    try {
+      copyStylesheet(bundle);
+    } catch (error: unknown) {
+      console.error(`Copying ${stylesheet} failed:`, error);
+    }
+  };
+  copy();
+  return [
+    watch(dirname(stylesheet), (_event, filename) => {
+      if (filename === basename(stylesheet)) copy();
+    })
+  ];
+}
+
 export interface Watch {
   contexts: BuildContext[];
+  /** Watchers that keep each bundle's stylesheet copy current. */
+  stylesheetWatchers: FSWatcher[];
   /** Resolves once every bundle has finished its first build, with whether each succeeded within its limits. */
   firstBuilds: Promise<boolean[]>;
 }
@@ -168,7 +208,8 @@ export async function watchBundles(
     })
   );
   await Promise.all(contexts.map((ctx) => ctx.watch()));
-  return { contexts, firstBuilds: Promise.all(firstBuilds) };
+  const stylesheetWatchers = bundles.flatMap(watchStylesheet);
+  return { contexts, stylesheetWatchers, firstBuilds: Promise.all(firstBuilds) };
 }
 
 /** Builds `bundles` (watching with `--watch`). Sets a failing exit code when one is over a limit. */
@@ -183,12 +224,6 @@ export async function main(
   }
   const sizes = await buildBundles(bundles, logLevel);
   if (!reportSizes(sizes)) process.exitCode = 1;
-}
-
-/** Whether the module at `moduleUrl` is the script node was started with. */
-export function isEntryPoint(argv1: string | undefined, moduleUrl: string): boolean {
-  if (argv1 === undefined) return false;
-  return resolve(argv1) === resolve(fileURLToPath(moduleUrl));
 }
 
 function isEsbuildFailure(error: unknown): error is { errors: unknown[] } {
