@@ -83,6 +83,11 @@ export function parseLocalDateTime(input: string): LocalDateTime | undefined {
   };
 }
 
+/** The `YYYY-MM-DD HH:MM` store-local form of an instant, as a merchant enters an end time. */
+export function toStoreLocalDateTime(epochSeconds: number): string {
+  return formatEpoch(epochSeconds, LOCAL_FORMAT);
+}
+
 function formatEpoch(epochSeconds: number, format: string): string {
   if (format === EPOCH_FORMAT) return String(epochSeconds);
   const wallClock = new Date(epochSeconds * 1000 - STORE_OFFSET_MS).toISOString();
@@ -127,18 +132,27 @@ class SchemaTag extends Tag {
   }
 }
 
-function createEngine(): Liquid {
+function createEngine(assetBaseUrl: string): Liquid {
   const engine = new Liquid();
   engine.registerTag('schema', SchemaTag);
   engine.registerFilter('t', lookupTranslation);
   engine.registerFilter('date', stubDate);
-  engine.registerFilter('asset_url', (filename: string) => `${ASSET_BASE_URL}${filename}`);
+  engine.registerFilter('asset_url', (filename: string) => `${assetBaseUrl}${filename}`);
   engine.registerFilter('stylesheet_tag', (url: string) => `<link rel="stylesheet" href="${url}">`);
   return engine;
 }
 
-export function renderBlock(settings: BlockSettings, { designMode = false } = {}): string {
-  return createEngine().parseAndRenderSync(readBlockSource(), {
+export interface RenderOptions {
+  designMode?: boolean;
+  /** Where `asset_url` points; end with a slash. */
+  assetBaseUrl?: string;
+}
+
+export function renderBlock(
+  settings: BlockSettings,
+  { designMode = false, assetBaseUrl = ASSET_BASE_URL }: RenderOptions = {}
+): string {
+  return createEngine(assetBaseUrl).parseAndRenderSync(readBlockSource(), {
     block: { settings },
     request: { design_mode: designMode }
   });

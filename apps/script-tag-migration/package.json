@@ -5,6 +5,7 @@
     "build": "pnpm build:widget && react-router build",
     "build:widget": "node scripts/build-widget.ts",
     "legacy:try-install": "esbuild scripts/try-legacy-install.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=build/try-legacy-install.mjs && node build/try-legacy-install.mjs",
+    "e2e:server": "esbuild e2e/server.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=build/e2e-server.mjs && node build/e2e-server.mjs",
     "dev:widget": "node scripts/build-widget.ts --watch",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
@@ -17,7 +18,7 @@
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
     "typecheck": "wrangler types --check && react-router typegen && tsc --noEmit && tsc --noEmit -p widget && tsc --noEmit -p widget/tsconfig.test.json",
-    "test": "vitest run",
+    "test": "vitest run && playwright test",
     "cf-typegen": "wrangler types",
     "db:generate": "drizzle-kit generate"
   },
@@ -38,7 +39,9 @@
     "react-router": "7.18.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@cloudflare/vite-plugin": "^1.63.1",
+    "@playwright/test": "1.63.0",
     "@react-router/dev": "7.18.2",
     "@repo/config": "workspace:*",
     "@shopify/api-codegen-preset": "^1.2.0",

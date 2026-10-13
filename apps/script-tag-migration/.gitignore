@@ -1,2 +1,4 @@
 /extensions/*/assets/*.js
 /public/legacy/
+/playwright-report/
+/test-results/

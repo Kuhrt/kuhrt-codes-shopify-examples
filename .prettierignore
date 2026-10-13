@@ -13,3 +13,5 @@ openspec
 migrations/meta
 apps/script-tag-migration/extensions/*/assets/*.js
 apps/script-tag-migration/public/legacy/
+playwright-report
+test-results
