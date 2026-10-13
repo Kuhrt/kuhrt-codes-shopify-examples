@@ -53,9 +53,9 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 5. Migration console (App Home)
 
-- [ ] 5.1 Add `app/services/script-tags.server.ts`: `listOwnedScriptTags(admin)` and `deleteOwnedScriptTag(admin, id)`. The delete re-lists first and refuses IDs that aren't in the list. Both return `Result`. Verify: unit tests cover the list (two tags, empty, GraphQL error, network error) and the delete (success, user error, a forged ID with no delete call sent).
-- [ ] 5.2 Build the `app._index.tsx` loader and action on that service. Verify: route tests with a mocked admin client cover list rendering data, the empty state flag, an error state naming the step, an action success, and action failures.
-- [ ] 5.3 Build the console UI with Polaris web components:
+- [x] 5.1 Add `app/services/script-tags.server.ts`: `listOwnedScriptTags(admin)` and `deleteOwnedScriptTag(admin, id)`. The delete re-lists first and refuses IDs that aren't in the list. Both return `Result`. Verify: unit tests cover the list (two tags, empty, GraphQL error, network error) and the delete (success, user error, a forged ID with no delete call sent).
+- [x] 5.2 Build the `app._index.tsx` loader and action on that service. Verify: route tests with a mocked admin client cover list rendering data, the empty state flag, an error state naming the step, an action success, and action failures.
+- [x] 5.3 Build the console UI with Polaris web components:
   - an embed status card (active, inactive, unknown with retry) driven by `shopify.app.extensions()`, re-checked on `focus` and `visibilitychange`;
   - an enable button using the deep link `activateAppId={client_id}/announcement-bar`;
   - per-theme recheck guidance;

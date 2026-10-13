@@ -51,7 +51,9 @@ apps/script-tag-migration/
 ├── public/legacy/announcement-bar.css   ← copied from the extension by the widget build (gitignored)
 ├── public/_headers               cache header for /legacy/*
 ├── app/                          React Router app (from template)
-│   ├── routes/app._index.tsx     Migration console (Polaris web components)
+│   ├── routes/app._index.tsx     Migration console: loader, delete action, renders ScriptTagConsole
+│   ├── components/console/       embed status (extensions() → status, deep link), script tag list, confirm modal
+│   ├── services/script-tags.ts   console data contract (types and form constants, client-safe)
 │   ├── routes/webhooks.app.uninstalled.tsx
 │   ├── services/script-tags.server.ts   listOwnedScriptTags / deleteOwnedScriptTag → Result
 │   ├── lib/result.ts             Result<T> and the failure kinds
@@ -358,3 +360,19 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
   - It imports modules that Node can't load directly, such as `widget/settings.ts`, which imports JSON without an import attribute. So the package script bundles it with esbuild (packages external) before running it. Scripts that Node runs directly import local files with their `.ts` extension, which the app's `allowImportingTsExtensions` permits.
 - **The captured rejection** is in `legacy/fixtures/script-tag-create-rejection.json` (the 4.3 user-error fixture). It was captured on `kuhrt-codes` with API version `2026-10` at 2026-10-13T17:16:35Z. HTTP 200, with `scriptTag: null` and one user error, `field: null`: "This app can't create or update script tags. Use theme app extensions instead." It maps to `{ ok: false, kind: 'user-error', message }` with no `field`. The spec's "message and field" scenario holds with an absent field.
 - **The legacy bar is styled in a browser.** Under `pnpm dev`, the legacy script loaded on the app's origin rendered the bar fixed to the bottom with the extension's styles.
+
+### Migration console (tasks 5.1–5.3)
+
+- **Ownership.** Script tags are scoped to the app that created them, and are removed when it is uninstalled (REST `ScriptTag` reference, 2026-10). So `scriptTags` lists only this app's tags. The delete still re-lists first and refuses an ID that isn't in the list, so a forged ID never reaches `scriptTagDelete`. If the re-list fails, nothing is deleted.
+- **Listing.** `scriptTags` is paged 250 at a time by cursor, up to 1000 tags. Past that cap, or on `hasNextPage` without a cursor, the list fails rather than truncating. A malformed response is a `graphql-error`, never an empty list.
+- **Shared payload checks.** `app/lib/mutation-payload.ts` holds the "first user error becomes a failure" and "malformed payload" rules. Both `scriptTagCreate` and `scriptTagDelete` use them.
+- **Loader and action.** The loader returns the client ID, the store handle (the shop domain without `.myshopify.com`) for the deep link, and the list as either tags or a failure naming its step. The action returns 400 only for malformed form data, such as an unknown intent or a missing ID. API outcomes, including a forged ID, return 200 with a typed failure that the UI renders. React Router revalidates after the action, so a deleted tag leaves the list.
+- **Embed status.** `embedStatusFrom` applies decision 8's mapping to `shopify.app.extensions()`.
+  - It matches the block handle `announcement-bar` in a `theme_app_extension`'s block entries, never the extension handle. A test ties the constant to the block's filename.
+  - `useEmbedStatus` re-checks on window `focus` and on `visibilitychange` when the page becomes visible. A rejected call gives `unknown`.
+  - A fourth state, `checking`, covers the first call. Like `inactive` and `unknown`, it doesn't pass the gate.
+- **Deep link.** `themeEditorLink` keeps the `/` in `activateAppId` literal, as in the link verified in decision 8. `URLSearchParams` would encode it as `%2F`.
+- **Confirmation.** The confirmation is a Polaris `s-modal`, opened and closed declaratively with `commandFor`/`command`. The remove button records which tag is pending, and only the modal's confirm button submits the delete. Success shows an App Bridge toast. A failure shows a critical banner with the step and the API's message.
+- **Tests locate elements by `data-testid` and state.** Polaris web components are custom elements with no implicit ARIA role, so role queries can't find them in happy-dom. Tests assert on `disabled`, `href`, `commandfor`/`command`, and `data-status`/`data-step`/`data-tag-id`, never on copy. `disabled` is rendered only when true, because React 18 writes `disabled="false"` on a custom element, which reads as disabled.
+- **Route test files.** `flatRoutes` ignores `**/*.test.*`, so a test next to a route is never built as one.
+- **Not covered by unit tests:** the real `s-modal` behavior, the `commandFor` wiring and the table layout. The manual check covers them.
