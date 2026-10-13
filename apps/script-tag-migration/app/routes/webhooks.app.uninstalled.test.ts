@@ -1,22 +1,26 @@
 import { createHmac } from 'node:crypto';
 
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { apiVersion } from '../api-version';
 import { clearSessions, offlineSession, onlineSession } from '../db/d1-test-support';
 
-const API_SECRET = 'test-only-api-secret';
 const SHOP = 'a.myshopify.com';
 const OTHER_SHOP = 'b.myshopify.com';
 
-const testDb = await vi.hoisted(async () => {
+const { testDb, API_SECRET } = await vi.hoisted(async () => {
   const { openTestDb } = await import('../db/d1-test-support');
-  return openTestDb();
+  return { testDb: await openTestDb(), API_SECRET: 'test-only-api-secret' };
+});
+
+afterAll(async () => {
+  await testDb.dispose();
 });
 
 vi.mock('cloudflare:workers', () => ({
   env: {
     SHOPIFY_API_KEY: 'test-api-key',
-    SHOPIFY_API_SECRET: 'test-only-api-secret',
+    SHOPIFY_API_SECRET: API_SECRET,
     SHOPIFY_APP_URL: 'https://app.example',
     DB: testDb.db
   }
@@ -38,7 +42,7 @@ function webhookArgs({
   const headers: Record<string, string> = {
     'X-Shopify-Topic': 'app/uninstalled',
     'X-Shopify-Shop-Domain': SHOP,
-    'X-Shopify-API-Version': '2026-10',
+    'X-Shopify-API-Version': apiVersion,
     'X-Shopify-Webhook-Id': 'webhook-id',
     'X-Shopify-Event-Id': 'event-id',
     'X-Shopify-Triggered-At': '2026-10-01T00:00:00.000Z'
@@ -69,16 +73,16 @@ async function storedSessionIds(): Promise<string[]> {
   return results.map((row) => row.id);
 }
 
-afterAll(async () => {
-  await testDb.dispose();
-});
-
 beforeEach(async () => {
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   await clearSessions(testDb.db);
   await sessionStorage.storeSession(offlineSession(SHOP));
   await sessionStorage.storeSession(onlineSession(SHOP));
   await sessionStorage.storeSession(offlineSession(OTHER_SHOP));
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('app/uninstalled webhook', () => {
@@ -111,6 +115,16 @@ describe('app/uninstalled webhook', () => {
 
     expect(response.status).toBe(401);
     expect(await storedSessionIds()).toHaveLength(3);
+  });
+
+  it('fails so Shopify retries when the sessions cannot be deleted', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(sessionStorage, 'deleteSessions').mockResolvedValueOnce(false);
+
+    const response = await respondTo(webhookArgs());
+
+    expect(response.status).toBe(500);
+    expect(error).toHaveBeenCalledOnce();
   });
 
   it('rejects a request without a signature header', async () => {

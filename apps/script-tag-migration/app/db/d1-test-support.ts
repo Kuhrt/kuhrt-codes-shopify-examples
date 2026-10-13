@@ -26,7 +26,12 @@ export interface TestDb {
 /** Opens an in-memory local D1 with every migration applied. */
 export async function openTestDb(): Promise<TestDb> {
   const proxy = await getPlatformProxy<Env>({ persist: false });
-  await applyMigrations(proxy.env.DB);
+  try {
+    await applyMigrations(proxy.env.DB);
+  } catch (error) {
+    await proxy.dispose();
+    throw error;
+  }
   return { db: proxy.env.DB, dispose: () => proxy.dispose() };
 }
 
