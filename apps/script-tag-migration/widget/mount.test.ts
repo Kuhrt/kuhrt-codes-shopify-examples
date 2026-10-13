@@ -6,6 +6,7 @@ import { campaignKey, createDismissalStore } from './dismissal';
 import { MOUNTED, mountEmbed, mountLegacy } from './mount';
 import { buildBar } from './render';
 import {
+  COUNTDOWN_ATTRIBUTE,
   dataAttributeFor,
   DESIGN_MODE_ATTRIBUTE,
   DISMISS_ATTRIBUTE,
@@ -308,7 +309,38 @@ describe('mountEmbed', () => {
     expect(bars()).toHaveLength(0);
   });
 
-  it('starts the countdown at once while the document is loading', () => {
+  it('waits for DOMContentLoaded when a node follows a root still missing its dismiss button', () => {
+    createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+    const embed = embedRoot(EMBED_CONFIG);
+    embed.querySelector(`[${DISMISS_ATTRIBUTE}]`)?.remove();
+    setReadyState('loading');
+    closeRoot();
+
+    mountEmbed(document);
+    expect(bars()).toHaveLength(1);
+
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    expect(bars()).toHaveLength(0);
+  });
+
+  it.each([true, false])(
+    'waits for DOMContentLoaded when a node follows a root still missing its countdown (dismissible: %s)',
+    (dismissible) => {
+      const embed = embedRoot({ dismissible, endsAtMs: FAR_FUTURE_MS });
+      embed.querySelector(`[${COUNTDOWN_ATTRIBUTE}]`)?.remove();
+      setReadyState('loading');
+      closeRoot();
+      vi.useFakeTimers();
+
+      mountEmbed(document);
+      expect(vi.getTimerCount()).toBe(0);
+
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+      expect(vi.getTimerCount()).toBe(1);
+    }
+  );
+
+  it('enhances at once a root that has all of its markers while the document is loading', () => {
     embedRoot({ endsAtMs: FAR_FUTURE_MS });
     setReadyState('loading');
     closeRoot();
@@ -412,6 +444,21 @@ describe('mountEmbed', () => {
       expect(bars()).toHaveLength(1);
 
       closeRoot();
+      await flushObserver();
+
+      expect(bars()).toHaveLength(0);
+    });
+
+    it('enhances a present root once a missing marker arrives', async () => {
+      createDismissalStore().dismiss(campaignKey(EMBED_CONFIG));
+      const embed = embedRoot(EMBED_CONFIG);
+      const button = embed.querySelector(`[${DISMISS_ATTRIBUTE}]`);
+      button?.remove();
+      closeRoot();
+      mountEmbed(document);
+      expect(bars()).toHaveLength(1);
+
+      if (button) embed.appendChild(button);
       await flushObserver();
 
       expect(bars()).toHaveLength(0);

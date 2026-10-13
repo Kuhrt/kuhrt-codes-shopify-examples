@@ -238,7 +238,7 @@ const SETTING_IDS: readonly string[] = Object.values(SETTING);
 
 /** The setting a warning names, wherever its id appears as a word in the text. */
 function warnedSettingId(call: unknown[]): string {
-  const words = String(call[0]).split(/[\s,:]+/);
+  const words = String(call[0]).split(/\s+/);
   return words.find((word) => SETTING_IDS.includes(word)) ?? '';
 }
 
@@ -247,7 +247,6 @@ function embedWarnedSettings(html: string): string[] {
   const fragment = parseFragment(html);
   fragment.querySelector('link')?.remove();
   document.body.replaceChildren(fragment);
-  document.body.appendChild(document.createComment(''));
   warn.mockClear();
   mountEmbed(document);
   return warn.mock.calls.map(warnedSettingId).sort();
