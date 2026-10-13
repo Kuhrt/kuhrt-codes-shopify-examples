@@ -380,3 +380,10 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **Tests locate elements by `data-testid` and state.** Polaris web components are custom elements with no implicit ARIA role, so role queries can't find them in happy-dom. Tests assert on `disabled`, `href`, `commandfor`/`command`, and `data-status`/`data-step`/`data-tag-id`, never on copy. `disabled` is rendered only when true, because React 18 writes `disabled="false"` on a custom element, which reads as disabled.
 - **Route test files.** `flatRoutes` ignores `**/*.test.*`, so a test next to a route is never built as one.
 - **Not covered by unit tests:** the real `s-modal` behavior, the `commandFor` wiring and the table layout. The manual check covers them.
+- **Checked on `kuhrt-codes` (task 5.4):**
+  - the status card matched the published theme;
+  - the enable deep link opened the theme editor with the embed toggled on;
+  - after saving, the status refreshed to active on returning to the tab, with no reload;
+  - the empty script tag list showed the cleanup step as complete.
+
+  The user waived the screenshots. The confirmation modal and the remove buttons can't be exercised on a real store, because Shopify blocks script tag creation, so the component tests are their only coverage.
