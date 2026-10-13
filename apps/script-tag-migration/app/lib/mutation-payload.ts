@@ -5,6 +5,16 @@ interface UserError {
   field?: string[] | null;
 }
 
+function isUserError(value: unknown): value is UserError {
+  if (typeof value !== 'object' || value === null) return false;
+  const { message, field } = value as Record<string, unknown>;
+  const validField =
+    field === undefined ||
+    field === null ||
+    (Array.isArray(field) && field.every((part) => typeof part === 'string'));
+  return typeof message === 'string' && validField;
+}
+
 export type Payload = Record<string, unknown>;
 
 export function malformedPayload(operation: string): Failure {
@@ -26,8 +36,8 @@ export function payloadOf(data: unknown, operation: string): Payload | undefined
 
 /**
  * Maps the first entry of a mutation payload's `userErrors` to a `user-error` failure, keeping its
- * `field` when present. A `userErrors` value that is not an array is a malformed payload. Returns
- * `undefined` when there are no user errors.
+ * `field` when present. A `userErrors` value that is not an array, or whose first entry is not a
+ * user error, is a malformed payload. Returns `undefined` when there are no user errors.
  */
 export function userErrorFailure(
   payload: { userErrors?: unknown },
@@ -35,8 +45,9 @@ export function userErrorFailure(
 ): Failure | undefined {
   const { userErrors } = payload;
   if (userErrors !== undefined && !Array.isArray(userErrors)) return malformedPayload(operation);
-  const [userError] = (userErrors ?? []) as UserError[];
+  const [userError]: unknown[] = userErrors ?? [];
   if (userError === undefined) return undefined;
+  if (!isUserError(userError)) return malformedPayload(operation);
   return {
     ok: false,
     kind: 'user-error',

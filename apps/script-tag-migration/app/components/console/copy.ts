@@ -24,7 +24,9 @@ export const COPY = {
   columnSource: 'Source',
   columnScope: 'Display scope',
   columnCreated: 'Created',
+  columnActions: 'Actions',
   remove: 'Remove',
+  removeLabel: (src: string) => `Remove script tag ${src}`,
   retryList: 'Retry',
   confirmHeading: 'Remove this script tag?',
   confirmBody:

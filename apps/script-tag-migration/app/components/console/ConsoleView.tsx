@@ -1,17 +1,11 @@
 import type { ReactNode } from 'react';
 
-import type { Failure } from '../../lib/result';
-import type { ScriptTagsState, Step } from '../../services/script-tags';
+import type { ScriptTagsState, StepFailure } from '../../services/script-tags';
 import { COPY, STEP_LABEL } from './copy';
 import { EmbedStatusCard } from './EmbedStatusCard';
 import { ScriptTagList } from './ScriptTagList';
 import { TEST_ID } from './test-ids';
 import type { EmbedCheck } from './use-embed-status';
-
-export interface StepFailure {
-  step: Step;
-  failure: Failure;
-}
 
 interface FailureBannerProps {
   heading: string;
@@ -33,10 +27,12 @@ function FailureBanner({ heading, error, testId, children }: FailureBannerProps)
 
 interface ConsoleViewProps {
   embedStatus: EmbedCheck;
+  embedChecking: boolean;
   enableHref: string;
   onRecheckEmbed: () => void;
   scriptTags: ScriptTagsState;
   onRetryList: () => void;
+  retryingList: boolean;
   removalBusy: boolean;
   removalError: StepFailure | null;
   onRemove: (id: string) => void;
@@ -44,19 +40,27 @@ interface ConsoleViewProps {
 
 export function ConsoleView({
   embedStatus,
+  embedChecking,
   enableHref,
   onRecheckEmbed,
   scriptTags,
   onRetryList,
+  retryingList,
   removalBusy,
   removalError,
   onRemove
 }: ConsoleViewProps) {
   const gated = embedStatus !== 'active';
+  const removalDisabled = gated || embedChecking || removalBusy;
 
   return (
     <s-page heading={COPY.pageHeading}>
-      <EmbedStatusCard status={embedStatus} enableHref={enableHref} onRecheck={onRecheckEmbed} />
+      <EmbedStatusCard
+        status={embedStatus}
+        checking={embedChecking}
+        enableHref={enableHref}
+        onRecheck={onRecheckEmbed}
+      />
       <s-section heading={COPY.scriptTagsHeading}>
         <s-stack gap="base">
           {removalError && (
@@ -68,7 +72,12 @@ export function ConsoleView({
           )}
           {!scriptTags.ok && (
             <FailureBanner heading={COPY.listFailed} error={scriptTags} testId={TEST_ID.listError}>
-              <s-button slot="primary-action" onClick={onRetryList} data-testid={TEST_ID.retryList}>
+              <s-button
+                slot="primary-action"
+                loading={retryingList || undefined}
+                onClick={onRetryList}
+                data-testid={TEST_ID.retryList}
+              >
                 {COPY.retryList}
               </s-button>
             </FailureBanner>
@@ -87,7 +96,7 @@ export function ConsoleView({
               )}
               <ScriptTagList
                 tags={scriptTags.tags}
-                removalDisabled={gated || removalBusy}
+                removalDisabled={removalDisabled}
                 onRemove={onRemove}
               />
             </>

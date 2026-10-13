@@ -2,36 +2,14 @@ import { GraphqlQueryError } from '@shopify/shopify-api';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AdminClient } from '../lib/admin-graphql.server';
+import {
+  deleteResponse,
+  jsonResponse,
+  listPageResponse,
+  TAG_A,
+  TAG_B
+} from './script-tags.fixtures';
 import { deleteOwnedScriptTag, listOwnedScriptTags } from './script-tags.server';
-
-const TAG_A = {
-  id: 'gid://shopify/ScriptTag/1',
-  src: 'https://a.example/a.js',
-  displayScope: 'ONLINE_STORE',
-  createdAt: '2026-01-01T00:00:00Z'
-};
-const TAG_B = {
-  id: 'gid://shopify/ScriptTag/2',
-  src: 'https://a.example/b.js',
-  displayScope: 'ALL',
-  createdAt: '2026-02-01T00:00:00Z'
-};
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body));
-}
-
-function page(nodes: unknown[], next: string | null = null) {
-  return jsonResponse({
-    data: {
-      scriptTags: { nodes, pageInfo: { hasNextPage: next !== null, endCursor: next } }
-    }
-  });
-}
-
-function deletion(payload: unknown) {
-  return jsonResponse({ data: { scriptTagDelete: payload } });
-}
 
 /** Answers each call with the next queued response. */
 function fakeAdmin(...responses: Array<Response | Error>) {
@@ -50,19 +28,22 @@ function deleteCalls(graphql: ReturnType<typeof fakeAdmin>['graphql']) {
 
 describe('listOwnedScriptTags', () => {
   it('returns both tags with only the fields the console shows', async () => {
-    const { admin } = fakeAdmin(page([{ ...TAG_A, cache: true }, TAG_B]));
+    const { admin } = fakeAdmin(listPageResponse([{ ...TAG_A, cache: true }, TAG_B]));
 
     expect(await listOwnedScriptTags(admin)).toEqual({ ok: true, tags: [TAG_A, TAG_B] });
   });
 
   it('returns an empty list as success', async () => {
-    const { admin } = fakeAdmin(page([]));
+    const { admin } = fakeAdmin(listPageResponse([]));
 
     expect(await listOwnedScriptTags(admin)).toEqual({ ok: true, tags: [] });
   });
 
   it('follows the cursor until there are no more pages', async () => {
-    const { admin, graphql } = fakeAdmin(page([TAG_A], 'cursor-1'), page([TAG_B]));
+    const { admin, graphql } = fakeAdmin(
+      listPageResponse([TAG_A], 'cursor-1'),
+      listPageResponse([TAG_B])
+    );
 
     expect(await listOwnedScriptTags(admin)).toEqual({ ok: true, tags: [TAG_A, TAG_B] });
     expect(graphql.mock.calls.map(([, options]) => options?.variables?.after)).toEqual([
@@ -73,7 +54,7 @@ describe('listOwnedScriptTags', () => {
 
   it('fails instead of truncating when the pages never end', async () => {
     const { admin } = fakeAdmin(
-      ...Array.from({ length: 10 }, (_, i) => page([TAG_A], `cursor-${i}`))
+      ...Array.from({ length: 10 }, (_, i) => listPageResponse([TAG_A], `cursor-${i}`))
     );
 
     expect(await listOwnedScriptTags(admin)).toMatchObject({ ok: false });
@@ -122,8 +103,8 @@ describe('listOwnedScriptTags', () => {
 describe('deleteOwnedScriptTag', () => {
   it('lists first, then deletes the requested tag', async () => {
     const { admin, graphql } = fakeAdmin(
-      page([TAG_A, TAG_B]),
-      deletion({ deletedScriptTagId: TAG_B.id, userErrors: [] })
+      listPageResponse([TAG_A, TAG_B]),
+      deleteResponse({ deletedScriptTagId: TAG_B.id, userErrors: [] })
     );
 
     const result = await deleteOwnedScriptTag(admin, TAG_B.id);
@@ -137,8 +118,8 @@ describe('deleteOwnedScriptTag', () => {
 
   it('returns the API user error', async () => {
     const { admin } = fakeAdmin(
-      page([TAG_A]),
-      deletion({ deletedScriptTagId: null, userErrors: [{ field: ['id'], message: 'Nope' }] })
+      listPageResponse([TAG_A]),
+      deleteResponse({ deletedScriptTagId: null, userErrors: [{ field: ['id'], message: 'Nope' }] })
     );
 
     expect(await deleteOwnedScriptTag(admin, TAG_A.id)).toEqual({
@@ -150,7 +131,7 @@ describe('deleteOwnedScriptTag', () => {
   });
 
   it('refuses an id the app does not own and sends no delete', async () => {
-    const { admin, graphql } = fakeAdmin(page([TAG_A]));
+    const { admin, graphql } = fakeAdmin(listPageResponse([TAG_A]));
 
     const result = await deleteOwnedScriptTag(admin, 'gid://shopify/ScriptTag/999');
 
@@ -160,9 +141,9 @@ describe('deleteOwnedScriptTag', () => {
 
   it('finds an owned id that is on a later page', async () => {
     const { admin } = fakeAdmin(
-      page([TAG_A], 'c1'),
-      page([TAG_B]),
-      deletion({ deletedScriptTagId: TAG_B.id, userErrors: [] })
+      listPageResponse([TAG_A], 'c1'),
+      listPageResponse([TAG_B]),
+      deleteResponse({ deletedScriptTagId: TAG_B.id, userErrors: [] })
     );
 
     expect(await deleteOwnedScriptTag(admin, TAG_B.id)).toEqual({ ok: true, deletedId: TAG_B.id });
@@ -179,7 +160,7 @@ describe('deleteOwnedScriptTag', () => {
   });
 
   it('reports a failed delete request', async () => {
-    const { admin } = fakeAdmin(page([TAG_A]), new TypeError('fetch failed'));
+    const { admin } = fakeAdmin(listPageResponse([TAG_A]), new TypeError('fetch failed'));
 
     expect(await deleteOwnedScriptTag(admin, TAG_A.id)).toMatchObject({
       ok: false,
@@ -189,8 +170,8 @@ describe('deleteOwnedScriptTag', () => {
 
   it('does not report success without a deleted id', async () => {
     const { admin } = fakeAdmin(
-      page([TAG_A]),
-      deletion({ deletedScriptTagId: null, userErrors: [] })
+      listPageResponse([TAG_A]),
+      deleteResponse({ deletedScriptTagId: null, userErrors: [] })
     );
 
     expect(await deleteOwnedScriptTag(admin, TAG_A.id)).toMatchObject({

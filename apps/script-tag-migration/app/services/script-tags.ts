@@ -19,8 +19,13 @@ export const INTENT = { delete: 'delete' } as const;
 
 export const FIELD = { intent: 'intent', id: 'id' } as const;
 
-export type ScriptTagsState =
-  { ok: true; tags: OwnedScriptTag[] } | { ok: false; step: Step; failure: Failure };
+export interface StepFailure {
+  ok: false;
+  step: Step;
+  failure: Failure;
+}
+
+export type ScriptTagsState = { ok: true; tags: OwnedScriptTag[] } | StepFailure;
 
 export interface ConsoleLoaderData {
   clientId: string;
@@ -28,5 +33,4 @@ export interface ConsoleLoaderData {
   scriptTags: ScriptTagsState;
 }
 
-export type ConsoleActionData =
-  { ok: true; deletedId: string } | { ok: false; step: Step; failure: Failure };
+export type ConsoleActionData = { ok: true; deletedId: string } | StepFailure;

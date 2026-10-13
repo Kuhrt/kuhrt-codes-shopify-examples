@@ -37,6 +37,16 @@ describe('userErrorFailure', () => {
     expect(userErrorFailure(payload, 'op')).toBeUndefined();
   });
 
+  it.each([
+    ['a null entry', [null]],
+    ['an entry without a message', [{}]],
+    ['a non-string message', [{ message: 1 }]],
+    ['a non-array field', [{ message: 'bad', field: 'id' }]],
+    ['a field with non-string parts', [{ message: 'bad', field: [1] }]]
+  ])('treats %s as malformed', (_name, userErrors) => {
+    expect(userErrorFailure({ userErrors }, 'op')).toEqual(malformedPayload('op'));
+  });
+
   it('treats a non-array userErrors as malformed', () => {
     expect(userErrorFailure({ userErrors: 'x' }, 'op')).toEqual(malformedPayload('op'));
   });

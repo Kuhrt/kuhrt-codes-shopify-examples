@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { OwnedScriptTag } from '../../services/script-tags';
 import { STEP } from '../../services/script-tags';
+import { TAG_A, TAG_B } from '../../services/script-tags.fixtures';
 import { ConsoleView } from './ConsoleView';
 import { themeEditorLink } from './embed';
 import { TEST_ID } from './test-ids';
@@ -11,38 +11,41 @@ import type { EmbedCheck } from './use-embed-status';
 
 afterEach(cleanup);
 
-const tags: OwnedScriptTag[] = [
-  {
-    id: 'gid://shopify/ScriptTag/1',
-    src: 'https://a.example/one.js',
-    displayScope: 'ONLINE_STORE',
-    createdAt: '2026-01-02T00:00:00Z'
-  },
-  {
-    id: 'gid://shopify/ScriptTag/2',
-    src: 'https://a.example/two.js',
-    displayScope: 'ALL',
-    createdAt: '2026-02-03T00:00:00Z'
-  }
-];
+const tags = [TAG_A, TAG_B];
 
 const enableHref = themeEditorLink('my-store', 'client-123');
 
-function renderView(overrides: Partial<Parameters<typeof ConsoleView>[0]> = {}) {
-  const props = {
+type ViewProps = Parameters<typeof ConsoleView>[0];
+
+function renderView(overrides: Partial<ViewProps> = {}) {
+  const props: ViewProps = {
     embedStatus: 'active' as EmbedCheck,
+    embedChecking: false,
     enableHref,
     onRecheckEmbed: vi.fn(),
     scriptTags: { ok: true as const, tags },
     onRetryList: vi.fn(),
+    retryingList: false,
     removalBusy: false,
     removalError: null,
     onRemove: vi.fn(),
     ...overrides
   };
-  render(<ConsoleView {...props} />);
-  return props;
+  const { rerender } = render(<ConsoleView {...props} />);
+  return {
+    ...props,
+    rerender: (changes: Partial<ViewProps>) => rerender(<ConsoleView {...props} {...changes} />)
+  };
 }
+
+/** The modal element is unknown to happy-dom, so the overlay method it would expose is stubbed. */
+function stubHideOverlay() {
+  const hideOverlay = vi.fn();
+  Object.assign(screen.getByTestId(TEST_ID.confirmModal), { hideOverlay });
+  return hideOverlay;
+}
+
+const isLoading = (element: HTMLElement) => element.hasAttribute('loading');
 
 function at<T>(items: T[], index: number): T {
   const item = items[index];
@@ -100,7 +103,19 @@ describe('script tag list', () => {
       const row = within(at(rows, index));
       expect(row.getByText(tag.src)).toBeTruthy();
       expect(row.getByText(tag.displayScope)).toBeTruthy();
-      expect(at([...at(rows, index).querySelectorAll('s-table-cell')], 2).textContent).not.toBe('');
+    });
+  });
+
+  it('formats the creation date in UTC so the server and browser render the same text', () => {
+    renderView();
+    const dates = screen.getAllByTestId(TEST_ID.createdAt).map((cell) => cell.textContent);
+    expect(dates).toEqual(['Jan 2, 2026, UTC', 'Feb 3, 2026, UTC']);
+  });
+
+  it('labels each remove action with the tag it removes', () => {
+    renderView();
+    tags.forEach((tag, index) => {
+      expect(at(removeButtons(), index).getAttribute('accessibilitylabel')).toContain(tag.src);
     });
   });
 
@@ -126,6 +141,18 @@ describe('script tag list', () => {
     fireEvent.click(screen.getByTestId(TEST_ID.retryList));
     expect(onRetryList).toHaveBeenCalledOnce();
   });
+
+  it.each([true, false])('marks the retry action loading=%s while the list reloads', (retrying) => {
+    renderView({
+      retryingList: retrying,
+      scriptTags: {
+        ok: false,
+        step: STEP.listScriptTags,
+        failure: { ok: false, kind: 'network', message: 'boom' }
+      }
+    });
+    expect(isLoading(screen.getByTestId(TEST_ID.retryList))).toBe(retrying);
+  });
 });
 
 describe('removal gate', () => {
@@ -150,6 +177,16 @@ describe('removal gate', () => {
     renderView({ removalBusy: true });
     expect(removeButtons().every(isDisabled)).toBe(true);
   });
+
+  it('disables removal while the embed is being re-checked, even from active', () => {
+    renderView({ embedStatus: 'active', embedChecking: true });
+    expect(removeButtons().every(isDisabled)).toBe(true);
+  });
+
+  it.each([true, false])('marks the re-check action loading=%s while checking', (checking) => {
+    renderView({ embedStatus: 'unknown', embedChecking: checking });
+    expect(isLoading(screen.getByTestId(TEST_ID.recheck))).toBe(checking);
+  });
 });
 
 describe('removal confirmation', () => {
@@ -163,11 +200,61 @@ describe('removal confirmation', () => {
     expect(onRemove).toHaveBeenCalledExactlyOnceWith(at(tags, 1).id);
   });
 
-  it('removes nothing when cancelled', () => {
+  it('removes nothing when cancelled, and forgets the pending tag', () => {
     const { onRemove } = renderView();
     fireEvent.click(at(removeButtons(), 0));
     fireEvent.click(screen.getByTestId(TEST_ID.cancelRemove));
+    fireEvent.click(screen.getByTestId(TEST_ID.confirmRemove));
     expect(onRemove).not.toHaveBeenCalled();
+  });
+
+  it('forgets the pending tag once it is removed', () => {
+    const { onRemove } = renderView();
+    fireEvent.click(at(removeButtons(), 0));
+    fireEvent.click(screen.getByTestId(TEST_ID.confirmRemove));
+    fireEvent.click(screen.getByTestId(TEST_ID.confirmRemove));
+    expect(onRemove).toHaveBeenCalledOnce();
+  });
+
+  it('names the pending tag in the confirmation', () => {
+    renderView();
+    fireEvent.click(at(removeButtons(), 1));
+    expect(screen.getByTestId(TEST_ID.confirmTag).textContent).toBe(TAG_B.src);
+  });
+
+  it('leaves the confirm action enabled while removal is available', () => {
+    renderView();
+    fireEvent.click(at(removeButtons(), 0));
+    expect(isDisabled(screen.getByTestId(TEST_ID.confirmRemove))).toBe(false);
+  });
+
+  describe.each([
+    ['inactive', { embedStatus: 'inactive' }],
+    ['unknown', { embedStatus: 'unknown' }],
+    ['checking', { embedStatus: 'checking' }],
+    ['re-checking from active', { embedChecking: true }],
+    ['busy', { removalBusy: true }]
+  ] as const)('when removal becomes unavailable (%s) with the modal open', (_name, closed) => {
+    it('does not remove on confirm, disables the confirm action and hides the modal', () => {
+      const view = renderView();
+      const hideOverlay = stubHideOverlay();
+      fireEvent.click(at(removeButtons(), 0));
+      expect(hideOverlay).not.toHaveBeenCalled();
+
+      view.rerender(closed);
+
+      expect(hideOverlay).toHaveBeenCalledOnce();
+      expect(isDisabled(screen.getByTestId(TEST_ID.confirmRemove))).toBe(true);
+      fireEvent.click(screen.getByTestId(TEST_ID.confirmRemove));
+      expect(view.onRemove).not.toHaveBeenCalled();
+    });
+  });
+
+  it('does not touch the modal when removal becomes unavailable while it is closed', () => {
+    const view = renderView();
+    const hideOverlay = stubHideOverlay();
+    view.rerender({ embedStatus: 'inactive' });
+    expect(hideOverlay).not.toHaveBeenCalled();
   });
 
   it('wires remove to show the modal and confirm and cancel to hide it', () => {
@@ -188,6 +275,7 @@ describe('removal failure', () => {
   it('shows the reason and the step, and keeps the tags listed', () => {
     renderView({
       removalError: {
+        ok: false,
         step: STEP.deleteScriptTag,
         failure: { ok: false, kind: 'user-error', message: 'denied' }
       }

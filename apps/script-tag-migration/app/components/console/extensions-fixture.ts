@@ -1,6 +1,6 @@
+import type { ExtensionList } from './embed';
 import { BLOCK_HANDLE } from './embed';
 
-type ExtensionList = Awaited<ReturnType<typeof shopify.app.extensions>>;
 type BlockStatus = 'active' | 'available' | 'unavailable';
 
 interface ExtensionsPayloadOptions {

@@ -3,25 +3,13 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { createRoutesStub } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ConsoleActionData, ConsoleLoaderData } from '../../services/script-tags';
+import type { ConsoleActionData, OwnedScriptTag } from '../../services/script-tags';
 import { FIELD, INTENT, STEP } from '../../services/script-tags';
+import { TAG_A as tag } from '../../services/script-tags.fixtures';
 import { BLOCK_HANDLE } from './embed';
 import { extensionsPayload } from './extensions-fixture';
 import { ScriptTagConsole } from './ScriptTagConsole';
 import { TEST_ID } from './test-ids';
-
-const tag = {
-  id: 'gid://shopify/ScriptTag/1',
-  src: 'https://a.example/one.js',
-  displayScope: 'ONLINE_STORE',
-  createdAt: '2026-01-02T00:00:00Z'
-};
-
-const loaderData: ConsoleLoaderData = {
-  clientId: 'client-123',
-  storeHandle: 'my-store',
-  scriptTags: { ok: true, tags: [tag] }
-};
 
 const toastShow = vi.fn();
 const extensions = vi.fn();
@@ -38,15 +26,25 @@ afterEach(() => {
   extensions.mockReset();
 });
 
+/** The loader serves the remaining tags; a successful action removes the deleted tag from them. */
 function renderConsole(actionResult: ConsoleActionData) {
   const submitted: FormData[] = [];
+  let remaining: OwnedScriptTag[] = [tag];
   const Stub = createRoutesStub([
     {
       path: '/',
       Component: ScriptTagConsole,
-      loader: () => loaderData,
+      HydrateFallback: () => null,
+      loader: () => ({
+        clientId: 'client-123',
+        storeHandle: 'my-store',
+        scriptTags: { ok: true, tags: remaining }
+      }),
       action: async ({ request }) => {
         submitted.push(await request.formData());
+        if (actionResult.ok) {
+          remaining = remaining.filter(({ id }) => id !== actionResult.deletedId);
+        }
         return actionResult;
       }
     }
@@ -95,13 +93,14 @@ describe('ScriptTagConsole', () => {
     expect(submitted[0]?.get(FIELD.id)).toBe(tag.id);
   });
 
-  it('announces a successful removal with a toast and no error', async () => {
+  it('removes the tag from the list and announces it once, with no error', async () => {
     renderConsole({ ok: true, deletedId: tag.id });
 
     fireEvent.click(await removableTag());
     fireEvent.click(screen.getByTestId(TEST_ID.confirmRemove));
 
-    await waitFor(() => expect(toastShow).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByTestId(TEST_ID.scriptTagRow)).toBeNull());
+    expect(toastShow).toHaveBeenCalledOnce();
     expect(screen.queryByTestId(TEST_ID.removalError)).toBeNull();
   });
 

@@ -2,7 +2,7 @@ export const BLOCK_HANDLE = 'announcement-bar';
 
 export type EmbedStatus = 'active' | 'inactive' | 'unknown';
 
-type ExtensionList = Awaited<ReturnType<typeof shopify.app.extensions>>;
+export type ExtensionList = Awaited<ReturnType<typeof shopify.app.extensions>>;
 
 interface BlockActivation {
   handle: string;
@@ -39,7 +39,7 @@ export function themeEditorLink(storeHandle: string, clientId: string): string {
   const url = new URL(
     `https://admin.shopify.com/store/${encodeURIComponent(storeHandle)}/themes/current/editor`
   );
-  // The slash in `activateAppId` stays literal, as in the link verified against the theme editor.
+  // Shopify expects a literal slash in `activateAppId`.
   url.search = `context=apps&activateAppId=${encodeURIComponent(clientId)}/${BLOCK_HANDLE}`;
   return url.toString();
 }

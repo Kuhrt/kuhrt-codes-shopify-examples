@@ -10,8 +10,8 @@ import { useEmbedStatus } from './use-embed-status';
 
 export function ScriptTagConsole() {
   const { clientId, storeHandle, scriptTags } = useLoaderData<ConsoleLoaderData>();
-  const { status, recheck } = useEmbedStatus();
-  const { revalidate } = useRevalidator();
+  const { status, checking, recheck } = useEmbedStatus();
+  const { revalidate, state: revalidation } = useRevalidator();
   const fetcher = useFetcher<ConsoleActionData>();
   const result = fetcher.data;
 
@@ -27,10 +27,12 @@ export function ScriptTagConsole() {
   return (
     <ConsoleView
       embedStatus={status}
+      embedChecking={checking}
       enableHref={themeEditorLink(storeHandle, clientId)}
       onRecheckEmbed={recheck}
       scriptTags={scriptTags}
       onRetryList={revalidate}
+      retryingList={revalidation !== 'idle'}
       removalBusy={fetcher.state !== 'idle'}
       removalError={result && !result.ok ? result : null}
       onRemove={removeTag}
