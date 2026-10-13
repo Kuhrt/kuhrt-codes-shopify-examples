@@ -1,4 +1,4 @@
-import labels from '../extensions/announcement-bar/locales/en.default.json';
+import labels from '../extensions/announcement-bar/locales/en.default.json' with { type: 'json' };
 
 export const SETTING = {
   message: 'message',

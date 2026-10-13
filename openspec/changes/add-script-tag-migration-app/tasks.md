@@ -73,8 +73,8 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
 
 ## 7. End-to-end
 
-- [ ] 7.1 Build the Playwright harness. It serves two local pages: the Liquid-rendered embed markup (via liquidjs) with the built embed asset, and a page loading the built legacy bundle with query-string settings. Add a third, double-load page with both. Wire it into turbo `test` (CI). Verify: the harness pages load in the Playwright report.
-- [ ] 7.2 Write one scenario suite, parameterized over the embed page and the legacy page, using `page.clock`: countdown ticks, ended→hide, ended→message, loaded after the end, dismiss persists across reloads, a new campaign reappears, blocked storage, keyboard dismissal, zero layout shift (`PerformanceObserver` `layout-shift`), and axe with no violations. Add the JavaScript-disabled case for the embed page, and the one-bar assertion for the double-load page. Verify: the suite passes on both pages in CI.
+- [x] 7.1 Build the Playwright harness. It serves two local pages: the Liquid-rendered embed markup (via liquidjs) with the built embed asset, and a page loading the built legacy bundle with query-string settings. Add a third, double-load page with both. Wire it into turbo `test` (CI). Verify: the harness pages load in the Playwright report.
+- [x] 7.2 Write one scenario suite, parameterized over the embed page and the legacy page, using `page.clock`: countdown ticks, ended→hide, ended→message, loaded after the end, dismiss persists across reloads, a new campaign reappears, blocked storage, keyboard dismissal, zero layout shift (`PerformanceObserver` `layout-shift`), and axe with no violations. Add the JavaScript-disabled case for the embed page, and the one-bar assertion for the double-load page. Verify: the suite passes on both pages in CI.
 
 ## 8. Documentation
 

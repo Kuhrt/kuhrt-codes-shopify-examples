@@ -57,12 +57,44 @@ function closeRoot(): void {
   document.body.appendChild(document.createComment(''));
 }
 
-function flushObserver(): Promise<void> {
+function flushTasks(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function setReadyState(state: DocumentReadyState): void {
   vi.spyOn(document, 'readyState', 'get').mockReturnValue(state);
+}
+
+/** Makes a link look like a stylesheet the browser already loaded. */
+function markLoaded(link: HTMLLinkElement | undefined): void {
+  Object.defineProperty(link, 'sheet', { value: {} });
+}
+
+function appendStylesheetLink(href: string): HTMLLinkElement {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.appendChild(link);
+  return link;
+}
+
+/**
+ * Stops stylesheet links from reporting their own load or error, so a test decides when the
+ * stylesheet settles. Returns a function that reports the event on the first stylesheet link.
+ */
+function holdStylesheet(): (type: 'load' | 'error') => void {
+  const dispatch = HTMLLinkElement.prototype.dispatchEvent;
+  let held = true;
+  vi.spyOn(HTMLLinkElement.prototype, 'dispatchEvent').mockImplementation(function (
+    this: HTMLLinkElement,
+    event: Event
+  ) {
+    return held || dispatch.call(this, event);
+  });
+  return (type) => {
+    held = false;
+    stylesheetLinks().at(-1)?.dispatchEvent(new Event(type));
+  };
 }
 
 let warn: ReturnType<typeof vi.spyOn>;
@@ -97,8 +129,9 @@ afterEach(() => {
 });
 
 describe('mountLegacy', () => {
-  it('builds one bar from the query string settings', () => {
+  it('builds one bar from the query string settings', async () => {
     mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale', [SETTING.dismissible]: 'true' }));
+    await flushTasks();
 
     const [root, ...rest] = bars();
     expect(rest).toHaveLength(0);
@@ -107,11 +140,12 @@ describe('mountLegacy', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('renders one bar and warns once when loaded twice', () => {
+  it('renders one bar and warns once when loaded twice', async () => {
     const src = legacySrc({ [SETTING.message]: 'Sale' });
 
     mountLegacy(document, src);
     mountLegacy(document, src);
+    await flushTasks();
 
     expect(bars()).toHaveLength(1);
     expect(warn).toHaveBeenCalledTimes(1);
@@ -183,17 +217,19 @@ describe('mountLegacy', () => {
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
-  it('lets a valid copy render after a misconfigured one', () => {
+  it('lets a valid copy render after a misconfigured one', async () => {
     mountLegacy(document, legacySrc({ [SETTING.dismissible]: 'true' }));
     expect(bars()).toHaveLength(0);
 
     mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale' }));
+    await flushTasks();
 
     expect(bars()).toHaveLength(1);
   });
 
-  it('ignores unknown query parameters', () => {
+  it('ignores unknown query parameters', async () => {
     mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale', evil: 'x', onclick: 'y' }));
+    await flushTasks();
 
     const root = bars()[0];
     expect(root?.hasAttribute('data-kc-evil')).toBe(false);
@@ -201,21 +237,24 @@ describe('mountLegacy', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('warns exactly once, naming the setting, for an invalid setting', () => {
+  it('warns exactly once, naming the setting, for an invalid setting', async () => {
     mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale', [SETTING.textColor]: 'red' }));
+    await flushTasks();
 
     expect(bars()).toHaveLength(1);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warningText(0)).toContain(SETTING.textColor);
   });
 
-  it('waits for DOMContentLoaded while the document is loading', () => {
+  it('waits for DOMContentLoaded while the document is loading', async () => {
     setReadyState('loading');
 
     mountLegacy(document, legacySrc({ [SETTING.message]: 'Sale' }));
+    await flushTasks();
     expect(bars()).toHaveLength(0);
 
     document.dispatchEvent(new Event('DOMContentLoaded'));
+    await flushTasks();
     expect(bars()).toHaveLength(1);
   });
 });
@@ -239,13 +278,16 @@ describe('mountLegacy stylesheet', () => {
     expect(stylesheetLinks()).toHaveLength(1);
   });
 
-  it('does not add a second link when the page already links the stylesheet', () => {
+  it('does not add a second link when the page already links the stylesheet', async () => {
     const src = legacySrc({ [SETTING.message]: 'Sale' });
     mountLegacy(document, src);
+    await flushTasks();
+    markLoaded(stylesheetLinks()[0]);
     document.body.replaceChildren();
     Reflect.deleteProperty(window, MOUNTED);
 
     mountLegacy(document, src);
+    await flushTasks();
 
     expect(bars()).toHaveLength(1);
     expect(stylesheetLinks()).toHaveLength(1);
@@ -269,6 +311,78 @@ describe('mountLegacy stylesheet', () => {
     mountLegacy(document, src);
 
     expect(stylesheetLinks()).toHaveLength(0);
+  });
+});
+
+describe('mountLegacy while the stylesheet loads', () => {
+  const src = legacySrc({ [SETTING.message]: 'Sale' });
+  const stylesheetHref = new URL(STYLESHEET_FILE, src).href;
+
+  it('adds no bar until the stylesheet has loaded', async () => {
+    const settle = holdStylesheet();
+
+    mountLegacy(document, src);
+    await flushTasks();
+    expect(bars()).toHaveLength(0);
+
+    settle('load');
+    await flushTasks();
+    expect(bars()).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('adds the bar and warns once when the stylesheet fails to load', async () => {
+    const settle = holdStylesheet();
+    mountLegacy(document, src);
+    await flushTasks();
+    expect(bars()).toHaveLength(0);
+
+    settle('error');
+    await flushTasks();
+
+    expect(bars()).toHaveLength(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds the bar at once when the page already loaded the stylesheet', async () => {
+    const link = appendStylesheetLink(stylesheetHref);
+    markLoaded(link);
+    holdStylesheet();
+
+    mountLegacy(document, src);
+    await flushTasks();
+
+    expect(bars()).toHaveLength(1);
+    expect(stylesheetLinks()).toEqual([link]);
+  });
+
+  it('waits on its own link when the page links the stylesheet but it has not loaded', async () => {
+    const pageLink = appendStylesheetLink(stylesheetHref);
+    const settle = holdStylesheet();
+
+    mountLegacy(document, src);
+    await flushTasks();
+    expect(bars()).toHaveLength(0);
+    expect(stylesheetLinks()).toHaveLength(2);
+    expect(stylesheetLinks()[0]).toBe(pageLink);
+
+    settle('load');
+    await flushTasks();
+    expect(bars()).toHaveLength(1);
+  });
+
+  it('builds nothing from a second script during the wait and warns once', async () => {
+    const settle = holdStylesheet();
+    mountLegacy(document, src);
+
+    mountLegacy(document, legacySrc({ [SETTING.message]: 'Other' }));
+    settle('load');
+    await flushTasks();
+
+    expect(bars()).toHaveLength(1);
+    expect(bars()[0]?.getAttribute(dataAttributeFor(SETTING.message))).toBe('Sale');
+    expect(stylesheetLinks()).toHaveLength(1);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -435,7 +549,7 @@ describe('mountEmbed', () => {
     expect(store).toHaveBeenCalledTimes(1);
   });
 
-  it('does not enhance a bar a legacy script already built', () => {
+  it('does not enhance a bar a legacy script already built', async () => {
     const store = vi.spyOn(localStorage, 'setItem');
     vi.useFakeTimers();
     mountLegacy(
@@ -446,6 +560,7 @@ describe('mountEmbed', () => {
         [SETTING.endsAt]: String(FAR_FUTURE_MS / 1000)
       })
     );
+    await vi.advanceTimersByTimeAsync(0);
 
     mountEmbed(document);
     expect(vi.getTimerCount()).toBe(1);
@@ -490,7 +605,7 @@ describe('mountEmbed', () => {
 
       embedRoot(EMBED_CONFIG);
       closeRoot();
-      await flushObserver();
+      await flushTasks();
 
       expect(bars()).toHaveLength(0);
     });
@@ -502,7 +617,7 @@ describe('mountEmbed', () => {
       expect(bars()).toHaveLength(1);
 
       closeRoot();
-      await flushObserver();
+      await flushTasks();
 
       expect(bars()).toHaveLength(0);
     });
@@ -517,7 +632,7 @@ describe('mountEmbed', () => {
       expect(bars()).toHaveLength(1);
 
       if (button) embed.appendChild(button);
-      await flushObserver();
+      await flushTasks();
 
       expect(bars()).toHaveLength(0);
     });
@@ -529,7 +644,7 @@ describe('mountEmbed', () => {
       const wrapper = document.createElement('div');
       wrapper.append(buildBar(EMBED_CONFIG), document.createComment(''));
       document.body.appendChild(wrapper);
-      await flushObserver();
+      await flushTasks();
 
       expect(bars()).toHaveLength(0);
     });
@@ -537,12 +652,12 @@ describe('mountEmbed', () => {
     it('waits for a following node before enhancing a root added after mounting', async () => {
       mountEmbed(document);
       const embed = embedRoot();
-      await flushObserver();
+      await flushTasks();
       dismiss(embed);
       expect(bars()).toHaveLength(1);
 
       closeRoot();
-      await flushObserver();
+      await flushTasks();
       dismiss(embed);
       expect(bars()).toHaveLength(0);
     });
@@ -550,7 +665,7 @@ describe('mountEmbed', () => {
     it('enhances an unclosed root on DOMContentLoaded', async () => {
       mountEmbed(document);
       const embed = embedRoot();
-      await flushObserver();
+      await flushTasks();
       dismiss(embed);
       expect(bars()).toEqual([embed]);
 
@@ -564,10 +679,10 @@ describe('mountEmbed', () => {
       mountEmbed(document);
       embedRoot().setAttribute(dataAttributeFor(SETTING.backgroundColor), 'nope');
       closeRoot();
-      await flushObserver();
+      await flushTasks();
 
       document.dispatchEvent(new Event('DOMContentLoaded'));
-      await flushObserver();
+      await flushTasks();
 
       expect(warn).toHaveBeenCalledTimes(1);
     });
@@ -577,7 +692,7 @@ describe('mountEmbed', () => {
       const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
       embedRoot();
       closeRoot();
-      await flushObserver();
+      await flushTasks();
 
       expect(disconnect).toHaveBeenCalledTimes(1);
     });
@@ -596,7 +711,7 @@ describe('mountEmbed', () => {
       mountEmbed(document);
       const embed = embedRoot();
       closeRoot();
-      await flushObserver();
+      await flushTasks();
       dismiss(embed);
       expect(bars()).toHaveLength(1);
 
