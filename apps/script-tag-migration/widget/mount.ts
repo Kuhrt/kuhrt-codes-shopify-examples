@@ -101,8 +101,7 @@ function readLegacyConfig(scriptSrc: string | undefined): BarConfig | null {
   return raw === null ? null : reportParse(parseConfig(raw));
 }
 
-function mountBar(doc: Document, root: HTMLElement, config: BarConfig): void {
-  markMounted(doc);
+function mountBar(root: HTMLElement, config: BarConfig): void {
   const store = root.hasAttribute(DESIGN_MODE_ATTRIBUTE)
     ? createEphemeralDismissalStore()
     : undefined;
@@ -135,12 +134,12 @@ function parseRoot(root: HTMLElement): ParseResult {
 
 function enhanceRoot(doc: Document, root: HTMLElement, parsed: ParseResult): void {
   if (isMounted(doc)) return;
+  markMounted(doc);
   reportInvalidSettings(root);
   const config = reportParse(parsed);
   if (config) {
-    mountBar(doc, root, config);
+    mountBar(root, config);
   } else {
-    markMounted(doc);
     root.remove();
   }
 }
@@ -226,25 +225,54 @@ export function mountEmbed(doc: Document): void {
   );
 }
 
-function linksTo(doc: Document, href: string): boolean {
-  return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].some(
+function findStylesheet(doc: Document, href: string): HTMLLinkElement | undefined {
+  return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].find(
     (link) => link.href === href
   );
 }
 
-/** Links the stylesheet served next to the script, unless the page already does. */
-function loadStylesheet(doc: Document, scriptSrc: string): void {
-  const href = new URL(STYLESHEET_FILE, scriptSrc).href;
-  if (linksTo(doc, href)) return;
+function createStylesheetLink(doc: Document, href: string): HTMLLinkElement {
   const link = doc.createElement('link');
   link.rel = 'stylesheet';
   link.href = href;
+  return link;
+}
+
+/** Resolves once the link has loaded or failed; a link that already loaded resolves at once. */
+function settled(link: HTMLLinkElement): Promise<void> {
+  return new Promise((resolve) => {
+    link.addEventListener('load', () => resolve(), { once: true });
+    link.addEventListener(
+      'error',
+      () => {
+        warn(`the stylesheet ${link.href} failed to load, so the bar is shown unstyled`);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+/**
+ * Links the stylesheet served next to the script, unless the page already loaded it, and resolves
+ * once it has loaded. A page link that hasn't loaded may have failed and won't fire again, so the
+ * script waits on its own link. A failed load still resolves, after one warning, so the message is
+ * shown.
+ */
+function loadStylesheet(doc: Document, scriptSrc: string): Promise<void> {
+  const href = new URL(STYLESHEET_FILE, scriptSrc).href;
+  if (findStylesheet(doc, href)?.sheet) return Promise.resolve();
+  const link = createStylesheetLink(doc, href);
+  const loaded = settled(link);
   doc.head.appendChild(link);
+  return loaded;
 }
 
 /**
  * Builds a bar from the script URL's query string, unless the page already has one:
- * the embed's bar always wins.
+ * the embed's bar always wins. The page is marked as mounted before the stylesheet loads, so
+ * no other script mounts meanwhile. The bar is added only once the stylesheet has loaded, so
+ * it never paints unstyled or shifts the page.
  */
 export function mountLegacy(doc: Document, scriptSrc: string | undefined): void {
   whenDomReady(doc, () => {
@@ -254,9 +282,11 @@ export function mountLegacy(doc: Document, scriptSrc: string | undefined): void 
     }
     const config = readLegacyConfig(scriptSrc);
     if (!config || scriptSrc === undefined) return;
-    loadStylesheet(doc, scriptSrc);
-    const root = buildBar(config);
-    doc.body.appendChild(root);
-    mountBar(doc, root, config);
+    markMounted(doc);
+    void loadStylesheet(doc, scriptSrc).then(() => {
+      const root = buildBar(config);
+      doc.body.appendChild(root);
+      mountBar(root, config);
+    });
   });
 }

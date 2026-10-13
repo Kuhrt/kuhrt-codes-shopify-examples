@@ -7,6 +7,9 @@ export const EMBED_PATH = '/embed';
 export const LEGACY_PATH = '/legacy';
 export const DOUBLE_PATH = '/double';
 
+/** The id of a link in the page's main content, ahead of the bar in tab order. */
+export const PAGE_LINK_ID = 'page-link';
+
 export const EMBED_SCRIPT_PATH = '/assets/announcement-bar.js';
 export const EMBED_STYLESHEET_PATH = '/assets/announcement-bar.css';
 export const LEGACY_STYLESHEET_PATH = '/legacy/announcement-bar.css';

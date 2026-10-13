@@ -25,9 +25,13 @@ export async function trackLayoutShift(page: Page): Promise<void> {
   });
 }
 
-/** The layout shift summed since the document started, including entries not yet delivered. */
+/**
+ * The layout shift summed since the document started, read after two animation frames so a shift
+ * from the latest change has been reported. The page clock must be running, or no frame is scheduled.
+ */
 export async function totalLayoutShift(page: Page): Promise<number> {
-  return page.evaluate(() => {
+  return page.evaluate(async () => {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const tracker = (window as TrackedWindow).__layoutShift;
     if (!tracker) throw new Error('Layout shift tracking was not started');
     for (const entry of tracker.observer.takeRecords()) {

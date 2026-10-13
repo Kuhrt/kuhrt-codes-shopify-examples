@@ -18,9 +18,11 @@ import {
 import { advance, freezeClock, resumeClock } from './clock';
 import { totalLayoutShift, trackLayoutShift } from './layout-shift';
 import { openPage, PAGE_KINDS } from './pages';
+import { PAGE_LINK_ID } from './routes';
 
 const DISMISS_KEYS = ['Enter', 'Space'];
 const TICK_MS = 5 * SECOND_MS;
+const MOTION_PREFERENCES = ['reduce', 'no-preference'] as const;
 
 function collectPageErrors(page: Page): Error[] {
   const errors: Error[] = [];
@@ -38,13 +40,16 @@ for (const kind of PAGE_KINDS) {
       await openPage(page, kind, barEndingAfter(HOUR_MS));
       const { countdown } = barLocators(page);
       const initial = countdownText(HOUR_MS, 0);
+      const afterSecond = countdownText(HOUR_MS, SECOND_MS);
       const afterTick = countdownText(HOUR_MS, TICK_MS);
       await expect(countdown).toHaveText(initial);
 
-      await advance(page, TICK_MS);
+      await advance(page, SECOND_MS);
+      await expect(countdown).toHaveText(afterSecond);
+      expect(afterSecond).not.toBe(initial);
 
+      await advance(page, TICK_MS - SECOND_MS);
       await expect(countdown).toHaveText(afterTick);
-      expect(afterTick).not.toBe(initial);
     });
 
     test('a bar that hides when it ends disappears at the end time', async ({ page }) => {
@@ -52,7 +57,9 @@ for (const kind of PAGE_KINDS) {
       const { roots, bar } = barLocators(page);
       await expect(bar).toBeVisible();
 
-      await advance(page, MINUTE_MS);
+      await advance(page, MINUTE_MS - SECOND_MS);
+      await expect(bar).toBeVisible();
+      await advance(page, SECOND_MS);
 
       await expect(roots).toHaveCount(0);
     });
@@ -62,7 +69,9 @@ for (const kind of PAGE_KINDS) {
       const { bar, message, countdown } = barLocators(page);
       await expect(bar).not.toHaveAttribute(ENDED_ATTRIBUTE);
 
-      await advance(page, MINUTE_MS);
+      await advance(page, MINUTE_MS - SECOND_MS);
+      await expect(bar).not.toHaveAttribute(ENDED_ATTRIBUTE);
+      await advance(page, SECOND_MS);
 
       await expect(bar).toHaveAttribute(ENDED_ATTRIBUTE, '');
       await expect(message).toHaveText(ENDED_MESSAGE);
@@ -127,39 +136,50 @@ for (const kind of PAGE_KINDS) {
       await expect(bar).toBeVisible();
 
       await dismiss.click();
-
       await expect(roots).toHaveCount(0);
+      await page.reload();
+
+      await expect(bar).toBeVisible();
       expect(errors).toEqual([]);
     });
 
     for (const key of DISMISS_KEYS) {
-      test(`${key} on the focused dismiss button dismisses the bar and keeps focus on the page`, async ({
+      test(`${key} on the focused dismiss button dismisses the bar and keeps keyboard focus on the page`, async ({
         page
       }) => {
         await openPage(page, kind, barConfig());
         const { dismiss, roots } = barLocators(page);
         await expect(dismiss).toBeVisible();
 
-        await page.keyboard.press('Tab');
+        await dismiss.focus();
         await expect(dismiss).toBeFocused();
         await page.keyboard.press(key);
-
         await expect(roots).toHaveCount(0);
-        await expect(page.locator('body')).toBeFocused();
+        await expect(page.locator('body:focus')).toHaveCount(1);
+        await page.keyboard.press('Tab');
+
+        await expect(page.locator(`#${PAGE_LINK_ID}`)).toBeFocused();
       });
     }
 
-    test('the bar and its ticking countdown cause no layout shift', async ({ page }) => {
-      await trackLayoutShift(page);
-      await openPage(page, kind, barEndingAfter(HOUR_MS));
-      const { countdown } = barLocators(page);
-      await expect(countdown).toHaveText(countdownText(HOUR_MS, 0));
+    for (const reducedMotion of MOTION_PREFERENCES) {
+      test.describe(`with ${reducedMotion} motion`, () => {
+        test.use({ reducedMotion });
 
-      await advance(page, TICK_MS);
-      await expect(countdown).toHaveText(countdownText(HOUR_MS, TICK_MS));
+        test('the bar and its ticking countdown cause no layout shift', async ({ page }) => {
+          await trackLayoutShift(page);
+          await openPage(page, kind, barEndingAfter(HOUR_MS));
+          const { countdown } = barLocators(page);
+          await expect(countdown).toHaveText(countdownText(HOUR_MS, 0));
 
-      expect(await totalLayoutShift(page)).toBe(0);
-    });
+          await advance(page, TICK_MS);
+          await expect(countdown).toHaveText(countdownText(HOUR_MS, TICK_MS));
+          await resumeClock(page);
+
+          expect(await totalLayoutShift(page)).toBe(0);
+        });
+      });
+    }
 
     test('the bar has no accessibility violations', async ({ page }) => {
       await openPage(page, kind, barEndingAfter(HOUR_MS, { linkUrl: '/sale' }));

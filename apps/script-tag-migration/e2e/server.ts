@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
@@ -17,6 +17,7 @@ import {
   HOST,
   LEGACY_PATH,
   LEGACY_STYLESHEET_PATH,
+  PAGE_LINK_ID,
   PORT
 } from './routes';
 
@@ -24,6 +25,8 @@ const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const JAVASCRIPT = 'text/javascript; charset=utf-8';
 const CSS = 'text/css; charset=utf-8';
 const HTML = 'text/html; charset=utf-8';
+const NEWLINE = '\n';
+const LEGACY_MESSAGE_SUFFIX = 'from the legacy script';
 
 interface StaticFile {
   path: string;
@@ -45,6 +48,16 @@ const STATIC_FILES = new Map<string, StaticFile>([
     { path: resolve(APP_ROOT, 'public/legacy/announcement-bar.css'), contentType: CSS }
   ]
 ]);
+
+function assertStaticFilesExist(): void {
+  const missing = [...STATIC_FILES.values()].filter(({ path }) => !existsSync(path));
+  if (missing.length === 0) return;
+  const paths = missing.map(({ path }) => path).join(NEWLINE);
+  console.error(
+    `E2E harness cannot start; run "pnpm build:widget" first. Missing files:${NEWLINE}${paths}`
+  );
+  process.exit(1);
+}
 
 function escapeAttribute(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
@@ -87,6 +100,7 @@ function renderPage({
     <main>
       <h1>Storefront</h1>
       <p>Page content that must not move when the bar appears.</p>
+      <a id="${PAGE_LINK_ID}" href="#${PAGE_LINK_ID}">Page link</a>
     </main>
     ${blockHtml}
   </body>
@@ -97,6 +111,13 @@ function embedBlock(params: URLSearchParams): string {
   return renderBlock(blockSettingsFrom(params), { assetBaseUrl: '/assets/' });
 }
 
+/** The settings for the double-load page's legacy script: the same campaign under a different message. */
+function withLegacyMessage(params: URLSearchParams): URLSearchParams {
+  const legacy = new URLSearchParams(params);
+  legacy.set(SETTING.message, `${params.get(SETTING.message) ?? ''} ${LEGACY_MESSAGE_SUFFIX}`);
+  return legacy;
+}
+
 function pageFor(pathname: string, params: URLSearchParams): string | undefined {
   switch (pathname) {
     case EMBED_PATH:
@@ -105,7 +126,7 @@ function pageFor(pathname: string, params: URLSearchParams): string | undefined 
       return renderPage({ headScripts: [legacyScriptTag(params.toString())] });
     case DOUBLE_PATH:
       return renderPage({
-        headScripts: [EMBED_SCRIPT_TAG, legacyScriptTag(params.toString())],
+        headScripts: [EMBED_SCRIPT_TAG, legacyScriptTag(withLegacyMessage(params).toString())],
         blockHtml: embedBlock(params)
       });
     default:
@@ -146,6 +167,8 @@ function handleSafely(request: IncomingMessage, response: ServerResponse): void 
     sendText(response, 500, 'Server error');
   }
 }
+
+assertStaticFilesExist();
 
 createServer(handleSafely).listen(PORT, HOST, () => {
   console.log(`E2E harness listening on http://${HOST}:${PORT}`);
