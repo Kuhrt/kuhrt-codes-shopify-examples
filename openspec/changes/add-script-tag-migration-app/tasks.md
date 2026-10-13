@@ -91,12 +91,12 @@ Prerequisite: `bootstrap-examples-workspace` is applied (workspace, `@repo/confi
   - the closing hire-me section.
 
   Verify: all links resolve (link checker). Every section in the spec's sequence is present, in order. A read-through on the "could a client follow this?" question is noted in the PR.
-- [ ] 8.2 Write `README.md` to the portfolio template. It includes the architecture diagram from design.md, a run-locally block of five commands or fewer, and the scopes table (consumed by 6.2). Add the app to the root README's examples table. Verify: the template section check, the 6.2 scope test, and following the run-locally steps from a fresh clone against `kuhrt-codes` works.
+- [x] 8.2 Write `README.md` to the portfolio template. It includes the architecture diagram from design.md, a run-locally block of five commands or fewer, and the scopes table (consumed by 6.2). Add the app to the root README's examples table. Verify: the template section check, the 6.2 scope test, and following the run-locally steps from a fresh clone against `kuhrt-codes` works.
 
 ## 9. Acceptance on the demo store
 
-- [ ] 9.1 Confirm in the Partner Dashboard that the app can be installed on both `kuhrt-codes` and `kuhrt-codes-demo` (distribution setting), and pick the Worker hostname (design.md, Open Questions). Verify: the setting and hostname are recorded in design.md.
-- [ ] 9.2 Deploy with `pnpm build && pnpm exec wrangler deploy` and `pnpm run app:deploy`, which builds the widget first. Install on `kuhrt-codes-demo`, enable the embed on Horizon, and configure a realistic campaign. Verify:
+- [x] 9.1 Confirm in the Partner Dashboard that the app can be installed on both `kuhrt-codes` and `kuhrt-codes-demo` (distribution setting), and pick the Worker hostname (design.md, Open Questions). Verify: the setting and hostname are recorded in design.md.
+- [x] 9.2 Deploy with `pnpm build && pnpm exec wrangler deploy` and `pnpm app:deploy --config production`, which builds the widget first. Install on `kuhrt-codes-demo`, enable the embed on Horizon, and configure a realistic campaign. Verify:
   - the spec acceptance holds: the bar works and its settings are editable in the theme editor;
   - the console shows the embed active and no legacy tags;
   - Lighthouse shows no CLS from the bar.

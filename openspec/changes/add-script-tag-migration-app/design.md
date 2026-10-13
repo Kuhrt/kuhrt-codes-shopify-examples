@@ -62,7 +62,7 @@ apps/script-tag-migration/
 ├── scripts/build-widget.ts      esbuild bundles for both paths + gzip budget and the embed's raw size limit
 ├── scripts/try-legacy-install.ts dev-only: runs legacy/install against kuhrt-codes, prints the response
 ├── e2e/                          Playwright harness: embed page vs legacy page, same scenarios
-├── shopify.app.toml · wrangler.jsonc · README.md · MIGRATION.md
+├── shopify.app.toml · shopify.app.production.toml · wrangler.jsonc · README.md · MIGRATION.md
 ```
 
 ```
@@ -164,7 +164,7 @@ apps/script-tag-migration/
   - Remove Prisma entirely.
 - **Deploy:** two manual commands, documented in the README:
   - `pnpm build && pnpm exec wrangler deploy`, for the app server and the legacy asset;
-  - `pnpm run app:deploy`, for the app config and theme extension. It builds the widget first. Plain `shopify app deploy` would ship a missing or stale bundle, and `pnpm deploy` is pnpm's own command.
+  - `pnpm app:deploy --config production`, for the app config and theme extension. It builds the widget first. Plain `shopify app deploy` would ship a missing or stale bundle, and `pnpm deploy` is pnpm's own command.
   - Secrets (`SHOPIFY_API_SECRET`) live in `wrangler secret`, and locally in `.dev.vars`.
   - **Alternative considered:** SST, as the website uses. One Worker and one D1 database don't justify it. Plain `wrangler.jsonc` is easier for a reviewer to read. Rejected.
 - **Local dev:** `shopify.web.toml` runs the Vite dev server with the Cloudflare plugin (workerd locally). The Shopify CLI tunnels it as usual.
@@ -192,14 +192,14 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - [Markup is duplicated between Liquid and `render.ts`] → The parity test fails on drift (decision 2).
 - [The legacy path can't be shown running on a real store] → The E2E harness runs it for real against the same scenarios, the recorded rejection proves the block, and `MIGRATION.md` says so plainly rather than faking a "before".
 - [`shopify.app.extensions()` shape or availability changes] → Status falls back to "unknown". Removal stays gated, so failure is safe.
-- [Installing on two development stores may need a specific distribution setting] → Verify in the Partner Dashboard before acceptance (task 9.1).
+- [Installing on two development stores may need a specific distribution setting] → Verified unnecessary: development stores install from the Dev Dashboard with no distribution selected (see "Acceptance deploy").
 
 ## Migration Plan
 
 1. Develop entirely against `kuhrt-codes`.
 2. Once acceptance is checked there:
    - `pnpm build && pnpm exec wrangler deploy`;
-   - `pnpm run app:deploy`;
+   - `pnpm app:deploy --config production`;
    - install on `kuhrt-codes-demo`;
    - enable the embed on Horizon.
 3. Record the README GIF on `kuhrt-codes-demo`.
@@ -207,7 +207,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 ## Open Questions
 
-- Worker hostname: a `*.workers.dev` URL or a custom subdomain such as `script-tag-migration.apps.kuhrt.codes`. Either works and nothing else depends on the choice. Pick at deploy time.
+- Resolved: the Worker hostname is `script-tag-migration.apps.kuhrt.codes` (see "Acceptance deploy").
 
 ## Implementation Notes
 
@@ -263,10 +263,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 
 ### Deploy checklist (for tasks 9.1 and 9.2)
 
-- Choose `AppDistribution` for custom distribution (check shopify.dev; the template ships `AppStore`).
-- Replace the `https://example.com` placeholders in `shopify.app.toml` with the Worker URL. Check `redirect_urls` against `authPathPrefix` (`/auth`).
-- Check that `wrangler deploy` provisions the D1 database (no `database_id` is committed), then run `wrangler d1 migrations apply DB --remote` before the first install.
-- Set the three secrets with `wrangler secret put`.
+Done; "Acceptance deploy" records how each item was resolved. The production URLs live in `shopify.app.production.toml`, and `shopify.app.toml` keeps its placeholders for development.
 
 ### Widget core (tasks 2.1–2.4)
 
@@ -400,7 +397,7 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **A missing required header returns 400, not 401.** `@shopify/shopify-api` checks the required webhook headers (signature, topic, shop domain, API version, webhook ID) before verifying anything, and reports any that are missing as `MissingHeaders`. Only `InvalidHmac`, a signature that doesn't match the body, maps to 401. Nothing is deleted either way. The spec now covers both cases.
 - **A failed deletion returns 500.** The Drizzle adapter's `deleteSessions` returns `false` on any error. The route then logs the failure and responds 500, so Shopify retries the delivery. A test covers this.
 - **Session fixtures expire in 2100.** `authenticate.webhook` refreshes an offline token that expires within five minutes, which would call Shopify from a test.
-- **The scope contract** reads `shopify.app.toml` with `smol-toml` and compares its scopes, as a set, with the first column of the README's "Access scopes" table. A second test checks that `webhooks.api_version` equals the app's `apiVersion`. `app/db/d1-test-support.ts` is the one local D1 setup shared by the storage and webhook tests.
+- **The scope contract** reads every `shopify.app*.toml` with `smol-toml` and compares its scopes, as a set, with the first column of the README's "Access scopes" table. It also checks that `webhooks.api_version` equals the app's `apiVersion`, and that each config subscribes the same webhooks as `shopify.app.toml`. `app/db/d1-test-support.ts` is the one local D1 setup shared by the storage and webhook tests.
 - **Triggered against dev.** `shopify app webhook trigger --topic app/uninstalled --api-version 2026-10 --delivery-method http` to the local route reported a successful delivery, so the CLI-signed request passed real verification. The sample payload names a shop other than `kuhrt-codes`, so it took the no-sessions path, and the `kuhrt-codes` dev session was untouched.
 
 ### End-to-end suite (tasks 7.1–7.2)
@@ -425,3 +422,14 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **Links are checked by a one-off script**, not a repository tool: relative files and heading anchors, and every external URL fetched, with shopify.dev anchors matched against the page's `id`s. A committed link checker would hit the network in `pnpm check`.
 - **Run locally from a fresh clone** uses `pnpm config:link`, because the committed `shopify.app.toml` names this repository's app; another developer creates their own app there. `pnpm dev --store` overrides the committed `dev_store_url`.
 - **The README's demo section** holds a placeholder until task 9.3 records the media on `kuhrt-codes-demo`.
+
+### Acceptance deploy (tasks 9.1–9.2)
+
+- **Two apps.** `shopify.app.toml` is the development app ("Script Tag Migration (dev)", client ID `0537e606…`), used by `shopify app dev` on `kuhrt-codes`. `shopify.app.production.toml` is the production app ("Script Tag Migration", client ID `8242cec2…`), served by the deployed Worker and installed on `kuhrt-codes-demo`. One app would not work: `automatically_update_urls_on_dev` points the app at the dev tunnel on every dev session, which breaks the deployed install. Deploy with `pnpm app:deploy --config production`; dev keeps `shopify.app.toml` as the active config.
+- **`shopify app config link` keeps scopes but not webhooks.** Creating the production app wrote `write_script_tags` but no webhook subscriptions, with webhooks on `2027-01`. The `[webhooks]` section was copied from the development config, and the app contract test now checks every `shopify.app*.toml` for the README's scopes, the app's API version and the development config's subscriptions.
+- **Distribution is not selected.** The choice is permanent, and both stores are development stores in the same organization, which can install the app from the Dev Dashboard's Installs card without one. `shopifyApp` keeps `AppDistribution.AppStore`. Public or custom distribution can still be chosen later.
+- **Hostname: `script-tag-migration.apps.kuhrt.codes`**, a Workers Custom Domain (`routes` with `custom_domain: true` in `wrangler.jsonc`). The `kuhrt.codes` zone is on Cloudflare, and the custom domain's certificate covers the two-level name at no cost. It served about two minutes after the first deploy. The auth redirect is `/auth/callback`, under `authPathPrefix`.
+- **First deploy needs a secrets file.** `secrets.required` makes `wrangler deploy` refuse a Worker that doesn't exist yet, and `wrangler secret put` can't target one. The first deploy used `wrangler deploy --secrets-file` with a file outside the repository, deleted afterwards; all three values are stored as `secret_text`. Later deploys keep them.
+- **D1 is provisioned on first deploy** from the binding's `database_name`, with no `database_id` committed. `wrangler d1 migrations apply DB --remote` then created the session table.
+- **Verified on `kuhrt-codes-demo` (Horizon):** the bar showed the configured campaign, and a setting changed in the theme editor reached the storefront after saving. The console showed the embed active and no legacy script tags. Lighthouse reported a CLS of 0.
+- **The CLI rewrites the production config on deploy.** `shopify app deploy --config production` normalized `shopify.app.production.toml` and dropped `include_config_on_deploy`, leaving an empty `[build]` table. That file is kept as the CLI writes it.

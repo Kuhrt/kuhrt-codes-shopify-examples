@@ -64,7 +64,21 @@ pnpm config:link
 pnpm dev --store your-dev-store.myshopify.com
 ```
 
-`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one); check that the `shopify.app.*.toml` it writes requests `write_script_tags` and subscribes both webhooks. `pnpm dev` builds the widget once, applies the D1 migrations locally, starts the Worker in workerd and tunnels it to your development store. Install the app when prompted, then use **Enable app embed** on the app home to turn the embed on. To rebuild the widget as you edit it, run `pnpm dev:widget` alongside.
+`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one); the `shopify.app.*.toml` it writes keeps the scopes but not the webhooks, so copy the `[webhooks]` section over from `shopify.app.toml`. `pnpm test` checks every app config against the README's scopes and `shopify.app.toml`'s webhooks. `pnpm dev` builds the widget once, applies the D1 migrations locally, starts the Worker in workerd and tunnels it to your development store. Install the app when prompted, then use **Enable app embed** on the app home to turn the embed on. To rebuild the widget as you edit it, run `pnpm dev:widget` alongside.
+
+## Deploy
+
+The Worker serves the app and the legacy script; the Shopify app config carries the URLs, scopes, webhooks and the theme extension. `shopify.app.production.toml` is the deployed app, and `shopify.app.toml` stays the development app.
+
+```sh
+pnpm build && pnpm exec wrangler deploy
+pnpm exec wrangler d1 migrations apply DB --remote
+pnpm app:deploy --config production
+```
+
+The first `wrangler deploy` needs `--secrets-file` with `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` and `SHOPIFY_APP_URL`, because the Worker doesn't exist yet. Later deploys keep them.
+
+## Tests
 
 `pnpm check` from the repository root runs the full suite. The end-to-end tests need Chromium once: `pnpm exec playwright install chromium`.
 
