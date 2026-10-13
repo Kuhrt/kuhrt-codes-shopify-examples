@@ -399,3 +399,16 @@ Tests assert roles, data attributes, state and timing, never copy (per project r
 - **Session fixtures expire in 2100.** `authenticate.webhook` refreshes an offline token that expires within five minutes, which would call Shopify from a test.
 - **The scope contract** reads `shopify.app.toml` with `smol-toml` and compares its scopes, as a set, with the first column of the README's "Access scopes" table. A second test checks that `webhooks.api_version` equals the app's `apiVersion`. `app/db/d1-test-support.ts` is the one local D1 setup shared by the storage and webhook tests.
 - **Triggered against dev.** `shopify app webhook trigger --topic app/uninstalled --api-version 2026-10 --delivery-method http` to the local route reported a successful delivery, so the CLI-signed request passed real verification. The sample payload names a shop other than `kuhrt-codes`, so it took the no-sessions path, and the `kuhrt-codes` dev session was untouched.
+
+### End-to-end suite (tasks 7.1–7.2)
+
+- **Harness.** Playwright's `webServer` runs `e2e/server.ts`, a plain `node:http` server bundled with esbuild first. Pages take their campaign from the query string:
+  - `/embed` renders the block through `renderBlock` (the same stubs as the parity test) and loads the embed asset as `<script async>` in `<head>`, the way Shopify injects it.
+  - `/legacy` loads the legacy bundle with `<script defer>` in `<head>`, so the legacy path runs from `DOMContentLoaded`.
+  - `/double` is the embed page plus the legacy script.
+
+  The server serves the two bundles and their stylesheets from a fixed allowlist.
+- **One scenario suite** runs against both `/embed` and `/legacy`. A single `BarConfig` drives both pages: the embed gets a store-local `ends_at` from `toStoreLocalDateTime`, and the legacy page gets its query from `toQuery`. The clock is installed and paused before navigation, and time moves only through `runFor`. Countdown text is compared with `formatCountdown(remaining(...))`, never hard-coded. Axe runs with the clock resumed, because it never finishes against a paused clock.
+- **The double-load page** checks for exactly one bar and one `LOG_PREFIX` warning. To show the embed's bar is the one on the page, it checks for the embed's stylesheet link and the absence of the legacy one. A normal embed bar carries no embed-only data attribute, but the legacy script links its stylesheet only when it builds a bar. That campaign has no end time, because the two scripts read it in different forms.
+- **Running it.** The app's `test` script is `vitest run && playwright test`, so `turbo test` and `pnpm check` run both. Locally, install Chromium once with `pnpm exec playwright install chromium`. CI installs it with system dependencies before `pnpm check`. Turbo's strict env mode passes through what Playwright needs (`CI`, `HOME`, `LOCALAPPDATA`). Setting `PLAYWRIGHT_BROWSERS_PATH` would need `passThroughEnv` on the app's `test` task.
+- **`widget/settings.ts` imports its locale JSON `with { type: 'json' }`**, because Playwright loads specs as native ESM and Node requires the attribute there.
