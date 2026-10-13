@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { parse } from 'smol-toml';
@@ -13,11 +13,17 @@ function readAppFile(name: string): string {
   return readFileSync(path.join(APP_ROOT, name), 'utf8');
 }
 
-function readAppConfig() {
-  return parse(readAppFile('shopify.app.toml')) as {
-    access_scopes: { scopes: string };
-    webhooks: { api_version: string };
-  };
+interface AppConfig {
+  access_scopes: { scopes: string };
+  webhooks: { api_version: string; subscriptions?: unknown[] };
+}
+
+const CONFIG_FILES = readdirSync(APP_ROOT).filter((name) =>
+  /^shopify\.app(\..+)?\.toml$/.test(name)
+);
+
+function readAppConfig(name: string): AppConfig {
+  return parse(readAppFile(name)) as unknown as AppConfig;
 }
 
 function sorted(values: string[]): string[] {
@@ -49,14 +55,32 @@ function scopesFromReadme(readme: string): string[] {
 }
 
 describe('app contract', () => {
-  it('lists in the README exactly the scopes requested in shopify.app.toml', () => {
-    const documented = scopesFromReadme(readAppFile('README.md'));
-
-    expect(documented.length).toBeGreaterThan(0);
-    expect(documented).toEqual(scopesFromToml(readAppConfig().access_scopes.scopes));
+  it('covers the development and production app configs', () => {
+    expect(CONFIG_FILES).toEqual(
+      expect.arrayContaining(['shopify.app.toml', 'shopify.app.production.toml'])
+    );
   });
 
-  it('subscribes webhooks at the API version the app uses', () => {
-    expect(readAppConfig().webhooks.api_version).toBe(apiVersion);
+  it('documents at least one scope in the README', () => {
+    expect(scopesFromReadme(readAppFile('README.md')).length).toBeGreaterThan(0);
+  });
+
+  describe.each(CONFIG_FILES)('%s', (name) => {
+    it('requests exactly the scopes listed in the README', () => {
+      expect(scopesFromReadme(readAppFile('README.md'))).toEqual(
+        scopesFromToml(readAppConfig(name).access_scopes.scopes)
+      );
+    });
+
+    it('subscribes webhooks at the API version the app uses', () => {
+      expect(readAppConfig(name).webhooks.api_version).toBe(apiVersion);
+    });
+
+    it('subscribes the same webhooks as the development config', () => {
+      const subscriptions = readAppConfig(name).webhooks.subscriptions;
+
+      expect(subscriptions?.length).toBeGreaterThan(0);
+      expect(subscriptions).toEqual(readAppConfig('shopify.app.toml').webhooks.subscriptions);
+    });
   });
 });
