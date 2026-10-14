@@ -20,21 +20,21 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
   - Run the decision 4 query from the extension.
   - Invoke the create intent with the returned Function ID and the edit intent with the test discount's node ID.
   - Verify: record in design.md that App Home renders with no distribution method chosen, which scopes the query needs, and that both intents open the right page. **Gate: if App Home needs a distribution method, or `shopifyFunctions` needs a scope beyond `write_discounts`, stop and ask the user.**
-- [ ] 1.4 Check the component test setup.
+- [x] 1.4 Check the component test setup.
   - Render each placeholder with `@shopify/ui-extensions-tester` under Vitest 5 and assert one element by role.
   - Verify: both tests pass in `pnpm check`. If the tester doesn't work, switch to `@testing-library/preact` with a hand-written `shopify` mock, and record why in design.md.
 
 ## 2. Settings form logic (`wholesale-tiers-settings/src/form.ts`)
 
-- [ ] 2.1 Implement form state, `DEFAULT_CONFIG`, `toConfigCandidate`, `issuesByField`, `addTier` and `removeTier` (design decision 1).
+- [x] 2.1 Implement form state, `DEFAULT_CONFIG`, `toConfigCandidate`, `issuesByField`, `addTier` and `removeTier` (design decision 1).
   - Verify: Vitest covers:
     - empty, non-numeric, fractional and padded inputs reach `parseTierConfig` as given and produce its issue codes;
     - every issue lands on its field's key, and a count issue lands on the tier list;
     - add stops at `MAX_TIERS` and remove at `MIN_TIERS`, without changing the state;
     - `DEFAULT_CONFIG` passes `parseTierConfig`.
-- [ ] 2.2 Implement `fromSaved` (design decision 2).
+- [x] 2.2 Implement `fromSaved` (design decision 2).
   - Verify: Vitest shows that a valid stored config round-trips to the same config. An invalid one keeps its values, with the same issues the Function would log. A missing or non-object value gives an empty tag and one empty tier, with issues on both.
-- [ ] 2.3 Add the agreement test.
+- [x] 2.3 Add the agreement test.
   - Verify: for a table of form states covering every issue code, the form's verdict (no issues) equals `parseTierConfig(toConfigCandidate(form)).ok`.
 
 ## 3. Settings extension UI (`wholesale-tiers-settings/src/Settings.tsx`)

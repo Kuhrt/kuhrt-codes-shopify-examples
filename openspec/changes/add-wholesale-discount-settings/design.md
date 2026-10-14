@@ -175,3 +175,9 @@ Checked 2026-10-14 on `kuhrt-codes` with Shopify CLI 4.9.3.
 **App Home (1.3)**
 - With only `write_discounts`, the decision 4 query returned `shopifyFunctions` (`apiType: "discount"`, the Function's UUID) and the test discount with its `functionId` and config. Requested cost 47, actual 7.
 - The create intent with `functionId` opened this Function's create page in a modal, with the settings inside. The edit intent opened the test discount. Closing either modal, and creating a discount, resolved `activity.complete` to `undefined`.
+
+**Component tests (1.4)**
+- `@shopify/ui-extensions-tester` 2026.7.4 (the `2026-07` dist-tag) works under Vitest 5.0.3 with `environment: 'jsdom'` (jsdom 30.1.2), in both UI extension packages. No `@testing-library/preact` or hand-written `shopify` mock is needed yet.
+- `setUpExtension(target).render()` reads `shopify.extension.toml`, imports the target's module and runs its default export, so the entry needs no refactor to be testable. It supports `admin.discount-details.function-settings.render` and `admin.app.home.render`.
+- On Windows, `render()` imports an absolute `C:\...` path through Node's loader and fails. Adding `server.deps.inline: ['@shopify/ui-extensions-tester']` to each package's `vitest.config.ts` makes Vitest do the import, which works on every platform.
+- `@testing-library/preact` is still the tester's recommendation for `fireEvent` and `waitFor`; it is added with the first interaction test (task 3).
