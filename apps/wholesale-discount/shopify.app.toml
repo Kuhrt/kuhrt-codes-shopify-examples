@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "bb2d126d23ff67194f89af8c60b49037"
-name = "Wholesale Discount (dev)"
+name = "Wholesale Discount"
 application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
 
@@ -16,7 +16,6 @@ api_version = "2026-10"
 redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 
 [build]
-include_config_on_deploy = true
 dev_store_url = "kuhrt-codes.myshopify.com"
 
 [discount.metafields.app.tier-config]
