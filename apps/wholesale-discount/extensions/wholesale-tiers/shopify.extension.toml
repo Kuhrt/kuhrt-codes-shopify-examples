@@ -1,0 +1,17 @@
+api_version = "2026-10"
+
+[[extensions]]
+name = "t:name"
+handle = "wholesale-tiers"
+uid = "3b7fa344-b2e9-7099-e70c-83110d73ba888081bd9d"
+type = "function"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.lines.discounts.generate.run"
+  input_query = "src/cart_lines_discounts_generate_run.graphql"
+  export = "cart-lines-discounts-generate-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"

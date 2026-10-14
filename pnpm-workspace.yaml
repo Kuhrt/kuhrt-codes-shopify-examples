@@ -1,7 +1,9 @@
 packages:
   - apps/*
+  - apps/*/extensions/*
   - packages/*
 allowBuilds:
   '@parcel/watcher': true
+  core-js: false
   esbuild: true
   workerd: true

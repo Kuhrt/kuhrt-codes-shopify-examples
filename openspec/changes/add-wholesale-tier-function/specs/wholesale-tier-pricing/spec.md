@@ -90,8 +90,8 @@ A configuration SHALL be valid only when all of these hold:
 When the discount has no configuration, or its configuration is invalid, the discount SHALL apply nothing and SHALL NOT fail the checkout. The Function's run log SHALL state why nothing applied.
 
 #### Scenario: Missing configuration
-- **WHEN** a discount backed by the Function has no configuration metafield
-- **THEN** no line is discounted, checkout proceeds at full price, and the run log names the missing configuration
+- **WHEN** a discount backed by the Function has no configuration metafield, or its configuration has no tag
+- **THEN** no line is discounted, checkout proceeds at full price, and the run log records the run as failed because the tag was not provided
 
 #### Scenario: Invalid configuration
 - **WHEN** the configuration fails validation

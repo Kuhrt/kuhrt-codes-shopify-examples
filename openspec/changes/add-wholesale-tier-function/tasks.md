@@ -4,7 +4,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
 
 ## 1. Spike: scaffold and platform checks (gate)
 
-- [ ] 1.1 Scaffold `apps/wholesale-discount` with `shopify app init` → "Build an extension-only app".
+- [x] 1.1 Scaffold `apps/wholesale-discount` with `shopify app init` → "Build an extension-only app".
   - Create the app in the Kuhrt.Codes Partner account with `dev_store_url = "kuhrt-codes.myshopify.com"`.
   - Generate a JavaScript Discount Function extension, `wholesale-tiers`, on API version `2026-10`.
   - Pin the Shopify CLI as a dev dependency (≥ 4.9.0).
@@ -15,7 +15,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - Run the build and tests in a clean shell with the CLI logged out and no `.env`.
   - Record what is committed (`schema.graphql`, generated types) and any network fetches, such as Javy.
   - Verify: a pull request's CI run builds the Function and passes its tests. Otherwise, follow the fallback in design.md "Risks"; if none works, stop and ask the user.
-- [ ] 1.3 Confirm input query variables.
+- [x] 1.3 Confirm input query variables.
   - Declare `$tag: String!` and `input_variables` on the target.
   - Set the decision 2 JSON on a test automatic discount on `kuhrt-codes` via GraphiQL.
   - Verify, from the logged Function input:
@@ -23,12 +23,12 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
     - the `tiers` key is tolerated;
     - a discount with no metafield still runs, rather than failing.
   - Record the results under decision 2, and switch to the two-metafield fallback if needed.
-- [ ] 1.4 Confirm a Function in this custom, extension-only app applies at checkout on `kuhrt-codes` (non-Plus development store), using the template Function. Verify: a checkout shows the template discount applied. **Gate: if it doesn't apply, stop and report to the user. Don't switch distribution or hosting.**
-- [ ] 1.5 Confirm `shared/` bundles into both builds.
+- [x] 1.4 Confirm a Function in this custom, extension-only app applies at checkout on `kuhrt-codes` (non-Plus development store), using the template Function. Verify: a checkout shows the template discount applied. **Gate: if it doesn't apply, stop and report to the user. Don't switch distribution or hosting.**
+- [x] 1.5 Confirm `shared/` bundles into both builds.
   - Import a trivial `shared/` export from the Function and from a throwaway admin UI extension.
   - Remove the throwaway extension afterwards.
   - Verify: both build, and the Function's Wasm test still passes. Record the result under decision 3, and switch to the workspace-package fallback if needed.
-- [ ] 1.6 Settle the scopes and the App Home discount query for the next change.
+- [x] 1.6 Settle the scopes and the App Home discount query for the next change.
   - Find the minimum scopes for:
     - the Function's `hasTags` (is `read_customers` needed?);
     - reading the discount metafield;
@@ -69,7 +69,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - invalid config;
   - missing config;
   - a non-product line.
-  - Add one fixture captured from a real `kuhrt-codes` run (from `.shopify/logs`).
+  - Add one fixture captured from a real `kuhrt-codes` run (input copied from the Dev Dashboard run log).
   - Verify: the fixture suite passes, and editing one expected percentage in a fixture makes it fail.
 
 ## 4. Integration check on `kuhrt-codes`
