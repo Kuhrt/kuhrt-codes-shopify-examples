@@ -1,0 +1,4 @@
+{
+  "extends": "@repo/config/tsconfig.base.json",
+  "include": ["shared/**/*.ts", "vitest.config.ts"]
+}

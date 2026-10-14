@@ -3,6 +3,11 @@
   "extends": ["//"],
   "tasks": {
     "build": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/wholesale-discount/shared/**",
+        "!$TURBO_ROOT$/apps/wholesale-discount/shared/**/*.test.ts"
+      ],
       "outputs": ["$TURBO_EXTENDS$", "generated/**"]
     }
   }

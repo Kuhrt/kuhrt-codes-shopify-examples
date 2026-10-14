@@ -86,17 +86,17 @@ checkout --> Shopify runs the Function with:
 - A missing metafield, or one without `tag`, does **not** run the Function. Shopify fails the run with `InvalidVariableValueError` ("Variable $tag of type String! was provided invalid value") before our code executes. Checkout proceeds at full price, and the error is in the Dev Dashboard run log.
   - A GraphQL default (`$tag: String! = ""`) does not change this, because the missing key arrives as an explicit null.
   - An empty-string tag does run, and matches nothing.
-  - So "missing configuration" fails safe through Shopify, and our own reason codes cover every configuration that does reach the code. The settings UI never saves a configuration without a tag.
+  - So "missing configuration" fails safe through Shopify, and our own issue codes cover every configuration that does reach the code. The settings UI never saves a configuration without a tag.
 - **Alternative considered:** a fixed `wholesale` tag in the query. It is simpler, but the overview asks for a configurable tag, and input variables are the current way to do it.
 
 ### 3. A shared configuration module
 
 - `shared/tier-config.ts` exports:
   - the config type;
-  - `parseTierConfig(json) -> { ok: true, config } | { ok: false, reason }`;
+  - `parseTierConfig(json) -> { ok: true, config } | { ok: false, issues }`, where each issue is `{ code, path }` (for example `{ code: 'percentage-not-increasing', path: ['tiers', 1, 'percentage'] }`);
   - `pickTier(tiers, quantity) -> tier | null`.
 - The Function uses all three. The settings UI uses `parseTierConfig` for form validation. A config the form accepts can therefore never be one the Function rejects.
-- Failure reasons are typed codes (for example `too-many-tiers`, `percentages-not-increasing`). The Function logs the code. The UI maps codes to its own copy, so tests assert codes rather than wording.
+- Parsing collects every issue rather than stopping at the first, and each issue names the field it belongs to. The settings UI needs that to mark each invalid field; the Function only logs the codes. Codes are typed, the UI maps them to its own copy, and tests assert codes and paths rather than wording.
 - Confirmed by the spike: a relative import of `shared/` bundles into both the Function build (esbuild, then Javy) and an admin UI extension build. `shopify app dev` also rebuilds both when a file in `shared/` changes, so no workspace package is needed.
 - **Alternative considered:** validation in each extension. Rejected: the two copies would drift, and the drift would only show at checkout.
 
@@ -123,7 +123,7 @@ checkout --> Shopify runs the Function with:
 
 - A missing metafield or a missing `tag` never reaches the code (decision 2): Shopify fails the run, and checkout proceeds at full price.
 - An invalid config, or a buyer with no customer or no tag, returns `{ operations: [] }`.
-- Config problems log the reason code to the Function's run log (stderr), which appears in `shopify app dev` and the Dev Dashboard.
+- Config problems log the issue codes to the Function's run log (stderr), which appears in `shopify app dev` and the Dev Dashboard.
 - The Function never throws on bad input. A thrown error would fail the run and leave the merchant without a clear reason.
 
 ### 8. Testing layers
