@@ -39,7 +39,7 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
 
 ## 3. Settings extension UI (`wholesale-tiers-settings/src/Settings.tsx`)
 
-- [ ] 3.1 Render the tag and tier fields in `<s-function-settings>`.
+- [x] 3.1 Render the tag and tier fields in `<s-function-settings>`.
   - Defaults and product-only discount classes apply on create, and `fromSaved` on edit. Add and remove are disabled at the limits.
   - A hidden field carries the serialized form, with the saved form as its default (design decision 3).
   - Each invalid field shows `error`, with copy from the locale file keyed by issue code.
@@ -49,7 +49,7 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
     - an invalid saved config shows its values with errors on the right fields;
     - add and remove are disabled at the limits;
     - a non-increasing percentage marks that field.
-- [ ] 3.2 Wire `submit` and `reset` (design decision 3).
+- [x] 3.2 Wire `submit` and `reset` (design decision 3).
   - Verify: component tests show:
     - a valid submit calls `applyMetafieldChange` once with `valueType: 'json'` and the parsed config;
     - an invalid submit rejects without calling it;
@@ -65,13 +65,13 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
 
 ## 4. App Home (`wholesale-home`)
 
-- [ ] 4.1 Implement `loadDiscounts(query)` in `src/discounts.ts` (design decision 4).
+- [x] 4.1 Implement `loadDiscounts(query)` in `src/discounts.ts` (design decision 4).
   - Verify: Vitest with a fake query shows:
     - only this Function's discounts become rows;
     - a valid config gives a tier summary and an invalid or missing one gives a needs-attention row;
     - every page is fetched;
     - a failed query rejects.
-- [ ] 4.2 Render the states, list and actions in `src/AppHome.tsx` (design decision 5).
+- [x] 4.2 Render the states, list and actions in `src/AppHome.tsx` (design decision 5).
   - Verify: component tests show:
     - loading, empty, error with retry, and the list;
     - the create action in the empty, error and list states;

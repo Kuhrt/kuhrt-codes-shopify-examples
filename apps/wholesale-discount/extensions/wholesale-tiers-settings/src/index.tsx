@@ -2,14 +2,8 @@ import '@shopify/ui-extensions/preact';
 
 import { render } from 'preact';
 
-export default async () => {
-  render(<Extension />, document.body);
-};
+import { Settings } from './Settings';
 
-function Extension() {
-  return (
-    <s-function-settings>
-      <s-text>Wholesale settings placeholder</s-text>
-    </s-function-settings>
-  );
-}
+export default async () => {
+  render(<Settings />, document.body);
+};

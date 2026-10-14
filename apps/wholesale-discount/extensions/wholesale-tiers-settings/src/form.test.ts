@@ -16,6 +16,7 @@ import {
   issuesByField,
   removeTier,
   serializeForm,
+  setTierField,
   TAG_KEY,
   TIER_LIST_KEY,
   tierFieldKey,
@@ -102,6 +103,22 @@ describe('issuesByField', () => {
 
   test('is empty when there are no issues', () => {
     expect(issuesByField([]).size).toBe(0);
+  });
+});
+
+describe('setTierField', () => {
+  test('changes only the given field of the given tier', () => {
+    const form = formOf('a', ['1', '1'], ['2', '2']);
+
+    expect(setTierField(form, 1, 'percentage', '9')).toEqual(formOf('a', ['1', '1'], ['2', '9']));
+  });
+
+  test('leaves the original form untouched', () => {
+    const form = formOf('a', ['1', '1']);
+
+    setTierField(form, 0, 'minQuantity', '5');
+
+    expect(form).toEqual(formOf('a', ['1', '1']));
   });
 });
 

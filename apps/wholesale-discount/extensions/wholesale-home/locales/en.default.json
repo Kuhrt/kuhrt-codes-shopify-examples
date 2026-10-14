@@ -1,1 +1,38 @@
-{ "name": "Wholesale discounts", "description": "Find and create wholesale discounts" }
+{
+  "name": "Wholesale discounts",
+  "description": "Find and create wholesale discounts",
+  "page": {
+    "heading": "Wholesale discounts"
+  },
+  "actions": {
+    "create": "Create wholesale discount",
+    "retry": "Try again"
+  },
+  "loading": {
+    "label": "Loading wholesale discounts"
+  },
+  "empty": {
+    "heading": "No wholesale discounts yet",
+    "body": "Create a discount to give tagged customers tiered prices by quantity."
+  },
+  "error": {
+    "heading": "Wholesale discounts could not be loaded",
+    "body": "Check your connection and try again."
+  },
+  "table": {
+    "title": "Discount",
+    "status": "Status",
+    "tiers": "Tiers"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "SCHEDULED": "Scheduled",
+    "EXPIRED": "Expired"
+  },
+  "summary": {
+    "tiers": "Customers tagged {{tag}}: {{tiers}}",
+    "tier": "{{minQuantity}}+ at {{percentage}}% off",
+    "tierSeparator": ", ",
+    "needsAttention": "Needs attention"
+  }
+}

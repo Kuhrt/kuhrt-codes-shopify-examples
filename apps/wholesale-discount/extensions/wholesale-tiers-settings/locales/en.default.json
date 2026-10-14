@@ -1,4 +1,31 @@
 {
   "name": "Wholesale tier settings",
-  "description": "Configure the tag and tiers of a wholesale discount"
+  "description": "Configure the tag and tiers of a wholesale discount",
+  "headings": {
+    "settings": "Wholesale tiers",
+    "tiers": "Tiers",
+    "saveFailed": "The wholesale settings could not be saved"
+  },
+  "fields": {
+    "tag": "Customer tag",
+    "minQuantity": "Minimum quantity",
+    "percentage": "Percentage off",
+    "formState": "Wholesale settings state"
+  },
+  "buttons": {
+    "addTier": "Add tier",
+    "removeTier": "Remove tier"
+  },
+  "errors": {
+    "invalid": "Fix the highlighted wholesale settings before saving.",
+    "unavailable": "The wholesale settings cannot be saved right now."
+  },
+  "issues": {
+    "tag-invalid": "Enter a tag with no leading or trailing spaces.",
+    "tier-count": "Use between 1 and 5 tiers.",
+    "min-quantity-invalid": "Enter a whole number of 1 or more.",
+    "percentage-invalid": "Enter a whole number from 1 to 100.",
+    "min-quantity-not-increasing": "Use a larger quantity than the previous tier.",
+    "percentage-not-increasing": "Use a larger percentage than the previous tier."
+  }
 }

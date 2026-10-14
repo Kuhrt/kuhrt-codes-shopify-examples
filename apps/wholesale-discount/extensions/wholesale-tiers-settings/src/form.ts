@@ -91,6 +91,20 @@ export function removeTier(form: FormState, index: number): FormState {
   return { ...form, tiers: form.tiers.filter((_, position) => position !== index) };
 }
 
+export function setTierField(
+  form: FormState,
+  index: number,
+  field: keyof TierFormState,
+  value: string
+): FormState {
+  return {
+    ...form,
+    tiers: form.tiers.map((tier, position) =>
+      position === index ? { ...tier, [field]: value } : tier
+    )
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
