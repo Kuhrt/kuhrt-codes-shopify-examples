@@ -1,9 +1,4 @@
 {
-  "extends": "@repo/config/tsconfig.base.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx", "shopify.d.ts", "vitest.config.ts"],
-  "compilerOptions": {
-    "lib": ["ES2023", "DOM"],
-    "jsx": "react-jsx",
-    "jsxImportSource": "preact"
-  }
+  "extends": "../../tsconfig.ui-extension.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "shopify.d.ts", "vitest.config.ts"]
 }

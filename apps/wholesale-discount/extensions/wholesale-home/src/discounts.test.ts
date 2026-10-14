@@ -1,17 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { discountAdminHref, loadDiscounts, type QueryFunction } from './discounts';
+import {
+  discountAdminHref,
+  findDiscountFunctionId,
+  loadDiscountRows,
+  type QueryFunction
+} from './discounts';
 
 const FUNCTION_ID = 'function-1';
 const VALID_CONFIG = { tag: 'wholesale', tiers: [{ minQuantity: 10, percentage: 10 }] };
 
-const nodeGid = (id: string) => `gid://shopify/DiscountAutomaticNode/${id}`;
+const nodeGid = (id: string, type = 'DiscountAutomaticNode') => `gid://shopify/${type}/${id}`;
 
-function node(id: string, options: { functionId?: string; config?: unknown } = {}) {
-  const { functionId = FUNCTION_ID } = options;
+function node(id: string, options: { functionId?: string; config?: unknown; type?: string } = {}) {
+  const { functionId = FUNCTION_ID, type } = options;
   const config = 'config' in options ? options.config : VALID_CONFIG;
   return {
-    id: nodeGid(id),
+    id: nodeGid(id, type),
     discount: {
       title: `Title ${id}`,
       status: 'ACTIVE',
@@ -25,9 +30,7 @@ function page(nodes: unknown[], endCursor: string | null = null) {
   return { pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes };
 }
 
-function response(discountNodes: unknown, functions = [{ id: FUNCTION_ID, apiType: 'discount' }]) {
-  return { data: { shopifyFunctions: { nodes: functions }, discountNodes } };
-}
+const nodesResponse = (discountNodes: unknown) => ({ data: { discountNodes } });
 
 const queryReturning = (...responses: object[]) => {
   const query = vi.fn<QueryFunction>();
@@ -35,10 +38,52 @@ const queryReturning = (...responses: object[]) => {
   return query;
 };
 
-describe('loadDiscounts', () => {
-  it('returns the Function ID and only the discounts backed by it', async () => {
+const rowsFrom = (...responses: object[]) =>
+  loadDiscountRows(queryReturning(...responses), FUNCTION_ID);
+
+describe('findDiscountFunctionId', () => {
+  const functionsResponse = (nodes: { id: string; apiType: string }[]) => ({
+    data: { shopifyFunctions: { nodes } }
+  });
+
+  it('returns the discount Function when the app has Functions of other types', async () => {
     const query = queryReturning(
-      response(
+      functionsResponse([
+        { id: 'validation-1', apiType: 'validation' },
+        { id: FUNCTION_ID, apiType: 'discount' }
+      ])
+    );
+
+    await expect(findDiscountFunctionId(query)).resolves.toBe(FUNCTION_ID);
+  });
+
+  it('rejects when the app has no discount Function', async () => {
+    const query = queryReturning(functionsResponse([]));
+
+    await expect(findDiscountFunctionId(query)).rejects.toThrow(Error);
+  });
+
+  it('rejects when the response has no Function list', async () => {
+    await expect(findDiscountFunctionId(queryReturning({ data: {} }))).rejects.toThrow(Error);
+  });
+
+  it('rejects with the GraphQL error messages', async () => {
+    const query = queryReturning({ errors: [{ message: 'Throttled' }] });
+
+    await expect(findDiscountFunctionId(query)).rejects.toThrow('Throttled');
+  });
+
+  it('rejects when the request itself fails', async () => {
+    const query = vi.fn<QueryFunction>().mockRejectedValue(new Error('offline'));
+
+    await expect(findDiscountFunctionId(query)).rejects.toThrow('offline');
+  });
+});
+
+describe('loadDiscountRows', () => {
+  it('returns only the discounts backed by the Function', async () => {
+    const rows = await rowsFrom(
+      nodesResponse(
         page([
           node('1'),
           node('2', { functionId: 'function-2' }),
@@ -47,34 +92,43 @@ describe('loadDiscounts', () => {
       )
     );
 
-    const { functionId, rows } = await loadDiscounts(query);
-
-    expect(functionId).toBe(FUNCTION_ID);
     expect(rows.map(({ id }) => id)).toEqual([nodeGid('1')]);
   });
 
-  it('maps title and status onto the row', async () => {
-    const { rows } = await loadDiscounts(queryReturning(response(page([node('1')]))));
+  it('includes code discounts next to automatic ones', async () => {
+    const rows = await rowsFrom(
+      nodesResponse(page([node('1'), node('2', { type: 'DiscountCodeNode' })]))
+    );
 
-    expect(rows[0]).toMatchObject({ id: nodeGid('1'), title: 'Title 1', status: 'ACTIVE' });
+    expect(rows.map(({ id }) => id)).toEqual([nodeGid('1'), nodeGid('2', 'DiscountCodeNode')]);
   });
 
-  it('gives each row the admin link built from its numeric id', async () => {
-    const { rows } = await loadDiscounts(queryReturning(response(page([node('42')]))));
+  it('asks for the fields of both automatic and code app discounts', async () => {
+    const query = queryReturning(nodesResponse(page([])));
 
-    expect(rows[0]?.href).toBe('shopify:admin/discounts/42');
+    await loadDiscountRows(query, FUNCTION_ID);
+
+    const [document] = query.mock.calls[0]!;
+    expect(document).toContain('... on DiscountAutomaticApp');
+    expect(document).toContain('... on DiscountCodeApp');
+  });
+
+  it('maps title and status onto the row', async () => {
+    const [row] = await rowsFrom(nodesResponse(page([node('1')])));
+
+    expect(row).toMatchObject({ id: nodeGid('1'), title: 'Title 1', status: 'ACTIVE' });
   });
 
   it('rejects when a discount id is not a Shopify GID', async () => {
-    const query = queryReturning(response(page([{ ...node('1'), id: 'not-a-gid' }])));
-
-    await expect(loadDiscounts(query)).rejects.toThrow(Error);
+    await expect(
+      rowsFrom(nodesResponse(page([{ ...node('1'), id: 'not-a-gid' }])))
+    ).rejects.toThrow(Error);
   });
 
   it('summarizes a valid configuration as its tag and tiers', async () => {
-    const { rows } = await loadDiscounts(queryReturning(response(page([node('1')]))));
+    const [row] = await rowsFrom(nodesResponse(page([node('1')])));
 
-    expect(rows[0]?.summary).toEqual({ kind: 'tiers', ...VALID_CONFIG });
+    expect(row?.summary).toEqual({ kind: 'tiers', ...VALID_CONFIG });
   });
 
   it.each([
@@ -82,33 +136,29 @@ describe('loadDiscounts', () => {
     ['not an object', 'text'],
     ['failing validation', { tag: '', tiers: [] }]
   ])('marks a row with a %s configuration as needing attention', async (_label, config) => {
-    const { rows } = await loadDiscounts(queryReturning(response(page([node('1', { config })]))));
+    const [row] = await rowsFrom(nodesResponse(page([node('1', { config })])));
 
-    expect(rows[0]?.summary).toEqual({ kind: 'needs-attention' });
+    expect(row?.summary).toEqual({ kind: 'needs-attention' });
   });
 
   it('keeps the other rows when one configuration is invalid', async () => {
-    const { rows } = await loadDiscounts(
-      queryReturning(response(page([node('1', { config: null }), node('2')])))
-    );
+    const rows = await rowsFrom(nodesResponse(page([node('1', { config: null }), node('2')])));
 
     expect(rows.map(({ summary }) => summary.kind)).toEqual(['needs-attention', 'tiers']);
   });
 
   it('returns no rows when the store has none', async () => {
-    const { rows } = await loadDiscounts(queryReturning(response(page([]))));
-
-    expect(rows).toEqual([]);
+    await expect(rowsFrom(nodesResponse(page([])))).resolves.toEqual([]);
   });
 
-  it('fetches every page with the previous end cursor and looks up Functions once', async () => {
+  it('fetches every page with the previous end cursor', async () => {
     const query = queryReturning(
-      response(page([node('1')], 'cursor-1')),
-      { data: { discountNodes: page([node('2')], 'cursor-2') } },
-      { data: { discountNodes: page([node('3')]) } }
+      nodesResponse(page([node('1')], 'cursor-1')),
+      nodesResponse(page([node('2')], 'cursor-2')),
+      nodesResponse(page([node('3')]))
     );
 
-    const { rows } = await loadDiscounts(query);
+    const rows = await loadDiscountRows(query, FUNCTION_ID);
 
     expect(rows.map(({ id }) => id)).toEqual([nodeGid('1'), nodeGid('2'), nodeGid('3')]);
     expect(query.mock.calls.map(([, options]) => options?.variables)).toEqual([
@@ -116,58 +166,39 @@ describe('loadDiscounts', () => {
       { cursor: 'cursor-1' },
       { cursor: 'cursor-2' }
     ]);
-    const [firstQuery, ...laterQueries] = query.mock.calls.map(([document]) => document);
-    expect(firstQuery).toContain('shopifyFunctions');
-    laterQueries.forEach((document) => expect(document).not.toContain('shopifyFunctions'));
   });
 
-  it('uses the discount Function when the app has Functions of other types', async () => {
+  it('rejects when another page is announced without an end cursor', async () => {
     const query = queryReturning(
-      response(page([node('1')]), [
-        { id: 'validation-1', apiType: 'validation' },
-        { id: FUNCTION_ID, apiType: 'discount' }
-      ])
+      nodesResponse({ pageInfo: { hasNextPage: true, endCursor: null }, nodes: [node('1')] })
     );
 
-    await expect(loadDiscounts(query)).resolves.toMatchObject({ functionId: FUNCTION_ID });
-  });
-
-  it('rejects when the app has no discount Function', async () => {
-    const query = queryReturning(response(page([]), []));
-
-    await expect(loadDiscounts(query)).rejects.toThrow(Error);
+    await expect(loadDiscountRows(query, FUNCTION_ID)).rejects.toThrow('end cursor');
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('rejects with the GraphQL error messages', async () => {
-    const query = queryReturning({ errors: [{ message: 'Throttled' }] });
-
-    await expect(loadDiscounts(query)).rejects.toThrow('Throttled');
+    await expect(rowsFrom({ errors: [{ message: 'Throttled' }] })).rejects.toThrow('Throttled');
   });
 
   it('rejects when the response has no data', async () => {
-    await expect(loadDiscounts(queryReturning({}))).rejects.toThrow(Error);
+    await expect(rowsFrom({})).rejects.toThrow(Error);
   });
 
   it('rejects when the response has no discount list', async () => {
-    const query = queryReturning({
-      data: { shopifyFunctions: { nodes: [{ id: FUNCTION_ID, apiType: 'discount' }] } }
-    });
-
-    await expect(loadDiscounts(query)).rejects.toThrow(Error);
+    await expect(rowsFrom({ data: {} })).rejects.toThrow(Error);
   });
 
   it('rejects when a later page fails', async () => {
-    const query = queryReturning(response(page([node('1')], 'cursor-1')), {
-      errors: [{ message: 'Boom' }]
-    });
-
-    await expect(loadDiscounts(query)).rejects.toThrow('Boom');
+    await expect(
+      rowsFrom(nodesResponse(page([node('1')], 'cursor-1')), { errors: [{ message: 'Boom' }] })
+    ).rejects.toThrow('Boom');
   });
 
   it('rejects when the request itself fails', async () => {
     const query = vi.fn<QueryFunction>().mockRejectedValue(new Error('offline'));
 
-    await expect(loadDiscounts(query)).rejects.toThrow('offline');
+    await expect(loadDiscountRows(query, FUNCTION_ID)).rejects.toThrow('offline');
   });
 });
 
@@ -175,6 +206,12 @@ describe('discountAdminHref', () => {
   it('builds the admin link from the numeric id of a node GID', () => {
     expect(discountAdminHref('gid://shopify/DiscountAutomaticNode/123')).toBe(
       'shopify:admin/discounts/123'
+    );
+  });
+
+  it('builds the same link for a code discount node', () => {
+    expect(discountAdminHref('gid://shopify/DiscountCodeNode/456')).toBe(
+      'shopify:admin/discounts/456'
     );
   });
 

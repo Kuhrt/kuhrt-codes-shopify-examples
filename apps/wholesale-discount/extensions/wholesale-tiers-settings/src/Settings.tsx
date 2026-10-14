@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 
-import { MAX_TIERS, MIN_TIERS, type TierConfigIssueCode } from '../../../shared/tier-config';
+import {
+  MAX_TIERS,
+  MIN_TIERS,
+  TIER_CONFIG_KEY,
+  TIER_CONFIG_NAMESPACE,
+  type TierConfigIssueCode
+} from '../../../shared/tier-config';
 import {
   addTier,
   defaultForm,
@@ -12,7 +18,6 @@ import {
   serializeForm,
   setTierField,
   TAG_KEY,
-  TIER_CONFIG_KEY,
   TIER_LIST_KEY,
   tierFieldKey,
   type TierFormState,
@@ -21,9 +26,13 @@ import {
 
 const t = (key: string): string => shopify.i18n.translate(key);
 
+interface SavedSettings {
+  form: FormState;
+  serialized: string;
+}
+
 interface InitialSettings {
-  saved: FormState;
-  savedSerialized: string;
+  saved: SavedSettings;
   isCreate: boolean;
 }
 
@@ -31,10 +40,10 @@ function loadInitialSettings(): InitialSettings {
   const { id, metafields } = shopify.data;
   const savedConfig = findSavedConfig(metafields);
   if (id === '' && savedConfig === undefined) {
-    return { saved: defaultForm(), savedSerialized: '', isCreate: true };
+    return { saved: { form: defaultForm(), serialized: '' }, isCreate: true };
   }
   const saved = fromSaved(savedConfig);
-  return { saved, savedSerialized: serializeForm(saved), isCreate: false };
+  return { saved: { form: saved, serialized: serializeForm(saved) }, isCreate: false };
 }
 
 function issuesOf(form: FormState): Map<string, TierConfigIssueCode> {
@@ -48,7 +57,7 @@ async function writeConfig(form: FormState): Promise<void> {
   if (!shopify.applyMetafieldChange) throw new Error(t('errors.unavailable'));
   const outcome = await shopify.applyMetafieldChange({
     type: 'updateMetafield',
-    namespace: '$app',
+    namespace: TIER_CONFIG_NAMESPACE,
     key: TIER_CONFIG_KEY,
     value: JSON.stringify(result.config),
     valueType: 'json'
@@ -99,7 +108,8 @@ function TierRow({ index, tier, issues, canRemove, onChange, onRemove }: TierRow
 
 export function Settings() {
   const [initial] = useState(loadInitialSettings);
-  const [form, setForm] = useState(initial.saved);
+  const [saved, setSaved] = useState(initial.saved);
+  const [form, setForm] = useState(initial.saved.form);
   const [classesError, setClassesError] = useState<string>();
   const issues = issuesOf(form);
   const tierCountError = fieldError(issues, TIER_LIST_KEY);
@@ -111,11 +121,27 @@ export function Settings() {
   }, [initial]);
 
   function reset(): void {
-    setForm(initial.saved);
+    setForm(saved.form);
+  }
+
+  async function save(): Promise<void> {
+    const submitted = form;
+    await writeConfig(submitted);
+    setSaved({ form: submitted, serialized: serializeForm(submitted) });
+  }
+
+  function submit(event: { waitUntil?: (promise: Promise<void>) => void }): void {
+    const saving = save();
+    if (event.waitUntil) {
+      event.waitUntil(saving);
+      return;
+    }
+    console.error('The settings form cannot hold the save open, so a failed save is only logged.');
+    saving.catch(console.error);
   }
 
   return (
-    <s-function-settings onSubmit={(event) => event.waitUntil?.(writeConfig(form))} onReset={reset}>
+    <s-function-settings onSubmit={submit} onReset={reset}>
       <s-section heading={t('headings.settings')}>
         <s-stack gap="base">
           {classesError !== undefined && (
@@ -156,7 +182,7 @@ export function Settings() {
             name="wholesale-form-state"
             label={t('fields.formState')}
             value={serializeForm(form)}
-            defaultValue={initial.savedSerialized}
+            defaultValue={saved.serialized}
           />
         </s-box>
       </s-section>

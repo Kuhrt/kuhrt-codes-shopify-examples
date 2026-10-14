@@ -2,14 +2,13 @@ import {
   MAX_TIERS,
   MIN_TIERS,
   parseTierConfig,
+  TIER_CONFIG_KEY,
   type TierConfig,
   type TierConfigIssue,
   type TierConfigIssueCode,
   type TierConfigPath,
   type TierConfigResult
 } from '../../../shared/tier-config';
-
-export const TIER_CONFIG_KEY = 'tier-config';
 
 export const DEFAULT_CONFIG: TierConfig = {
   tag: 'wholesale',

@@ -1,3 +1,1 @@
-import preset from '@repo/config/eslint-preset';
-
-export default [{ ignores: ['shopify.d.ts'] }, ...preset];
+export { default } from '../../eslint.ui-extension.mjs';

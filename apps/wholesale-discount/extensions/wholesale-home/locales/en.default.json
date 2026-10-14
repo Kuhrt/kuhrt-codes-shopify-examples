@@ -19,6 +19,10 @@
     "heading": "Wholesale discounts could not be loaded",
     "body": "Check your connection and try again."
   },
+  "createError": {
+    "heading": "The discount page could not be opened",
+    "body": "Try creating the discount again."
+  },
   "table": {
     "title": "Discount",
     "status": "Status",

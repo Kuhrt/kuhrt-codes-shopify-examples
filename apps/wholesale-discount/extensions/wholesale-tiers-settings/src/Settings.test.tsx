@@ -3,8 +3,14 @@ import { createResult } from '@shopify/ui-extensions-tester/admin';
 import { act, fireEvent, waitFor } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { MAX_TIERS, MIN_TIERS, type TierConfigIssueCode } from '../../../shared/tier-config';
-import { DEFAULT_CONFIG, formFromConfig, serializeForm, TIER_CONFIG_KEY } from './form';
+import {
+  MAX_TIERS,
+  MIN_TIERS,
+  TIER_CONFIG_KEY,
+  TIER_CONFIG_NAMESPACE,
+  type TierConfigIssueCode
+} from '../../../shared/tier-config';
+import { DEFAULT_CONFIG, formFromConfig, serializeForm } from './form';
 
 const extension = getExtension('admin.discount-details.function-settings.render');
 const issueKey = (code: TierConfigIssueCode) => `issues.${code}`;
@@ -30,9 +36,11 @@ async function renderCreate() {
   await extension.render();
 }
 
+const EDIT_PAGE_ID = '1338644561989';
+
 async function renderEdit(saved: unknown) {
   extension.shopify.data = {
-    id: '1338644561989',
+    id: EDIT_PAGE_ID,
     metafields: [
       {
         id: 'gid://shopify/Metafield/1',
@@ -46,6 +54,11 @@ async function renderEdit(saved: unknown) {
   await extension.render();
 }
 
+async function renderEditWithoutConfig() {
+  extension.shopify.data = { id: EDIT_PAGE_ID, metafields: [] };
+  await extension.render();
+}
+
 const query = <T extends Element>(selector: string): T => {
   const element = document.body.querySelector<T>(selector);
   if (!element) throw new Error(`No element matches ${selector}`);
@@ -53,7 +66,10 @@ const query = <T extends Element>(selector: string): T => {
 };
 
 const attribute = (element: Element, name: string) => element.getAttribute(name);
-const valueOf = (field: Element) => attribute(field, 'value');
+const valueOf = (field: Element) =>
+  Object.hasOwn(field, 'value')
+    ? (field as Element & { value: string }).value
+    : attribute(field, 'value');
 const defaultValueOf = (field: Element) => attribute(field, 'defaultvalue');
 const errorOf = (field: Element) => attribute(field, 'error');
 const isDisabled = (control: Element) => control.hasAttribute('disabled');
@@ -90,6 +106,16 @@ function submit(): Promise<void> {
   expect(waitUntil).toHaveBeenCalledTimes(1);
   return waitUntil.mock.calls[0]![0];
 }
+
+const submitWithoutWaitUntil = () =>
+  act(() => {
+    settingsForm().dispatchEvent(new Event('submit'));
+  });
+
+const saveAndSettle = () =>
+  act(async () => {
+    await submit();
+  });
 
 const reset = () =>
   act(() => {
@@ -216,6 +242,20 @@ describe('edit page', () => {
     expect(errorOf(percentageField(0))).toBe(issueKey('percentage-invalid'));
   });
 
+  test('shows an empty tag and one empty tier, all marked, when nothing was saved', async () => {
+    await renderEditWithoutConfig();
+
+    expect(valueOf(tagField())).toBe('');
+    expect(errorOf(tagField())).toBe(issueKey('tag-invalid'));
+    expect(tierCount()).toBe(1);
+    expect(errorOf(minQuantityField(0))).toBe(issueKey('min-quantity-invalid'));
+    expect(errorOf(percentageField(0))).toBe(issueKey('percentage-invalid'));
+    const emptyForm = serializeForm({ tag: '', tiers: [{ minQuantity: '', percentage: '' }] });
+    expect(defaultValueOf(stateField())).toBe(emptyForm);
+    expect(valueOf(stateField())).toBe(emptyForm);
+    expect(updateDiscountClasses).not.toHaveBeenCalled();
+  });
+
   test('shows the tier-count issue at the list for an oversized saved config', async () => {
     await renderEdit(configWithTiers(MAX_TIERS + 1));
 
@@ -304,8 +344,8 @@ describe('submit', () => {
     expect(applyMetafieldChange).toHaveBeenCalledTimes(1);
     expect(applyMetafieldChange).toHaveBeenCalledWith({
       type: 'updateMetafield',
-      namespace: '$app',
-      key: 'tier-config',
+      namespace: TIER_CONFIG_NAMESPACE,
+      key: TIER_CONFIG_KEY,
       value: JSON.stringify({ tag: 'trade', tiers: DEFAULT_CONFIG.tiers }),
       valueType: 'json'
     });
@@ -349,6 +389,21 @@ describe('submit', () => {
     expect(banner()).toBeNull();
   });
 
+  test('logs and handles a failed save when the event cannot hold the save open', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await renderCreate();
+    await typeInto(percentageField(1), '10');
+
+    await submitWithoutWaitUntil();
+    await vi.waitFor(() => expect(logged).toHaveBeenCalledTimes(2));
+
+    expect(logged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ message: errorKey('invalid') })
+    );
+    expect(applyMetafieldChange).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   test('shows no banner after a successful save', async () => {
     await renderCreate();
 
@@ -359,6 +414,32 @@ describe('submit', () => {
 });
 
 describe('reset', () => {
+  test('restores the newly saved values after a save', async () => {
+    await renderEdit(DEFAULT_CONFIG);
+    await typeInto(tagField(), 'trade');
+    await saveAndSettle();
+    const savedState = serializeForm({
+      ...formFromConfig(DEFAULT_CONFIG),
+      tag: 'trade'
+    });
+
+    await typeInto(tagField(), 'changed');
+    await click(addButton());
+    await reset();
+
+    await waitFor(() => expect(valueOf(tagField())).toBe('trade'));
+    expect(tierCount()).toBe(DEFAULT_CONFIG.tiers.length);
+    expect(defaultValueOf(stateField())).toBe(savedState);
+    expect(valueOf(stateField())).toBe(savedState);
+  });
+
+  test('treats the defaults of a create page as saved once they are written', async () => {
+    await renderCreate();
+    await saveAndSettle();
+
+    expect(defaultValueOf(stateField())).toBe(valueOf(stateField()));
+  });
+
   test('restores the saved values, their issues and the hidden field', async () => {
     await renderEdit({ tag: ' trade ', tiers: [{ minQuantity: 5, percentage: 5 }] });
     const savedState = valueOf(stateField());

@@ -1,9 +1,3 @@
-import { defineConfig } from 'vitest/config';
+import { uiExtensionVitestConfig } from '../../vitest.ui-extension.ts';
 
-export default defineConfig({
-  test: {
-    include: ['src/**/*.test.{ts,tsx}'],
-    environment: 'jsdom',
-    server: { deps: { inline: ['@shopify/ui-extensions-tester'] } }
-  }
-});
+export default uiExtensionVitestConfig;

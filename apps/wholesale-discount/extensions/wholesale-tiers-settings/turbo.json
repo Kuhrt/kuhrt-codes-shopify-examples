@@ -3,13 +3,29 @@
   "extends": ["//"],
   "tasks": {
     "lint": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/wholesale-discount/shared/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/wholesale-discount/shared/**",
+        "!$TURBO_ROOT$/apps/wholesale-discount/shared/**/*.test.ts",
+        "$TURBO_ROOT$/apps/wholesale-discount/eslint.ui-extension.mjs"
+      ]
     },
     "typecheck": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/wholesale-discount/shared/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/wholesale-discount/shared/**",
+        "!$TURBO_ROOT$/apps/wholesale-discount/shared/**/*.test.ts",
+        "$TURBO_ROOT$/apps/wholesale-discount/tsconfig.ui-extension.json",
+        "$TURBO_ROOT$/apps/wholesale-discount/vitest.ui-extension.ts"
+      ]
     },
     "test": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/wholesale-discount/shared/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/wholesale-discount/shared/**",
+        "!$TURBO_ROOT$/apps/wholesale-discount/shared/**/*.test.ts",
+        "$TURBO_ROOT$/apps/wholesale-discount/vitest.ui-extension.ts"
+      ]
     }
   }
 }

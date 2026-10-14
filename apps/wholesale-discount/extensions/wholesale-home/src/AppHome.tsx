@@ -3,13 +3,15 @@ import { useCallback, useEffect, useState } from 'preact/hooks';
 import {
   type DiscountRow,
   type DiscountStatus,
-  loadDiscounts,
+  findDiscountFunctionId,
+  loadDiscountRows,
+  type QueryFunction,
   type TierSummary
 } from './discounts';
 
 type State =
   | { status: 'loading' }
-  | { status: 'error' }
+  | { status: 'error'; functionId?: string }
   | { status: 'ready'; rows: DiscountRow[]; functionId: string };
 
 const STATUS_TONES = {
@@ -21,54 +23,75 @@ const STATUS_TONES = {
 const t = (key: string, options?: { [key: string]: string | number }) =>
   shopify.i18n.translate(key, options);
 
+async function loadState(query: QueryFunction): Promise<State> {
+  let functionId: string;
+  try {
+    functionId = await findDiscountFunctionId(query);
+  } catch (error) {
+    console.error(error);
+    return { status: 'error' };
+  }
+  try {
+    return { status: 'ready', rows: await loadDiscountRows(query, functionId), functionId };
+  } catch (error) {
+    console.error(error);
+    return { status: 'error', functionId };
+  }
+}
+
 function useDiscounts() {
   const [state, setState] = useState<State>({ status: 'loading' });
 
   const load = useCallback(async () => {
     setState({ status: 'loading' });
-    try {
-      const { rows, functionId } = await loadDiscounts(shopify.query);
-      setState({ status: 'ready', rows, functionId });
-    } catch (error) {
-      console.error(error);
-      setState({ status: 'error' });
-    }
+    setState(await loadState(shopify.query));
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  return { state, load, fail: () => setState({ status: 'error' }) };
+  return { state, load };
+}
+
+async function openCreateIntent(functionId: string): Promise<void> {
+  if (!shopify.intents.invoke) {
+    throw new Error('Creating a discount is not available: the intents API is missing');
+  }
+  const activity = await shopify.intents.invoke('create:shopify/Discount', {
+    data: { functionId }
+  });
+  await activity?.complete;
 }
 
 export function AppHome() {
-  const { state, load, fail } = useDiscounts();
+  const { state, load } = useDiscounts();
+  const [createFailed, setCreateFailed] = useState(false);
+  const functionId = state.status === 'loading' ? undefined : state.functionId;
 
-  async function runIntent(...args: Parameters<NonNullable<typeof shopify.intents.invoke>>) {
+  async function create(id: string) {
     try {
-      const activity = await shopify.intents.invoke?.(...args);
-      await activity?.complete;
+      await openCreateIntent(id);
     } catch (error) {
       console.error(error);
-      fail();
+      setCreateFailed(true);
       return;
     }
+    setCreateFailed(false);
     await load();
   }
 
-  const create = () =>
-    runIntent(
-      'create:shopify/Discount',
-      state.status === 'ready' ? { data: { functionId: state.functionId } } : undefined
-    );
-
   return (
     <s-page heading={t('page.heading')}>
-      {state.status !== 'loading' && (
-        <s-button slot="primary-action" variant="primary" onClick={create}>
+      {functionId !== undefined && (
+        <s-button slot="primary-action" variant="primary" onClick={() => create(functionId)}>
           {t('actions.create')}
         </s-button>
+      )}
+      {createFailed && (
+        <s-banner tone="critical" heading={t('createError.heading')}>
+          <s-paragraph>{t('createError.body')}</s-paragraph>
+        </s-banner>
       )}
       {state.status === 'loading' && <Loading />}
       {state.status === 'error' && <LoadError onRetry={load} />}

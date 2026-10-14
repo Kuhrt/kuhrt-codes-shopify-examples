@@ -286,7 +286,7 @@ describe('findSavedConfig', () => {
   });
 });
 
-describe('agreement with parseTierConfig', () => {
+describe('issue placement', () => {
   const cases: [string, FormState][] = [
     ['defaults', defaultForm()],
     ['single smallest tier', formOf('a', ['1', '1'])],
@@ -305,9 +305,20 @@ describe('agreement with parseTierConfig', () => {
     ['everything wrong', formOf('', ['', ''], ['x', '200'])]
   ];
 
-  test.each(cases)('%s: the form is valid exactly when the configuration parses', (_name, form) => {
-    const formIsValid = issuesByField(issuesOfForm(form)).size === 0;
-    expect(formIsValid).toBe(parseTierConfig(toConfigCandidate(form)).ok);
+  const renderedKeys = (form: FormState): string[] => [
+    TAG_KEY,
+    TIER_LIST_KEY,
+    ...form.tiers.flatMap((_, index) => [
+      tierFieldKey(index, 'minQuantity'),
+      tierFieldKey(index, 'percentage')
+    ])
+  ];
+
+  test.each(cases)('%s: every issue lands on a field the form renders', (_name, form) => {
+    const rendered = renderedKeys(form);
+    for (const key of issuesByField(issuesOfForm(form)).keys()) {
+      expect(rendered).toContain(key);
+    }
   });
 
   test('the cases produce every issue code a form can reach', () => {

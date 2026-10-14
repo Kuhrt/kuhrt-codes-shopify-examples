@@ -91,18 +91,21 @@ App Home --> shopifyFunctions + discountNodes --> rows --> discount page link / 
   - `save()` validates again. If invalid, it rejects with an error, which blocks the save and shows in the page's error banner.
   - If valid, it calls `applyMetafieldChange` with namespace `$app`, key `tier-config`, `valueType: 'json'` and the config from `parseTierConfig` (extra keys dropped). An `error` result, or the function being unavailable, rejects with that message.
   - Shopify shows a rejection's message in the page's error banner, so the settings show no banner of their own for a failed save. They show one only when setting the product class on a create page fails, which isn't part of a save.
-- On `reset`, the form returns to the last saved configuration from `shopify.data.metafields`, and the issues to theirs.
+- After a successful write, the written form becomes the saved form, and the hidden field's default follows it. So a later discard restores what was just saved, whether or not Shopify reloads the extension.
+- On `reset`, the form returns to the saved form, and the issues to theirs.
+- If the submit event has no `waitUntil`, the save is still attempted, and a failure is logged rather than left unhandled.
 - Field errors use `error` on each field, with copy from `shopify.i18n.translate('issues.<code>')`. Tests assert issue codes and which field holds an error, never the copy.
 - Lists of fields are wrapped in their own `s-stack`. As siblings of other elements, rows were rendered out of order.
 
 ### 4. App Home finds its own discounts through its Function's ID
 
-- One query asks for `shopifyFunctions` (this app's Functions only; `write_discounts` is enough) and `discountNodes(first: 50, query: "type:app", after: $cursor)`, with `appDiscountType { functionId }`, title, status and the `tier-config` metafield.
+- Two queries: `shopifyFunctions` (this app's Functions only; `write_discounts` is enough) finds the discount Function, then `discountNodes(first: 50, query: "type:app", after: $cursor)` lists discounts with `appDiscountType { functionId }`, title, status and the `tier-config` metafield. Keeping them apart means a failed list still knows the Function ID, so the create action works in the error state. Only a failed Function lookup leaves the page without create, showing retry alone.
+- The node fields are read from both `DiscountAutomaticApp` and `DiscountCodeApp`: the create page defaults to a code discount, so a wholesale discount can be either.
 - Rows keep only nodes whose `appDiscountType.functionId` is this app's discount Function. That ID is also what the create intent needs, so one value does both jobs.
-- It follows `pageInfo.hasNextPage` until done, because the spec says every discount. The extra pages are fetched for `discountNodes` only.
+- It follows `pageInfo.hasNextPage` until done, because the spec says every discount. A page that reports more without a cursor is an error rather than a loop.
 - Each row has the title, a status badge from `DiscountStatus`, and a tier summary built from `parseTierConfig`'s result. An invalid or missing config gives a "needs attention" row instead of a summary.
 - Rows link to the full discount page (`shopify:admin/discounts/<numeric id>`). The edit intent was tried first: its modal never shows the save bar for changes made inside the settings (see Context).
-- The create action uses `create:shopify/Discount` with the Function ID. After its activity completes the list reloads, because the result doesn't say whether anything was created.
+- The create action uses `create:shopify/Discount` with the Function ID. After its activity completes the list reloads, because the result doesn't say whether anything was created. If the intent can't open, a separate banner says so and the list stays.
 - **Alternative considered:** filter on `appDiscountType.app.id`, with `currentAppInstallation { app { id } }`. Rejected: the create intent needs the Function ID anyway.
 
 ### 5. States are one discriminated value
@@ -126,11 +129,12 @@ App Home --> shopifyFunctions + discountNodes --> rows --> discount page link / 
 | Components | `@shopify/ui-extensions-tester` with Vitest | settings: defaults and product-only classes on create, add/remove disabled at limits, error on the right field, the hidden field's value and default, submit writes once when valid and rejects when invalid, reset; App Home: each state, retry, create and edit intents, reload after an intent |
 | Manual | `kuhrt-codes` | create, edit, discard, add and remove a tier, invalid field, a checkout after a tier change, App Home links and create |
 
-If the tester doesn't run under Vitest 5, components are tested with `@testing-library/preact` and a hand-written `shopify` mock, and design.md records why.
+Interactions in both packages go through `@testing-library/preact` on top of the tester's mock. The two UI extensions share one TypeScript, Vitest and ESLint config from `apps/wholesale-discount/`; each keeps its own `turbo.json`, whose inputs include `shared/` (tests excluded) and those config files.
 
 ### 8. The configuration is an app-owned metafield definition
 
 - `shopify.app.toml` declares `[discount.metafields.app.tier-config]`: type `json`, `access.admin = "merchant_read_write"`. The Function's `input_variables` and input query, and the settings, use namespace `$app` and key `tier-config`.
+- `shared/tier-config.ts` exports the namespace and key, and both extensions import them. The tomls and the Function's `.graphql` input query can't import, so they spell them out.
 - Why: the discount page saves as the merchant. An app-owned metafield with no definition defaults to merchant read-only, and the save failed with "Access to this namespace and key on Metafields for this resource type is not allowed". Declared definitions must use the bare `$app` namespace, so `$app:wholesale-discount` couldn't be kept.
 - The definition also makes Shopify reject a value that isn't JSON, and only this app can change the definition.
 - **Alternative considered:** a merchant-owned namespace (`wholesale-discount`), as Shopify's settings examples use. Rejected by the user: any app or the merchant could edit or delete it outside the settings, and nothing declares its type.
@@ -192,3 +196,4 @@ Checked 2026-10-14 on `kuhrt-codes` with Shopify CLI 4.9.3.
 - The App Home bundle is 27.4 KB, about 9.6 KB compressed, well under 64 KB.
 - Checkout as the customer tagged `wholesale`, with "Wholesale live check" at 10+ for 12% next to the test discount at 10%: both 6-unit wax lines got "Wholesale 12% off", so the discount created through App Home applied with no further setup and its tier change took effect. The discount was then deleted.
 - `shopify app build` writes `manifest.json` in each UI extension; the root `.gitignore` (which Prettier also reads) now ignores it.
+- A code discount of this app's type ("Wholesale code check", created through the Admin API) was listed alongside the automatic one after the list began reading `DiscountCodeApp` nodes. It was then deleted.

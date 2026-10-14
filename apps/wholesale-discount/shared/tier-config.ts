@@ -1,3 +1,7 @@
+/** Where a discount's configuration is stored: a metafield owned by this app. */
+export const TIER_CONFIG_NAMESPACE = '$app';
+export const TIER_CONFIG_KEY = 'tier-config';
+
 export const MIN_TIERS = 1;
 export const MAX_TIERS = 5;
 const MAX_PERCENTAGE = 100;
