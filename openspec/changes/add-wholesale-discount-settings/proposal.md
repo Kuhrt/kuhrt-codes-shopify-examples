@@ -41,7 +41,8 @@ None. `wholesale-tier-pricing` already defines what a valid configuration is, an
   - a discount settings UI extension;
   - an App Home UI extension.
   - Both use Polaris web components (Preact) and import `shared/tier-config.ts`.
-- **Scopes:** `read_discounts` for the App Home list, as the spike found. It is listed in the README in `ship-wholesale-discount`.
+- **Scopes:** `write_discounts`. The settings target requires it, and it covers the App Home list (`discountNodes` needs `read_discounts`, which it includes). It is listed in the README in `ship-wholesale-discount`.
+- **Configuration storage:** the config moves to an app-owned metafield definition, `$app` / `tier-config`, declared in `shopify.app.toml` with merchant write access, because the discount page saves as the merchant (design.md decision 8). The Function reads it from there.
 - **Depends on:** `add-wholesale-tier-function`, applied, including its spike results.
 - **Planning:** `design.md` and `tasks.md` are written after that spike, with `/opsx:update`, because the spike decides:
   - where the shared module lives;

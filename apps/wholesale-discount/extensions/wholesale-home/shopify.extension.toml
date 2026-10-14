@@ -1,0 +1,12 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "wholesale-home"
+uid = "5bdab4ce-65e3-6a31-6ddd-10c442bed73dbc3db9ba"
+type = "ui_extension"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "admin.app.home.render"
+  module = "./src/index.tsx"

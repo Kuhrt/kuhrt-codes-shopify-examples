@@ -1,5 +1,6 @@
 node_modules
 apps/*/extensions/*/generated
+apps/*/extensions/*/manifest.json
 .turbo
 .wrangler
 .shopify/

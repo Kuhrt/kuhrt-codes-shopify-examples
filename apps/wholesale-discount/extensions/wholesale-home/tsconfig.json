@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.ui-extension.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "shopify.d.ts", "vitest.config.ts"]
+}

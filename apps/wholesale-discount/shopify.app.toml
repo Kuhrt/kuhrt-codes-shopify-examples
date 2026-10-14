@@ -7,7 +7,7 @@ embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+scopes = "write_discounts"
 
 [webhooks]
 api_version = "2026-10"
@@ -18,3 +18,9 @@ redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 [build]
 include_config_on_deploy = true
 dev_store_url = "kuhrt-codes.myshopify.com"
+
+[discount.metafields.app.tier-config]
+name = "Wholesale tier configuration"
+description = "Customer tag and quantity tiers read by the wholesale tier discount Function"
+type = "json"
+access.admin = "merchant_read_write"

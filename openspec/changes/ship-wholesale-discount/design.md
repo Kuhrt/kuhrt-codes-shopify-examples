@@ -4,7 +4,7 @@
 
 See `proposal.md`, "Why". The app's shape and platform facts come from `add-wholesale-tier-function` (archived, "Spike results" and "Live check") and `add-wholesale-discount-settings`. Facts below were checked against Shopify CLI 4.9.3's `--help` output and shopify.dev on 2026-10-14. Items marked **(check)** are unconfirmed and settled by the task that first relies on them.
 
-- **Scopes.** The Function needs none. App Home's discount list needs `read_discounts`, added by `add-wholesale-discount-settings`, which also settles whether the settings extension needs any.
+- **Scopes.** The Function needs none. The app requests `write_discounts`, because the discount settings target refuses to render without it; it also covers App Home's discount list (`add-wholesale-discount-settings`, "Spike results").
 - **Seeding without app scopes.** `shopify store auth -s <shop> --scopes <list>` stores an online access token for a developer, with scopes chosen at auth time. `shopify store execute -s <shop> --query-file <f> --variable-file <f> --allow-mutations --json` then runs Admin GraphQL non-interactively with that token. The app's own scopes are untouched. `shopify app execute` would use the app's scopes, so it can't seed without adding write scopes to the app. `shopify populate` no longer exists.
   - The one-time `store auth` is interactive (a browser sign-in). Token lifetime and silent refresh are **(check)**.
 - **Installing on a second development store.** An app with a released version can be installed on any development store in the same Partner organization from the Dev Dashboard's Installs card, with no distribution method chosen. Distribution can't be changed once chosen, and Shopify advises choosing it on the production app.

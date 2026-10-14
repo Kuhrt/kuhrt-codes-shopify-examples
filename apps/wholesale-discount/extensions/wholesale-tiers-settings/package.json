@@ -1,0 +1,24 @@
+{
+  "name": "wholesale-tiers-settings",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@preact/signals": "2.11.3",
+    "@shopify/ui-extensions": "2026.7.4",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@repo/config": "workspace:*",
+    "@shopify/ui-extensions-tester": "2026.7.4",
+    "@testing-library/preact": "^3.2.4",
+    "eslint": "^10.12.0",
+    "jsdom": "^30.1.2",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

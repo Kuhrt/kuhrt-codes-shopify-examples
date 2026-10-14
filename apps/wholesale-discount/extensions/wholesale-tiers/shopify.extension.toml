@@ -11,8 +11,11 @@ description = "t:description"
   target = "cart.lines.discounts.generate.run"
   input_query = "src/cart_lines_discounts_generate_run.graphql"
   export = "cart-lines-discounts-generate-run"
-  input_variables = { namespace = "$app:wholesale-discount", key = "config" }
+  input_variables = { namespace = "$app", key = "tier-config" }
 
   [extensions.build]
   command = ""
   path = "dist/function.wasm"
+
+  [extensions.ui]
+  handle = "wholesale-tiers-settings"
