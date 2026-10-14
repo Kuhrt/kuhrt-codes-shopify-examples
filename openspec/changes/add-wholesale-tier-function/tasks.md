@@ -11,7 +11,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - Wire `build`, `lint`, `typecheck` and `test` into the workspace, extending `@repo/config`.
   - Record the scaffolded package versions in design.md.
   - Verify: `pnpm check` passes with the template Function and its generated tests, and `shopify app dev` installs the app on `kuhrt-codes`.
-- [ ] 1.2 Confirm the Function builds and its Wasm tests run with no Shopify credentials.
+- [x] 1.2 Confirm the Function builds and its Wasm tests run with no Shopify credentials.
   - Run the build and tests in a clean shell with the CLI logged out and no `.env`.
   - Record what is committed (`schema.graphql`, generated types) and any network fetches, such as Javy.
   - Verify: a pull request's CI run builds the Function and passes its tests. Otherwise, follow the fallback in design.md "Risks"; if none works, stop and ask the user.
