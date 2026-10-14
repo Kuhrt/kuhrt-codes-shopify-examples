@@ -82,7 +82,7 @@ pnpm config:link
 pnpm dev --store your-dev-store.myshopify.com
 ```
 
-`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one); the `shopify.app.*.toml` it writes may not include the `[discount.metafields.app.tier-config]` section. If it doesn't, copy it over from `shopify.app.toml`; without it the discount settings can't save. `pnpm test` checks every app config for it. `pnpm dev` builds the extensions and starts a dev preview on your development store. Open the app from the admin, create a discount from App Home, then check out as a customer with the tag (the [demo setup](#demo) creates one).
+`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one); the `shopify.app.*.toml` it writes may not include the `[discount.metafields.app.tier-config]` section. If it doesn't, copy it over from `shopify.app.toml`; without it the discount settings can't save. `pnpm test` checks every app config for it. `pnpm dev` builds the extensions and starts a dev preview on your development store. `shopify app dev clean` ends the preview and also deletes the discounts created on that store while it ran. Open the app from the admin, create a discount from App Home, then check out as a customer with the tag (the [demo setup](#demo) creates one).
 
 ## Deploy
 
