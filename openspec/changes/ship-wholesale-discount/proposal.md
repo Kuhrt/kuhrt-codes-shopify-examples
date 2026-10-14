@@ -37,7 +37,7 @@ None. The root README requirement in `examples-workspace` already requires the n
 
 - **Code and docs:**
   - `apps/wholesale-discount/README.md`;
-  - a scope-contract test;
+  - a scope-contract test, using helpers moved from App 1's contract test into a new `packages/app-contract`, which App 1 then imports;
   - a demo setup script;
   - a root `README.md` row;
   - `docs/demo.gif`.

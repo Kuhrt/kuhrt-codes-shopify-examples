@@ -41,7 +41,7 @@ None. `wholesale-tier-pricing` already defines what a valid configuration is, an
   - a discount settings UI extension;
   - an App Home UI extension.
   - Both use Polaris web components (Preact) and import `shared/tier-config.ts`.
-- **Scopes:** possibly one discount read scope for the App Home list. It is confirmed by the spike and listed in the README in `ship-wholesale-discount`.
+- **Scopes:** `read_discounts` for the App Home list, as the spike found. It is listed in the README in `ship-wholesale-discount`.
 - **Depends on:** `add-wholesale-tier-function`, applied, including its spike results.
 - **Planning:** `design.md` and `tasks.md` are written after that spike, with `/opsx:update`, because the spike decides:
   - where the shared module lives;
