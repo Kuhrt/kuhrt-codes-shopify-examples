@@ -60,7 +60,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - Regenerate the types.
   - Verify: `shopify app function typegen` succeeds, and the query cost (computed by hand from the documented costs) is within the limit; record it in design.md.
 - [x] 3.2 Implement `run`: the class guard, the customer and tag guard, config parsing with the issue codes logged, per-product grouping, `pickTier`, and one candidate per qualifying product (design decisions 4–7).
-  - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy", "CI run", and "Missing configuration" (Shopify fails that run before our code executes; task 4.1 checks it). Tests assert targets, percentages and the operation list, never the message.
+  - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy", "CI run", and "Missing configuration" (Shopify fails that run before our code executes; task 4.1 checks it). Tests assert targets, percentages and the operation list, never a literal message.
 - [x] 3.3 Replace the template fixtures with fixtures for these carts:
   - tagged customer, mixed variants reaching a tier;
   - two products below the tier;

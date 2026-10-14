@@ -18,7 +18,9 @@ interface ProductLines {
   lineIds: string[];
 }
 
-const NO_OPERATIONS: CartLinesDiscountsGenerateRunResult = { operations: [] };
+function noDiscount(): CartLinesDiscountsGenerateRunResult {
+  return { operations: [] };
+}
 
 export function discountMessage(percentage: number): string {
   return `Wholesale ${percentage}% off`;
@@ -65,22 +67,22 @@ export function cartLinesDiscountsGenerateRun(
   input: CartInput
 ): CartLinesDiscountsGenerateRunResult {
   if (!input.discount.discountClasses.includes(DiscountClass.Product)) {
-    return NO_OPERATIONS;
+    return noDiscount();
   }
 
   const parsed = parseTierConfig(input.discount.metafield?.jsonValue);
   if (!parsed.ok) {
     logInvalidConfig(parsed.issues);
-    return NO_OPERATIONS;
+    return noDiscount();
   }
 
   if (!isTaggedCustomer(input)) {
-    return NO_OPERATIONS;
+    return noDiscount();
   }
 
   const candidates = buildCandidates(parsed.config.tiers, linesByProduct(input.cart.lines));
   if (candidates.length === 0) {
-    return NO_OPERATIONS;
+    return noDiscount();
   }
 
   return {

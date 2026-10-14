@@ -26,24 +26,31 @@ function customLine(id: string, quantity: number): TestLine {
   return { id, quantity, merchandise: { __typename: 'CustomProduct' } };
 }
 
+type Buyer = 'tagged' | 'untagged' | 'no-buyer-identity' | 'no-customer';
+
+const BUYER_IDENTITIES: Record<Buyer, CartInput['cart']['buyerIdentity']> = {
+  tagged: { customer: { hasTags: [{ hasTag: true }] } },
+  untagged: { customer: { hasTags: [{ hasTag: false }] } },
+  'no-buyer-identity': null,
+  'no-customer': { customer: null }
+};
+
 interface InputOptions {
   lines: TestLine[];
-  tagged?: boolean;
-  guest?: boolean;
+  buyer?: Buyer;
   classes?: DiscountClass[];
   config?: unknown;
 }
 
 function buildInput({
   lines,
-  tagged = true,
-  guest = false,
+  buyer = 'tagged',
   classes = [DiscountClass.Product],
   config = { tag: 'wholesale', tiers: TIERS }
 }: InputOptions): CartInput {
   return {
     cart: {
-      buyerIdentity: guest ? null : { customer: { hasTags: [{ hasTag: tagged }] } },
+      buyerIdentity: BUYER_IDENTITIES[buyer],
       lines
     },
     discount: { discountClasses: classes, metafield: { jsonValue: config } }
@@ -56,6 +63,10 @@ function candidatesOf(input: CartInput) {
   const add = operations[0]?.productDiscountsAdd;
   if (!add) throw new Error('expected a productDiscountsAdd operation');
   return add;
+}
+
+function expectNoDiscount(input: CartInput) {
+  expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
 }
 
 function targetIds(candidate: { targets: { cartLine: { id: string } }[] }): string[] {
@@ -94,20 +105,17 @@ describe('cartLinesDiscountsGenerateRun', () => {
       ]);
     });
 
-    it('applies nothing for an untagged customer', () => {
-      const input = buildInput({ lines: [variantLine('line-1', 'p1', 10)], tagged: false });
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
-    });
-
-    it('applies nothing for a guest', () => {
-      const input = buildInput({ lines: [variantLine('line-1', 'p1', 10)], guest: true });
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
-    });
+    it.each(['untagged', 'no-buyer-identity', 'no-customer'] as const)(
+      'applies nothing for a %s buyer',
+      (buyer) => {
+        expectNoDiscount(buildInput({ lines: [variantLine('line-1', 'p1', 10)], buyer }));
+      }
+    );
 
     it('applies nothing for a customer without tag results', () => {
       const input = buildInput({ lines: [variantLine('line-1', 'p1', 10)] });
       input.cart.buyerIdentity = { customer: { hasTags: [] } };
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
     });
   });
 
@@ -125,7 +133,7 @@ describe('cartLinesDiscountsGenerateRun', () => {
       const input = buildInput({
         lines: [variantLine('line-1', 'p1', 6), variantLine('line-2', 'p2', 6)]
       });
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
     });
 
     it('ignores non-product lines and does not count their quantity', () => {
@@ -141,7 +149,7 @@ describe('cartLinesDiscountsGenerateRun', () => {
       const input = buildInput({
         lines: [variantLine('line-1', 'p1', 5), customLine('custom', 40)]
       });
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
     });
   });
 
@@ -159,7 +167,7 @@ describe('cartLinesDiscountsGenerateRun', () => {
 
     it('applies nothing below the lowest tier', () => {
       const input = buildInput({ lines: [variantLine('line-1', 'p1', 9)] });
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
     });
 
     it('produces one candidate per qualifying product at its own tier', () => {
@@ -197,7 +205,7 @@ describe('cartLinesDiscountsGenerateRun', () => {
         lines: [variantLine('line-1', 'p1', 10)],
         classes: [DiscountClass.Order]
       });
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
     });
   });
 
@@ -213,7 +221,7 @@ describe('cartLinesDiscountsGenerateRun', () => {
       };
       const input = buildInput({ lines: [variantLine('line-1', 'p1', 60)], config });
 
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
       expect(loggedIssues(spy)).toEqual([
         { code: 'percentage-not-increasing', path: ['tiers', 1, 'percentage'] }
       ]);
@@ -223,9 +231,20 @@ describe('cartLinesDiscountsGenerateRun', () => {
       const spy = silenceErrorLog();
       const input = buildInput({ lines: [variantLine('line-1', 'p1', 60)], config: null });
 
-      expect(cartLinesDiscountsGenerateRun(input)).toEqual({ operations: [] });
+      expectNoDiscount(input);
       expect(loggedIssues(spy)).toEqual([{ code: 'not-an-object', path: [] }]);
     });
+
+    it.each(['untagged', 'no-buyer-identity'] as const)(
+      'logs invalid configuration even for a %s buyer',
+      (buyer) => {
+        const spy = silenceErrorLog();
+        expectNoDiscount(
+          buildInput({ lines: [variantLine('line-1', 'p1', 60)], buyer, config: null })
+        );
+        expect(loggedIssues(spy)).toEqual([{ code: 'not-an-object', path: [] }]);
+      }
+    );
 
     it('does not log for a valid configuration', () => {
       const spy = silenceErrorLog();
