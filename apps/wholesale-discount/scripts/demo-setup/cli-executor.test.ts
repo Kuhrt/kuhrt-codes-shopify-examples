@@ -1,46 +1,49 @@
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildExecuteArgs,
+  createCliExecutor,
   describeCliFailure,
   parseExecuteOutput,
-  queryFileFor
+  queryFileFor,
+  type RunCli
 } from './cli-executor.ts';
-import type { OperationName } from './steps.ts';
+import { OPERATION_NAMES } from './steps.ts';
 
-const OPERATIONS: OperationName[] = [
-  'publications',
-  'product-set',
-  'publishable-publish',
-  'customer-set'
-];
+const STORE = 'demo.myshopify.com';
 
 function valueAfter(args: string[], flag: string): string | undefined {
   return args[args.indexOf(flag) + 1];
 }
 
 describe('buildExecuteArgs', () => {
-  const args = buildExecuteArgs('demo.myshopify.com', 'query.graphql', 'vars.json');
+  const args = buildExecuteArgs(STORE, 'query.graphql', 'vars.json', true);
 
   it('runs `store execute` against the given store with the given files', () => {
     expect(args.slice(0, 2)).toEqual(['store', 'execute']);
-    expect(valueAfter(args, '-s')).toBe('demo.myshopify.com');
+    expect(valueAfter(args, '-s')).toBe(STORE);
     expect(valueAfter(args, '--query-file')).toBe('query.graphql');
     expect(valueAfter(args, '--variable-file')).toBe('vars.json');
   });
 
-  it('never prompts, prints JSON, pins the API version and allows mutations', () => {
+  it('never prompts, prints JSON and pins the API version', () => {
     expect(args).toContain('--no-input');
     expect(args).toContain('--json');
-    expect(args).toContain('--allow-mutations');
     expect(valueAfter(args, '--version')).toMatch(/^\d{4}-\d{2}$/);
+  });
+
+  it('allows mutations only when asked to', () => {
+    expect(args).toContain('--allow-mutations');
+    expect(buildExecuteArgs(STORE, 'q', 'v', false)).not.toContain('--allow-mutations');
   });
 });
 
 describe('queryFileFor', () => {
-  it.each(OPERATIONS)('points %s at a .graphql file that exists', (operation) => {
+  it.each(OPERATION_NAMES)('points %s at a .graphql file that exists', (operation) => {
     const file = queryFileFor(operation);
     expect(file.endsWith('.graphql')).toBe(true);
     expect(existsSync(file)).toBe(true);
@@ -69,5 +72,76 @@ describe('describeCliFailure', () => {
 
   it('falls back when stderr is empty', () => {
     expect(describeCliFailure('  \n', 'exit 1')).toBe('exit 1');
+  });
+});
+
+describe('createCliExecutor', () => {
+  function recordingRun(stdout = '{"ok":true}') {
+    const seen: { args: string[]; variables?: unknown; directory?: string } = { args: [] };
+    const run: RunCli = async (args) => {
+      const variableFile = valueAfter(args, '--variable-file') ?? '';
+      seen.args = args;
+      seen.directory = dirname(variableFile);
+      seen.variables = JSON.parse(await readFile(variableFile, 'utf8'));
+      return { stdout };
+    };
+    return { run, seen };
+  }
+
+  it('hands the CLI the variables in a file and returns the parsed output', async () => {
+    const { run, seen } = recordingRun('{"ok":true}');
+    const variables = { id: 'gid://shopify/Product/1' };
+
+    const data = await createCliExecutor(STORE, run)('publishable-publish', variables);
+
+    expect(data).toEqual({ ok: true });
+    expect(seen.variables).toEqual(variables);
+    expect(valueAfter(seen.args, '-s')).toBe(STORE);
+    expect(valueAfter(seen.args, '--query-file')).toBe(queryFileFor('publishable-publish'));
+    expect(seen.args).toContain('--allow-mutations');
+  });
+
+  it('does not allow mutations for the publications query', async () => {
+    const { run, seen } = recordingRun();
+
+    await createCliExecutor(STORE, run)('publications', {});
+
+    expect(seen.args).not.toContain('--allow-mutations');
+  });
+
+  it('removes the temporary directory after success', async () => {
+    const { run, seen } = recordingRun();
+
+    await createCliExecutor(STORE, run)('publications', {});
+
+    expect(existsSync(seen.directory ?? '')).toBe(false);
+  });
+
+  it('removes the temporary directory and reports stderr with the cause when the CLI fails', async () => {
+    const cliError = Object.assign(new Error('Command failed'), {
+      stderr: '\u001b[31mNot authenticated\u001b[39m\n'
+    });
+    let directory = '';
+    const run = vi.fn<RunCli>((args) => {
+      directory = dirname(valueAfter(args, '--variable-file') ?? '');
+      return Promise.reject(cliError);
+    });
+
+    const failure: unknown = await createCliExecutor(STORE, run)('publications', {}).catch(
+      (e: unknown) => e
+    );
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toBe('Not authenticated');
+    expect((failure as Error).cause).toBe(cliError);
+    expect(existsSync(directory)).toBe(false);
+  });
+
+  it('removes the temporary directory when the output is not JSON', async () => {
+    const { run, seen } = recordingRun('Please sign in');
+
+    await expect(createCliExecutor(STORE, run)('publications', {})).rejects.toThrow(Error);
+
+    expect(existsSync(seen.directory ?? '')).toBe(false);
   });
 });

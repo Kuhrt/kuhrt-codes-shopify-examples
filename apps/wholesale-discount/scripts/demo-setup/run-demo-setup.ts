@@ -2,9 +2,12 @@ import type { DemoSetupArgs } from './args.ts';
 import { DEMO_PRODUCTS, ONLINE_STORE_PUBLICATION } from './demo-data.ts';
 import {
   customerSetVariables,
+  MUTATION_PAYLOAD_KEYS,
+  type MutationName,
   type OperationName,
   productSetVariables,
   publishVariables,
+  tagsAddVariables,
   type Variables
 } from './steps.ts';
 
@@ -15,8 +18,8 @@ export class StepError extends Error {
   readonly step: string;
   readonly messages: string[];
 
-  constructor(step: string, messages: string[]) {
-    super(`${step}: ${messages.join('; ')}`);
+  constructor(step: string, messages: string[], options?: { cause: unknown }) {
+    super(`${step}: ${messages.join('; ')}`, options);
     this.step = step;
     this.messages = messages;
   }
@@ -40,7 +43,8 @@ async function execute(
   try {
     data = await executor(operation, variables);
   } catch (error: unknown) {
-    throw failure(step, error instanceof Error ? error.message : String(error));
+    const message = error instanceof Error ? error.message : String(error);
+    throw new StepError(step, [message], { cause: error });
   }
   if (!isRecord(data)) throw failure(step, 'the response was not a JSON object');
   return data;
@@ -59,10 +63,10 @@ function userErrorMessages(payload: Record<string, unknown>): string[] {
 async function executeMutation(
   step: string,
   executor: Executor,
-  operation: OperationName,
-  payloadKey: string,
+  operation: MutationName,
   variables: Variables
 ): Promise<Record<string, unknown>> {
+  const payloadKey = MUTATION_PAYLOAD_KEYS[operation];
   const data = await execute(step, executor, operation, variables);
   const payload = data[payloadKey];
   if (!isRecord(payload)) throw failure(step, `the response has no ${payloadKey}`);
@@ -93,7 +97,8 @@ async function findOnlineStorePublicationId(executor: Executor): Promise<string>
 }
 
 /**
- * Creates or updates the demo products (published to the Online Store) and the tagged customer.
+ * Creates or updates the demo products (published to the Online Store) and the customer, then adds the wholesale
+ * tag to the customer without touching their other fields or tags.
  * Stops at the first failing step by throwing a `StepError`.
  */
 export async function runDemoSetup(args: DemoSetupArgs, executor: Executor): Promise<void> {
@@ -105,23 +110,26 @@ export async function runDemoSetup(args: DemoSetupArgs, executor: Executor): Pro
       setStep,
       executor,
       'product-set',
-      'productSet',
       productSetVariables(product)
     );
     await executeMutation(
       `publishable-publish:${product.handle}`,
       executor,
       'publishable-publish',
-      'publishablePublish',
       publishVariables(idOf(setStep, set['product']), publicationId)
     );
   }
 
-  await executeMutation(
+  const customer = await executeMutation(
     'customer-set',
     executor,
     'customer-set',
-    'customerSet',
     customerSetVariables(args.email)
+  );
+  await executeMutation(
+    'tags-add',
+    executor,
+    'tags-add',
+    tagsAddVariables(idOf('customer-set', customer['customer']))
   );
 }

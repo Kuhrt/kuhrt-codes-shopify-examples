@@ -7,17 +7,25 @@ import { fileURLToPath } from 'node:url';
 import { promisify, stripVTControlCharacters } from 'node:util';
 
 import type { Executor } from './run-demo-setup.ts';
-import type { OperationName } from './steps.ts';
+import { isMutation, type OperationName } from './steps.ts';
 
 const execFileAsync = promisify(execFile);
 
 const ADMIN_API_VERSION = '2026-10';
+const CLI_TIMEOUT_MS = 120_000;
+
+export type RunCli = (args: string[]) => Promise<{ stdout: string }>;
 
 export function queryFileFor(operation: OperationName): string {
   return fileURLToPath(new URL(`./${operation}.graphql`, import.meta.url));
 }
 
-export function buildExecuteArgs(store: string, queryFile: string, variableFile: string): string[] {
+export function buildExecuteArgs(
+  store: string,
+  queryFile: string,
+  variableFile: string,
+  allowMutations: boolean
+): string[] {
   return [
     'store',
     'execute',
@@ -27,7 +35,7 @@ export function buildExecuteArgs(store: string, queryFile: string, variableFile:
     '--json',
     '--version',
     ADMIN_API_VERSION,
-    '--allow-mutations',
+    ...(allowMutations ? ['--allow-mutations'] : []),
     '--query-file',
     queryFile,
     '--variable-file',
@@ -56,17 +64,27 @@ function shopifyCliEntry(): string {
   return join(dirname(packageJson), 'bin', 'run.js');
 }
 
+/** Runs the Shopify CLI with this Node, killing it if it outlives the timeout. */
+export const runShopifyCli: RunCli = (args) =>
+  execFileAsync(process.execPath, [shopifyCliEntry(), ...args], {
+    encoding: 'utf8',
+    timeout: CLI_TIMEOUT_MS
+  });
+
 /** An executor that runs each operation through `shopify store execute` as the signed-in developer. */
-export function createCliExecutor(store: string): Executor {
+export function createCliExecutor(store: string, run: RunCli = runShopifyCli): Executor {
   return async (operation, variables) => {
     const directory = await mkdtemp(join(tmpdir(), 'demo-setup-'));
     try {
       const variableFile = join(directory, 'variables.json');
       await writeFile(variableFile, JSON.stringify(variables));
-      const args = buildExecuteArgs(store, queryFileFor(operation), variableFile);
-      const { stdout } = await execFileAsync(process.execPath, [shopifyCliEntry(), ...args], {
-        encoding: 'utf8'
-      });
+      const args = buildExecuteArgs(
+        store,
+        queryFileFor(operation),
+        variableFile,
+        isMutation(operation)
+      );
+      const { stdout } = await run(args);
       return parseExecuteOutput(stdout);
     } catch (error: unknown) {
       const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr) : '';

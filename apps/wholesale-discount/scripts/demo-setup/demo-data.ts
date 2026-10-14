@@ -25,5 +25,3 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     price: '25.00'
   }
 ];
-
-export const DEMO_CUSTOMER = { firstName: 'Wholesale', lastName: 'Demo' };

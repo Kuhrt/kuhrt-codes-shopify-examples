@@ -1,19 +1,32 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEMO_PRODUCTS, WHOLESALE_TAG } from './demo-data.ts';
-import { customerSetVariables, productSetVariables, publishVariables } from './steps.ts';
+import {
+  customerSetVariables,
+  isMutation,
+  MUTATION_NAMES,
+  OPERATION_NAMES,
+  productSetVariables,
+  publishVariables,
+  tagsAddVariables
+} from './steps.ts';
 
 describe('demo data', () => {
-  it('has two products with three variants each', () => {
-    expect(DEMO_PRODUCTS).toHaveLength(2);
-    for (const product of DEMO_PRODUCTS) {
-      expect(product.optionValues).toHaveLength(3);
-    }
-  });
-
   it('has distinct handles', () => {
     const handles = DEMO_PRODUCTS.map((product) => product.handle);
     expect(new Set(handles).size).toBe(handles.length);
+  });
+
+  it.each(DEMO_PRODUCTS)('gives $handle more than one distinct option value', (product) => {
+    expect(product.optionValues.length).toBeGreaterThan(1);
+    expect(new Set(product.optionValues).size).toBe(product.optionValues.length);
+  });
+});
+
+describe('operations', () => {
+  it('treats every operation except the publications query as a mutation', () => {
+    expect(OPERATION_NAMES.filter(isMutation)).toEqual(MUTATION_NAMES);
+    expect(OPERATION_NAMES.filter((name) => !isMutation(name))).toEqual(['publications']);
   });
 });
 
@@ -53,11 +66,17 @@ describe('productSetVariables', () => {
 });
 
 describe('customerSetVariables', () => {
-  it('upserts by the given email and tags the customer wholesale', () => {
-    expect(customerSetVariables('buyer@example.com')).toMatchObject({
+  it('identifies the customer by email and sets nothing else, so an existing customer is kept', () => {
+    expect(customerSetVariables('buyer@example.com')).toEqual({
       identifier: { email: 'buyer@example.com' },
-      input: { email: 'buyer@example.com', tags: [WHOLESALE_TAG] }
+      input: { email: 'buyer@example.com' }
     });
+  });
+});
+
+describe('tagsAddVariables', () => {
+  it('adds only the wholesale tag to the given customer', () => {
+    expect(tagsAddVariables('customer-id')).toEqual({ id: 'customer-id', tags: [WHOLESALE_TAG] });
   });
 });
 

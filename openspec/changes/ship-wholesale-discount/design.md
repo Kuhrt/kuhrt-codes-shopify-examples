@@ -45,7 +45,7 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - Each step shells out to `shopify store execute --json` with a `.graphql` file under `scripts/demo-setup/` and a variables file the script writes to a temporary directory.
 - Idempotency comes from the API's upserts, not from lookups the script compares itself:
   - products use `productSet` with a `handle` identifier, so a second run updates the same products;
-  - the customer uses `customerSet` with an `email` identifier, and the `wholesale` tag is part of its input **(check: task 2.1 — fall back to `customers(query: "email:…")` then `customerCreate` or `tagsAdd`)**;
+  - the customer uses `customerSet` with an `email` identifier and only the email as input, then `tagsAdd` adds `wholesale`. An existing customer with that email keeps their name and other tags;
   - products are published to the Online Store with `publishablePublish`, which is a no-op when already published.
 - Demo data, in the script as a typed constant: two products, each with three variants (for example a T-shirt in S/M/L and a cap in three colours), untracked inventory so checkout never runs out, and prices that make 10% and 15% visible.
 - The script is split so it can be tested without a store: a pure part (argument parsing, building each step's variables from the demo data) and a thin runner that executes the steps through an injected executor. Tests use a fake executor; the real one spawns the CLI.
@@ -108,3 +108,4 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - The script runs with Node's type stripping (`node scripts/demo-setup.ts`), as App 1's build scripts do. It calls the CLI's own `bin/run.js` with `process.execPath`, without a shell, so it behaves the same on Windows.
 - Exit codes: 0 when done, 1 when a step fails (the step is named), 2 for a usage error, before any store call. Through `pnpm --filter … demo:setup`, pnpm reports any failure as exit 1.
 - Run three times against `kuhrt-codes`: the store held exactly the two demo products (three variants each, published to the Online Store, buyable with untracked inventory) and one customer tagged `wholesale`.
+- With the customer already named "Keep Me" and tagged `keepme`, two runs left the name and `keepme` in place and added `wholesale`. `customerSet` with more fields would have overwritten the name, and its `tags` would have replaced the others.
