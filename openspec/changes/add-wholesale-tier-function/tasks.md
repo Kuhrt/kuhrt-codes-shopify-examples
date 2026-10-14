@@ -55,13 +55,13 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
 
 ## 3. The Function (`extensions/wholesale-tiers`)
 
-- [ ] 3.1 Write the input query.
+- [x] 3.1 Write the input query.
   - It reads cart lines with quantity and `ProductVariant` product id, `hasTags(tags: [$tag])`, the config metafield, and `discountClasses`.
   - Regenerate the types.
   - Verify: `shopify app function typegen` succeeds, and the query cost (computed by hand from the documented costs) is within the limit; record it in design.md.
-- [ ] 3.2 Implement `run`: the class guard, the customer and tag guard, config parsing with the issue codes logged, per-product grouping, `pickTier`, and one candidate per qualifying product (design decisions 4–7).
-  - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy", "CI run", and "Missing configuration" (Shopify fails that run before our code executes; task 4.1 checks it). Tests assert targets, percentages and the operation list, never the message.
-- [ ] 3.3 Replace the template fixtures with fixtures for these carts:
+- [x] 3.2 Implement `run`: the class guard, the customer and tag guard, config parsing with the issue codes logged, per-product grouping, `pickTier`, and one candidate per qualifying product (design decisions 4–7).
+  - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy", "CI run", and "Missing configuration" (Shopify fails that run before our code executes; task 4.1 checks it). Tests assert targets, percentages and the operation list, never a literal message.
+- [x] 3.3 Replace the template fixtures with fixtures for these carts:
   - tagged customer, mixed variants reaching a tier;
   - two products below the tier;
   - exactly on the top threshold;
@@ -74,7 +74,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
 
 ## 4. Integration check on `kuhrt-codes`
 
-- [ ] 4.1 With `shopify app dev` running, set the config on a test automatic discount via GraphiQL and check out three ways: as a customer tagged `wholesale`, as an untagged customer, and as a guest, each with 6 + 6 variants of one product. Then change the config's tag to `vip`, tag the second customer `vip`, and check out again. Finally, remove `tag` from the config and check out as the `vip` customer.
+- [x] 4.1 With `shopify app dev` running, set the config on a test automatic discount via GraphiQL and check out three ways: as a customer tagged `wholesale`, as an untagged customer, and as a guest, each with 6 + 6 variants of one product. Then change the config's tag to `vip`, tag the second customer `vip`, and check out again. Finally, remove `tag` from the config and check out as the `vip` customer.
   - Verify: the discount applies only to the tagged customer, then only to the `vip` customer, with no redeploy in between. The last checkout is at full price, and the Dev Dashboard shows that run failed with `InvalidVariableValueError`. The Function logs in the Dev Dashboard match.
 
 ## Workflow follow-up

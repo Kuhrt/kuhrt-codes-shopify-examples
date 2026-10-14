@@ -229,4 +229,17 @@ Checked 2026-10-13 on `kuhrt-codes` (Partner development store, not Plus).
   }
   ```
   `type:app` matches every app's discounts. Keep only nodes whose `appDiscountType.app.id` equals the current app's ID.
-- The test automatic discount "Spike: template function" is still active on `kuhrt-codes`, with a `wholesale` config. Task 4.1 reuses it.
+- The spike's test discount was later found deleted from `kuhrt-codes`; group 3 created "Wholesale tiers (test)" (tiers 10+ at 10%, 50+ at 15%, tag `wholesale`) for the captured fixture and task 4.1.
+
+**Implementation notes**
+- Input query cost is 10 of 30: `id`, `quantity` and `product.id` on the cart lines, plus `discountClasses` cost 1 each (4), `hasTags` costs 3 and the config `metafield` costs 3; container fields, `__typename`, `hasTag` and `jsonValue` cost 0. Source: the input query limits table at shopify.dev/docs/api/functions/2026-10.
+- A real run on `kuhrt-codes` (tagged customer, 6 + 6 units of one product plus 1 of another) used 764,719 of 11,000,000 instructions with a 568-byte input. Its input and output are the `captured-kuhrt-codes-mixed-variants` fixture.
+
+**Live check (4.1)**
+
+Checked 2026-10-14 on `kuhrt-codes` with the "Wholesale tiers (test)" discount. The cart held 6 + 6 units of two variants of one product plus 1 unit of another.
+- Tag `wholesale`, customer tagged `wholesale`: both variant lines got 10% off and the other product none.
+- Tag changed to `vip` while the customer had only `wholesale`: no discount. This stood in for the untagged customer, so one test customer covered both cases instead of the two the task describes.
+- Customer tagged `VIP` as well: the discount returned at the next cart evaluation, with no deploy. `hasTags` matching ignores case (`VIP` matched the config's `vip`). The config keeps the tag as entered; matching is Shopify's.
+- `tag` removed from the config: full price, and the Dev Dashboard shows `InvalidVariableValueError` ("Variable $tag of type String! was provided invalid value").
+- Guest (signed out): full price. The real input has `buyerIdentity: null`, the shape the `guest-customer` fixture already uses, so no fixture was added. That run used 568,406 instructions with a 540-byte input.
