@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "shopify app dev",
+    "config:link": "shopify app config link",
     "generate": "shopify app generate",
     "app:deploy": "shopify app deploy",
     "shopify": "shopify",
@@ -16,6 +17,7 @@
     "node": ">=24 <25"
   },
   "devDependencies": {
+    "@repo/app-contract": "workspace:*",
     "@repo/config": "workspace:*",
     "@shopify/cli": "catalog:",
     "@types/node": "^24.0.0",

@@ -109,3 +109,5 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - Exit codes: 0 when done, 1 when a step fails (the step is named), 2 for a usage error, before any store call. Through `pnpm --filter … demo:setup`, pnpm reports any failure as exit 1.
 - Run three times against `kuhrt-codes`: the store held exactly the two demo products (three variants each, published to the Online Store, buyable with untracked inventory) and one customer tagged `wholesale`.
 - With the customer already named "Keep Me" and tagged `keepme`, two runs left the name and `keepme` in place and added `wholesale`. `customerSet` with more fields would have overwritten the name, and its `tags` would have replaced the others.
+
+**README (3.x)**: whether `shopify app config link` keeps the `[discount.metafields.app.tier-config]` definition was not checked, since it would mean creating an app in the Partner org. The README tells the reader to copy the section over if it is missing, and the contract test checks every app config for it, so both cases are covered.

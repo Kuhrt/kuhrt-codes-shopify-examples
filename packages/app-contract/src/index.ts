@@ -1,4 +1,7 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { parse } from 'smol-toml';
 
 const SCOPES_HEADING = '## Access scopes';
 
@@ -32,4 +35,12 @@ export function scopesFromReadme(readme: string): string[] {
 
 export function appConfigFiles(appRoot: string): string[] {
   return readdirSync(appRoot).filter((name) => /^shopify\.app(\..+)?\.toml$/.test(name));
+}
+
+export function readReadme(appRoot: string): string {
+  return readFileSync(path.join(appRoot, 'README.md'), 'utf8');
+}
+
+export function readAppConfig(appRoot: string, name: string): unknown {
+  return parse(readFileSync(path.join(appRoot, name), 'utf8'));
 }
