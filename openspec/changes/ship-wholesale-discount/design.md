@@ -111,3 +111,10 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - With the customer already named "Keep Me" and tagged `keepme`, two runs left the name and `keepme` in place and added `wholesale`. `customerSet` with more fields would have overwritten the name, and its `tags` would have replaced the others.
 
 **README (3.x)**: whether `shopify app config link` keeps the `[discount.metafields.app.tier-config]` definition was not checked, since it would mean creating an app in the Partner org. The README tells the reader to copy the section over if it is missing, and the contract test checks every app config for it, so both cases are covered.
+
+**Release (4.x)**, checked 2026-10-14:
+- `wholesale-discount-2` was deployed and installed on `kuhrt-codes-demo` from the Dev Dashboard, with no distribution method chosen. App Home rendered there.
+- The demo setup ran against `kuhrt-codes-demo` unchanged, and a "Wholesale pricing" automatic discount was created from App Home with the default settings.
+- One app is enough (decision 1). With `shopify app dev` running on `kuhrt-codes` and the Function's message changed, the `kuhrt-codes` cart showed the changed message while the demo store's cart kept the released one, before and after the session.
+- `shopify app dev clean` restores the released version on the dev store, but deletes the discounts created on it during dev previews: `kuhrt-codes`' test discount was gone afterwards. Discounts on stores with the released version installed were untouched.
+- On `kuhrt-codes-demo`, as the signed-in tagged customer, 6 + 6 variants of the T-shirt got 10% off those lines, and 25 + 25 got 15%. Signed out, the same 6 + 6 cart was at full price.
