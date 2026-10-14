@@ -318,6 +318,31 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.2)(happy-dom@20.14.6)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  apps/wholesale-discount/extensions/wholesale-home:
+    dependencies:
+      '@preact/signals':
+        specifier: 2.11.3
+        version: 2.11.3(preact@10.29.8)
+      '@shopify/ui-extensions':
+        specifier: 2026.7.4
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+      preact:
+        specifier: 10.29.8
+        version: 10.29.8
+    devDependencies:
+      '@repo/config':
+        specifier: workspace:*
+        version: link:../../../../packages/config
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(happy-dom@20.14.6)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/wholesale-discount/extensions/wholesale-tiers:
     dependencies:
       '@shopify/shopify_function':
@@ -351,6 +376,31 @@ importers:
       graphql:
         specifier: ^16.11.0
         version: 16.14.2
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(happy-dom@20.14.6)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  apps/wholesale-discount/extensions/wholesale-tiers-settings:
+    dependencies:
+      '@preact/signals':
+        specifier: 2.11.3
+        version: 2.11.3(preact@10.29.8)
+      '@shopify/ui-extensions':
+        specifier: 2026.7.4
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+      preact:
+        specifier: 10.29.8
+        version: 10.29.8
+    devDependencies:
+      '@repo/config':
+        specifier: workspace:*
+        version: link:../../../../packages/config
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2028,6 +2078,14 @@ packages:
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
 
+  '@preact/signals-core@1.14.4':
+    resolution: {integrity: sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA==}
+
+  '@preact/signals@2.11.3':
+    resolution: {integrity: sha512-mttwFM98G/JiriTgMwU+UWygL6sfVmYEiNcPSKkUnv4PxPpZhmP2ugGC4qi360+ZIHyQ8NY05bfJT3b4RUIGlw==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
+
   '@react-router/dev@7.18.2':
     resolution: {integrity: sha512-EHd0nt6JzrrJzIQLD0VkomLQ5mRaaVdnvYmY86s2OHSiPvlRIFT4mftn1xzahDgmV1qDEf5lqSs3Yqr0tGELBg==}
     engines: {node: '>=20.0.0'}
@@ -2400,6 +2458,17 @@ packages:
   '@shopify/storefront-api-client@2.0.1':
     resolution: {integrity: sha512-GsEb5L3y8ffqWHr7LPyrs8tFtfZJPlyC1kS3YClGQXX1eWS3HqWysvMwnEiXbYwCA0pUkthvAcqLZj/xXx3wCQ==}
 
+  '@shopify/ui-extensions@2026.7.4':
+    resolution: {integrity: sha512-z0CcCIpQCAYnEJ+A4pW0zW1KdVQZnrD4uZVMWcci8IeCTCF62yYm0k5CZCnwdrP70l2v7ZX3rsy/bGqOjRAbug==}
+    peerDependencies:
+      '@preact/signals': '*'
+      preact: '*'
+    peerDependenciesMeta:
+      '@preact/signals':
+        optional: true
+      preact:
+        optional: true
+
   '@sindresorhus/is@7.2.0':
     resolution: {integrity: sha512-P1Cz1dWaFfR4IR+U13mqqiGsLFf1KbayybWwdd2vfctdV6hDpUkgCY0nKOLLTMSoRd/jJNjtbqzf13K8DCCXQw==}
     engines: {node: '>=18'}
@@ -2428,6 +2497,9 @@ packages:
         optional: true
       '@types/react-dom':
         optional: true
+
+  '@ts-morph/common@0.26.1':
+    resolution: {integrity: sha512-Sn28TGl/4cFpcM+jwsH1wLncYq3FtN/BIpem+HOygfBWPT5pAeS5dB4VFVzV8FbnOKHpDLZmvAl4AjPEev5idA==}
 
   '@turbo/darwin-64@2.11.7':
     resolution: {integrity: sha512-Z2LFOxwbiJueD1miByXJS/BrW21vv6YaQXZustty5jEX4vQYw6zyh101Sz1QO7WG0mqBzKagZ/DoAeeujI0/Sw==}
@@ -2828,6 +2900,9 @@ packages:
   clone@1.0.4:
     resolution: {integrity: sha512-JQHZ2QMW6l3aH/j6xCqQThY/9OH4D/9ls34cgkUBiEeocRTU04tHfKPBsUK1PqZCUQM7GiA0IIXJSuXHI64Kbg==}
     engines: {node: '>=0.8'}
+
+  code-block-writer@13.0.3:
+    resolution: {integrity: sha512-Oofo0pq3IKnsFtuHqSF7TqBfr71aeyZDVJ0HpmqB7FBM2qEigL0iPONSCZSO9pE9dZTAxANe5XHG9Uy0YMv8cg==}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -4084,6 +4159,9 @@ packages:
   pascal-case@3.1.2:
     resolution: {integrity: sha512-uWlGT3YSnK9x3BQJaOdcZwrnV6hPpd8jFH1/ucpiLRPh/2zCVJKS19E4GvYHvaCcACn3foXZ0cLB9Wrx1KGe5g==}
 
+  path-browserify@1.0.1:
+    resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
+
   path-case@3.0.4:
     resolution: {integrity: sha512-qO4qCFjXqVTrcbPt/hQfhTQ+VhFsqNKOPtytgNKkKxSoEp3XPUQ8ObFuePylOIok5gjn69ry8XiULxCwot3Wfg==}
 
@@ -4150,6 +4228,14 @@ packages:
   postcss@8.5.29:
     resolution: {integrity: sha512-49cGhUbXj8Qenv0iTMxA1cFBzxXoctpC9Ujd77t1WcbJIr6nF/eI7g/8MgxrYldFRuAXvja7xQRwavoW7kgrxQ==}
     engines: {node: ^10 || ^12 || >=14}
+
+  preact@10.29.8:
+    resolution: {integrity: sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==}
+    peerDependencies:
+      preact-render-to-string: '>=5'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -4501,6 +4587,9 @@ packages:
 
   ts-log@2.2.7:
     resolution: {integrity: sha512-320x5Ggei84AxzlXp91QkIGSw5wgaLT6GeAH0KsqDmRZdVWW2OiSeVvElVoatk3f7nicwXlElXsoFkARiGE2yg==}
+
+  ts-morph@25.0.1:
+    resolution: {integrity: sha512-QJEiTdnz1YjrB3JFhd626gX4rKHDLSjSVMvGGG4v7ONc3RBwa0Eei98G9AT9uNFDMtV54JyuXsFeC+OH0n6bXQ==}
 
   tslib@2.6.3:
     resolution: {integrity: sha512-xNvxJEOUiWPGhUuUdQgAJPKOOJfGnIyKySOc09XkKsgdUV/3E2zvwZYdejjmRgPCgcym1juLH3226yA7sEFJKQ==}
@@ -6674,6 +6763,13 @@ snapshots:
 
   '@poppinss/exception@1.2.3': {}
 
+  '@preact/signals-core@1.14.4': {}
+
+  '@preact/signals@2.11.3(preact@10.29.8)':
+    dependencies:
+      '@preact/signals-core': 1.14.4
+      preact: 10.29.8
+
   '@react-router/dev@7.18.2(@react-router/serve@7.18.2(react-router@7.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(supports-color@7.2.0)(typescript@6.0.3))(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(react-router@7.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(supports-color@7.2.0)(tsx@4.23.15)(typescript@6.0.3)(vite@6.4.4(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.15)(yaml@2.9.1))(wrangler@4.149.0(@types/node@24.19.2))(yaml@2.9.1)':
     dependencies:
       '@babel/core': 7.29.7(supports-color@7.2.0)
@@ -7012,6 +7108,13 @@ snapshots:
     dependencies:
       '@shopify/graphql-client': 2.0.1
 
+  '@shopify/ui-extensions@2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)':
+    dependencies:
+      ts-morph: 25.0.1
+    optionalDependencies:
+      '@preact/signals': 2.11.3(preact@10.29.8)
+      preact: 10.29.8
+
   '@sindresorhus/is@7.2.0': {}
 
   '@speed-highlight/core@1.2.24': {}
@@ -7038,6 +7141,12 @@ snapshots:
     optionalDependencies:
       '@types/react': 18.3.31
       '@types/react-dom': 18.3.7(@types/react@18.3.31)
+
+  '@ts-morph/common@0.26.1':
+    dependencies:
+      fast-glob: 3.3.3
+      minimatch: 9.0.9
+      path-browserify: 1.0.1
 
   '@turbo/darwin-64@2.11.7':
     optional: true
@@ -7501,6 +7610,8 @@ snapshots:
       wrap-ansi: 7.0.0
 
   clone@1.0.4: {}
+
+  code-block-writer@13.0.3: {}
 
   color-convert@2.0.1:
     dependencies:
@@ -8867,6 +8978,8 @@ snapshots:
       no-case: 3.0.4
       tslib: 2.8.1
 
+  path-browserify@1.0.1: {}
+
   path-case@3.0.4:
     dependencies:
       dot-case: 3.0.4
@@ -8918,6 +9031,8 @@ snapshots:
       nanoid: 3.3.20
       picocolors: 1.1.1
       source-map-js: 1.2.2
+
+  preact@10.29.8: {}
 
   prelude-ls@1.2.1: {}
 
@@ -9339,6 +9454,11 @@ snapshots:
       typescript: 6.0.3
 
   ts-log@2.2.7: {}
+
+  ts-morph@25.0.1:
+    dependencies:
+      '@ts-morph/common': 0.26.1
+      code-block-writer: 13.0.3
 
   tslib@2.6.3: {}
 

@@ -4,22 +4,22 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
 
 ## 1. Spike: scaffold and platform checks (gate)
 
-- [ ] 1.1 Scaffold the two UI extensions as workspace packages, following the Function's layout.
+- [x] 1.1 Scaffold the two UI extensions as workspace packages, following the Function's layout.
   - Create `extensions/wholesale-tiers-settings` (`admin.discount-details.function-settings.render`) and `extensions/wholesale-home` (`admin.app.home.render`). Each needs a Preact entry rendering a placeholder, a `package.json` with lint/typecheck/test, and a `shopify.extension.toml`.
   - Use the latest stable `@shopify/ui-extensions` API version, re-checked now; record it in design.md.
   - Add `[extensions.ui] handle` to the Function's toml and `[[extensions.metafields]]` for the config to the settings toml.
-  - Set `scopes = "read_discounts"` in `shopify.app.toml`.
+  - Set `scopes = "write_discounts"` in `shopify.app.toml` (the settings target requires it; see design.md "Spike results").
   - Verify: `pnpm check` passes, and on `kuhrt-codes` the placeholder shows on the test discount's page and as the app's home page.
-- [ ] 1.2 Check the settings target on the test discount.
+- [x] 1.2 Check the settings target on the test discount.
   - Log `shopify.data` on a create page and an edit page.
   - From `submit`, write a changed config with `applyMetafieldChange`, then save the discount.
   - Reject the `waitUntil` promise and try to save.
-  - Remove `read_discounts` for one run to see if the write needs a scope.
+  - Note which scope the write uses: `write_discounts` is already required for the settings to render (task 1.1).
   - Verify: record in design.md "Spike results" how create and edit differ in `data`, that the write persists on save, whether a rejection blocks the save, and the write's scope need. **Gate: if a rejection does not block the save, stop and ask the user (design decision 3).**
-- [ ] 1.3 Check App Home and its queries.
+- [x] 1.3 Check App Home and its queries.
   - Run the decision 4 query from the extension.
   - Invoke the create intent with the returned Function ID and the edit intent with the test discount's node ID.
-  - Verify: record in design.md that App Home renders with no distribution method chosen, which scopes the query needs, and that both intents open the right page. **Gate: if App Home needs a distribution method, or `shopifyFunctions` needs a scope beyond `read_discounts`, stop and ask the user.**
+  - Verify: record in design.md that App Home renders with no distribution method chosen, which scopes the query needs, and that both intents open the right page. **Gate: if App Home needs a distribution method, or `shopifyFunctions` needs a scope beyond `write_discounts`, stop and ask the user.**
 - [ ] 1.4 Check the component test setup.
   - Render each placeholder with `@shopify/ui-extensions-tester` under Vitest 5 and assert one element by role.
   - Verify: both tests pass in `pnpm check`. If the tester doesn't work, switch to `@testing-library/preact` with a hand-written `shopify` mock, and record why in design.md.
@@ -40,10 +40,12 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
 ## 3. Settings extension UI (`wholesale-tiers-settings/src/Settings.tsx`)
 
 - [ ] 3.1 Render the tag and tier fields in `<s-function-settings>`.
-  - Defaults apply on create, and `fromSaved` on edit. Add and remove are disabled at the limits.
+  - Defaults and product-only discount classes apply on create, and `fromSaved` on edit. Add and remove are disabled at the limits.
+  - A hidden field carries the serialized form, with the saved form as its default (design decision 3).
   - Each invalid field shows `error`, with copy from the locale file keyed by issue code.
   - Verify: component tests show:
-    - defaults on create and saved values on edit;
+    - defaults and product-only classes on create, and saved values on edit;
+    - the hidden field changes with every edit, including adding and removing a tier, and defaults to empty on create;
     - an invalid saved config shows its values with errors on the right fields;
     - add and remove are disabled at the limits;
     - a non-increasing percentage marks that field.
@@ -56,9 +58,10 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
 - [ ] 3.3 Check the settings on `kuhrt-codes`.
   - Create a new wholesale discount with the defaults.
   - Edit the test discount's second tier and save, then check out as the tagged customer.
+  - Remove a tier and save, then add it back and save.
   - Edit and discard.
   - Enter a non-increasing percentage and try to save.
-  - Verify: the new discount applies at checkout with no further setup. The checkout uses the new tier. Discard restores the saved tier. The invalid field is marked and the save is blocked.
+  - Verify: the new discount applies at checkout with no further setup, with product as its only class. The checkout uses the new tier. Removing and adding a tier each show the save bar and save. Discard restores the saved tier. The invalid field is marked and the save is blocked.
 
 ## 4. App Home (`wholesale-home`)
 
@@ -74,7 +77,8 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
     - the create action in the empty, error and list states;
     - retry re-runs the load;
     - a row invokes the edit intent with its node ID;
-    - create invokes the create intent with the Function ID.
+    - create invokes the create intent with the Function ID;
+    - the list reloads after either intent completes.
 - [ ] 4.3 Check App Home on `kuhrt-codes`.
   - Create one non-wholesale automatic discount alongside the wholesale ones.
   - Break one wholesale discount's config with GraphiQL.

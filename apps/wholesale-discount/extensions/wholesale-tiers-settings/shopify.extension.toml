@@ -1,0 +1,16 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "wholesale-tiers-settings"
+uid = "44082428-9465-482a-8c82-12e53f499ed5cdfb7c3d"
+type = "ui_extension"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "admin.discount-details.function-settings.render"
+  module = "./src/index.tsx"
+
+  [[extensions.metafields]]
+  namespace = "$app"
+  key = "tier-config"

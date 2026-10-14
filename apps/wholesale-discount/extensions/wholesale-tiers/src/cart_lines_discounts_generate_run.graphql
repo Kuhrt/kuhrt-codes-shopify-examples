@@ -22,7 +22,7 @@ query CartInput($tag: String!) {
   }
   discount {
     discountClasses
-    metafield(namespace: "$app:wholesale-discount", key: "config") {
+    metafield(namespace: "$app", key: "tier-config") {
       jsonValue
     }
   }
