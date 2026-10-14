@@ -45,20 +45,20 @@ Prerequisite: `add-wholesale-tier-function` and `add-wholesale-discount-settings
 
 ## 4. Release on `kuhrt-codes-demo`
 
-- [ ] 4.1 Rename the app to "Wholesale Discount" and deploy a version with `pnpm app:deploy --allow-updates`. Then install it on `kuhrt-codes-demo` from the Dev Dashboard (design decision 1).
+- [x] 4.1 Rename the app to "Wholesale Discount" and deploy a version with `pnpm app:deploy --allow-updates`. Then install it on `kuhrt-codes-demo` from the Dev Dashboard (design decision 1).
   - Verify: the app appears in `kuhrt-codes-demo`'s admin with App Home listing no discounts.
-- [ ] 4.2 Check that a dev session doesn't reach the demo install.
+- [x] 4.2 Check that a dev session doesn't reach the demo install.
   - Start `shopify app dev` on `kuhrt-codes` with a changed discount message.
   - Then stop it and clean its preview.
   - Verify: the demo store's checkout keeps the released message. Record the result in design.md. If it changes, switch to the decision 1 fallback, then repeat 4.1.
-- [ ] 4.3 Run the demo setup against `kuhrt-codes-demo`, and create a wholesale discount there from App Home with the defaults.
+- [x] 4.3 Run the demo setup against `kuhrt-codes-demo`, and create a wholesale discount there from App Home with the defaults.
   - Verify: as the signed-in tagged customer (the user signs in), a cart of 6 + 6 variants of one product gets 10% off those lines. As a guest, the same cart is at full price. 50+ units get 15%.
 
 ## 5. Recording and index
 
-- [ ] 5.1 Record a 30–60 second GIF on `kuhrt-codes-demo` (design decision 5) and add it as `apps/wholesale-discount/docs/demo.gif` in the README.
+- [x] 5.1 Record a 30–60 second GIF on `kuhrt-codes-demo` (design decision 5) and add it as `apps/wholesale-discount/docs/demo.gif` in the README.
   - Verify: the README renders the GIF on GitHub, and it shows App Home, the settings, a tagged checkout with the tier applied, and the guest cart at full price.
-- [ ] 5.2 Add the app to the root README's examples index.
+- [x] 5.2 Add the app to the root README's examples index.
   - Verify: the row links to the app README, and every link in the root and app READMEs resolves.
 
 ## Workflow follow-up

@@ -32,7 +32,7 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 
 - Deploy a version of the existing app, install it on `kuhrt-codes-demo` from the Dev Dashboard, and keep developing with `shopify app dev` on `kuhrt-codes`.
 - Rename the app from "Wholesale Discount (dev)" to "Wholesale Discount" before deploying. The name is what merchants and the recording see, and with one app there is no second app to tell apart.
-- Check, before recording: start `shopify app dev` on `kuhrt-codes` with a visible change to the Function's discount message, and confirm the demo store's checkout still shows the released message. Stop the session and clean its preview afterwards.
+- Check, before recording: start `shopify app dev` on `kuhrt-codes` with a visible change to the Function's discount message, and confirm the demo store's checkout still shows the released message. Stop the session and clean its preview afterwards (the clean also deletes discounts created on the dev store; see "Release (4.x)").
 - **Fallback** if the check fails: App 1's shape. Create a production app with `shopify app config link`, keep it in `shopify.app.production.toml`, deploy with `--config production`, and restore the "(dev)" name on the development app. The scope contract test (decision 3) already reads every `shopify.app*.toml`.
 - **Alternative considered:** two apps from the start, to match App 1. Rejected: App 1's reason was URL rewriting, which this app doesn't have, and a second app doubles the configs a reviewer reads and the installs to maintain.
 
@@ -111,3 +111,13 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - With the customer already named "Keep Me" and tagged `keepme`, two runs left the name and `keepme` in place and added `wholesale`. `customerSet` with more fields would have overwritten the name, and its `tags` would have replaced the others.
 
 **README (3.x)**: whether `shopify app config link` keeps the `[discount.metafields.app.tier-config]` definition was not checked, since it would mean creating an app in the Partner org. The README tells the reader to copy the section over if it is missing, and the contract test checks every app config for it, so both cases are covered.
+
+**Release (4.x)**, checked 2026-10-14:
+- `wholesale-discount-2` was deployed and installed on `kuhrt-codes-demo` from the Dev Dashboard, with no distribution method chosen. App Home rendered there.
+- The deploy rewrote `shopify.app.toml` and dropped `include_config_on_deploy`, as it did for App 1. The configuration still shipped: the settings saved the `$app/tier-config` metafield on `kuhrt-codes-demo` and the Function priced carts from it.
+- The demo setup ran against `kuhrt-codes-demo` unchanged, and a "Wholesale pricing" automatic discount was created from App Home with the default settings.
+- One app is enough (decision 1). With `shopify app dev` running on `kuhrt-codes` and the Function's message changed, the `kuhrt-codes` cart showed the changed message while the demo store's cart kept the released one, before and after the session.
+- `shopify app dev clean` restores the released version on the dev store, but deletes the discounts created on it during dev previews: `kuhrt-codes`' test discount was gone afterwards. Discounts on stores with the released version installed were untouched.
+- On `kuhrt-codes-demo`, as the signed-in tagged customer, 6 + 6 variants of the T-shirt got 10% off those lines, and 25 + 25 got 15%. Signed out, the same 6 + 6 cart was at full price.
+
+**Recording (5.1)**: Claude in Chrome's recorder kept frames only around actions, dropped repeated screenshots, and captured App Home before its iframe drew. The GIF was assembled with ffmpeg from the recorder's frames plus a screenshot of the drawn App Home, with each scene held long enough to read: App Home, the settings, the tagged cart at 10% off and the guest cart at full price, about 37 seconds, 1280 px wide, under 1 MB. Every link in the root and app READMEs resolved; the GIF was checked on GitHub once pushed.
