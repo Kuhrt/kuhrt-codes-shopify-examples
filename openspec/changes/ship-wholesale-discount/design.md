@@ -45,7 +45,7 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - Each step shells out to `shopify store execute --json` with a `.graphql` file under `scripts/demo-setup/` and a variables file the script writes to a temporary directory.
 - Idempotency comes from the API's upserts, not from lookups the script compares itself:
   - products use `productSet` with a `handle` identifier, so a second run updates the same products;
-  - the customer uses `customerSet` with an `email` identifier, and the `wholesale` tag is part of its input **(check: task 2.1 — fall back to `customers(query: "email:…")` then `customerCreate` or `tagsAdd`)**;
+  - the customer uses `customerSet` with an `email` identifier and only the email as input, then `tagsAdd` adds `wholesale`. An existing customer with that email keeps their name and other tags;
   - products are published to the Online Store with `publishablePublish`, which is a no-op when already published.
 - Demo data, in the script as a typed constant: two products, each with three variants (for example a T-shirt in S/M/L and a cap in three colours), untracked inventory so checkout never runs out, and prices that make 10% and 15% visible.
 - The script is split so it can be tested without a store: a pure part (argument parsing, building each step's variables from the demo data) and a thin runner that executes the steps through an injected executor. Tests use a fake executor; the real one spawns the CLI.
@@ -91,3 +91,21 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 2. Run the demo setup against `kuhrt-codes-demo`, then create the wholesale discount there through App Home.
 3. Check tagged and guest checkouts there, then record.
 4. Rollback: uninstall the app from `kuhrt-codes-demo`. The demo products and customer are harmless to leave; the README says how to delete them.
+
+## Implementation notes
+
+**Seeding commands (2.1)**, checked 2026-10-14 on `kuhrt-codes` with Shopify CLI 4.9.3:
+- `shopify store auth -s kuhrt-codes.myshopify.com --scopes write_products,write_customers,write_publications` signs the developer in through the browser once. The stored token lasts 24 hours (`store auth list --json` shows `expiresAt`).
+- Each scope covers one step: `write_products` for `productSet`, `write_customers` for `customerSet`, `write_publications` for the `publications` lookup and `publishablePublish`. None of them is on the app.
+- `shopify store execute -s <store> --no-input --json --version 2026-10 --allow-mutations --query-file <f> --variable-file <f>` prints the operation's `data` as JSON on stdout. Progress lines and an assistant hint go to stderr. A mutation's `userErrors` come back with exit code 0, so the script must check them.
+- Run twice each, the steps changed nothing the second time:
+  - `productSet` with `identifier: { handle }` and `synchronous: true` returned the same product and variant IDs;
+  - `customerSet` with `identifier: { email }` returned the same customer, still tagged `wholesale`;
+  - `publishablePublish` to the Online Store succeeded again with the product still published.
+- The Online Store publication is found by name with `publications(first: 10)`, rather than hard-coded, since its ID differs per store.
+
+**Demo setup (2.2, 2.3)**
+- The script runs with Node's type stripping (`node scripts/demo-setup.ts`), as App 1's build scripts do. It calls the CLI's own `bin/run.js` with `process.execPath`, without a shell, so it behaves the same on Windows.
+- Exit codes: 0 when done, 1 when a step fails (the step is named), 2 for a usage error, before any store call. Through `pnpm --filter … demo:setup`, pnpm reports any failure as exit 1.
+- Run three times against `kuhrt-codes`: the store held exactly the two demo products (three variants each, published to the Online Store, buyable with untracked inventory) and one customer tagged `wholesale`.
+- With the customer already named "Keep Me" and tagged `keepme`, two runs left the name and `keepme` in place and added `wholesale`. `customerSet` with more fields would have overwritten the name, and its `tags` would have replaced the others.

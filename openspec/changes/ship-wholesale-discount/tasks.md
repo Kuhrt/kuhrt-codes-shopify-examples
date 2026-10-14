@@ -15,16 +15,16 @@ Prerequisite: `add-wholesale-tier-function` and `add-wholesale-discount-settings
 
 ## 2. Demo setup (`apps/wholesale-discount/scripts/demo-setup.ts`)
 
-- [ ] 2.1 Check the seeding commands on `kuhrt-codes`.
+- [x] 2.1 Check the seeding commands on `kuhrt-codes`.
   - Run `shopify store auth` with the smallest scope list that works.
   - Run `productSet` by handle, `customerSet` by email with the `wholesale` tag, and `publishablePublish` to the Online Store through `shopify store execute`, each twice.
   - Verify: record in design.md the scope list, that the second runs create nothing new, and the token lifetime the CLI reports. If `customerSet` doesn't upsert by email, use decision 2's fallback.
-- [ ] 2.2 Implement argument parsing, the demo data and each step's variables as pure functions, and the runner behind an executor interface.
+- [x] 2.2 Implement argument parsing, the demo data and each step's variables as pure functions, and the runner behind an executor interface.
   - Verify: Vitest with a fake executor shows:
     - no `--store` or no `--email` exits non-zero with no executor call;
     - each step's variables carry the demo data's handles and the given email;
     - a failed step stops the run and reports which step failed.
-- [ ] 2.3 Add the `demo:setup` script and the real executor, which spawns `shopify store execute --json`.
+- [x] 2.3 Add the `demo:setup` script and the real executor, which spawns `shopify store execute --json`.
   - Verify: running it twice against `kuhrt-codes` leaves exactly the demo products and one tagged customer, with no duplicates.
 
 ## 3. README and contract test

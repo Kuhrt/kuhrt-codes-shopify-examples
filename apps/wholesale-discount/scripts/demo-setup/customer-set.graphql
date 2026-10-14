@@ -1,0 +1,12 @@
+mutation CustomerSet($identifier: CustomerSetIdentifiers!, $input: CustomerSetInput!) {
+  customerSet(identifier: $identifier, input: $input) {
+    customer {
+      id
+    }
+    userErrors {
+      field
+      message
+      code
+    }
+  }
+}
