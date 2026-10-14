@@ -24,7 +24,7 @@ pnpm check
 
 `pnpm check` is the single quality gate: formatting, then build, lint, typecheck, and test for every package and app. CI runs the same command on every pull request and every push to `main`, alongside a secret scan.
 
-Each app is run from its own folder; its README has the exact commands.
+Each app is run from its own folder (or from the root with `pnpm --filter <app> dev`); its README has the exact commands. There is no root `dev`, because each app's `shopify app dev` session needs the terminal to itself.
 
 ### Development stores
 

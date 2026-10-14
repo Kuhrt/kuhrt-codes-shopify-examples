@@ -12,6 +12,7 @@ export const ignores = [
   '**/.react-router/**',
   '**/build/**',
   '**/dist/**',
+  '**/generated/**',
   '**/coverage/**',
   '**/worker-configuration.d.ts'
 ];

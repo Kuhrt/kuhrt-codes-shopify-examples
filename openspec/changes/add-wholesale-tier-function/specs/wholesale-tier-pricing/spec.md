@@ -87,11 +87,11 @@ A configuration SHALL be valid only when all of these hold:
 - **THEN** the configuration is rejected
 
 ### Requirement: Invalid or missing configuration fails safe
-When the discount has no configuration, or its configuration is invalid, the discount SHALL apply nothing and SHALL NOT fail the checkout. The Function's run log SHALL state why nothing applied.
+When the discount has no configuration, or its configuration is invalid, the discount SHALL apply nothing and SHALL NOT fail the checkout. The run log SHALL state why nothing applied: the Function's own reason for an invalid configuration, or Shopify's run error when the tag is missing.
 
 #### Scenario: Missing configuration
-- **WHEN** a discount backed by the Function has no configuration metafield
-- **THEN** no line is discounted, checkout proceeds at full price, and the run log names the missing configuration
+- **WHEN** a discount backed by the Function has no configuration metafield, or its configuration has no tag
+- **THEN** no line is discounted, checkout proceeds at full price, and the run log records the run as failed because the tag was not provided
 
 #### Scenario: Invalid configuration
 - **WHEN** the configuration fails validation

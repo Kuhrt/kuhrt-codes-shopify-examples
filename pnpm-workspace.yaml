@@ -1,7 +1,11 @@
 packages:
   - apps/*
+  - apps/*/extensions/*
   - packages/*
+catalog:
+  '@shopify/cli': 4.9.3
 allowBuilds:
   '@parcel/watcher': true
+  core-js: false
   esbuild: true
   workerd: true

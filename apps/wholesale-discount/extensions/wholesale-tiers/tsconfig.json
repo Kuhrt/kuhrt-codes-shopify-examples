@@ -1,0 +1,7 @@
+{
+  "extends": "@repo/config/tsconfig.base.json",
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"],
+  "compilerOptions": {
+    "types": ["node"]
+  }
+}

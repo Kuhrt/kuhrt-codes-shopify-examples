@@ -1,0 +1,17 @@
+{
+  "name": "wholesale-discount",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "shopify app dev",
+    "generate": "shopify app generate",
+    "app:deploy": "shopify app deploy",
+    "shopify": "shopify"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "devDependencies": {
+    "@shopify/cli": "catalog:"
+  }
+}

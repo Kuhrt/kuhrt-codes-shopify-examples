@@ -1,4 +1,5 @@
 node_modules
+apps/*/extensions/*/generated
 .turbo
 .wrangler
 .shopify/
