@@ -305,6 +305,9 @@ importers:
 
   apps/wholesale-discount:
     devDependencies:
+      '@repo/app-contract':
+        specifier: workspace:*
+        version: link:../../packages/app-contract
       '@repo/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -317,6 +320,9 @@ importers:
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
+      smol-toml:
+        specifier: 1.8.0
+        version: 1.8.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3

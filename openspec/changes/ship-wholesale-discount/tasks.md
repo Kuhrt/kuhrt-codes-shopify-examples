@@ -29,9 +29,9 @@ Prerequisite: `add-wholesale-tier-function` and `add-wholesale-discount-settings
 
 ## 3. README and contract test
 
-- [ ] 3.1 Add a `config:link` script to the app, as App 1 has.
+- [x] 3.1 Add a `config:link` script to the app, as App 1 has.
   - Verify: `pnpm --filter wholesale-discount config:link --help` runs the CLI's `app config link`.
-- [ ] 3.2 Write `apps/wholesale-discount/README.md` (design decision 4). Include:
+- [x] 3.2 Write `apps/wholesale-discount/README.md` (design decision 4). Include:
   - the template sections in App 1's order;
   - the Scripts comparison in five lines or fewer;
   - the distribution caveat;
@@ -40,7 +40,7 @@ Prerequisite: `add-wholesale-tier-function` and `add-wholesale-discount-settings
   - the scopes table.
   - Leave the GIF as a placeholder until group 5.
   - Verify: each requirement in the `wholesale-discount-guide` spec is checked against the README by reading it. The run-locally steps are five commands.
-- [ ] 3.3 Add `apps/wholesale-discount/app-contract.test.ts` using `@repo/app-contract`.
+- [x] 3.3 Add `apps/wholesale-discount/app-contract.test.ts` using `@repo/app-contract`.
   - Verify: it passes, and it fails naming the scope when `shopify.app.toml` gains a scope the README doesn't list (checked once and reverted).
 
 ## 4. Release on `kuhrt-codes-demo`
