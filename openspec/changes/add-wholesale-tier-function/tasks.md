@@ -21,7 +21,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - Verify, from the logged Function input:
     - `hasTags` resolves for the stored tag;
     - the `tiers` key is tolerated;
-    - a discount with no metafield still runs, rather than failing.
+    - what happens to a discount with no metafield, or one without `tag` (result: Shopify fails the run with `InvalidVariableValueError`; see decision 2).
   - Record the results under decision 2, and switch to the two-metafield fallback if needed.
 - [x] 1.4 Confirm a Function in this custom, extension-only app applies at checkout on `kuhrt-codes` (non-Plus development store), using the template Function. Verify: a checkout shows the template discount applied. **Gate: if it doesn't apply, stop and report to the user. Don't switch distribution or hosting.**
 - [x] 1.5 Confirm `shared/` bundles into both builds.
@@ -38,7 +38,8 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
 
 ## 2. Tier configuration module (`shared/tier-config.ts`)
 
-- [ ] 2.1 Add the config type, `parseTierConfig`, and typed failure reason codes (design decision 3), following every rule in "Valid configuration".
+- [ ] 2.1 Give `apps/wholesale-discount` its own `lint`, `typecheck` and `test` scripts, with tsconfig, eslint and Vitest configs that cover `shared/`, following App 1's package. Add `shared/**` to the Function build's turbo inputs, so editing it invalidates the cached Wasm. Verify: a failing test in `shared/` fails `pnpm check`, and editing a `shared/` file makes turbo rebuild `wholesale-tiers` instead of replaying its cache.
+- [ ] 2.2 Add the config type, `parseTierConfig`, and typed failure reason codes (design decision 3), following every rule in "Valid configuration".
   - Verify: Vitest covers:
     - the valid example;
     - empty tag;
@@ -50,7 +51,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
     - non-increasing percentages;
     - wrong JSON types (`null`, string, missing keys).
   - Each failure test asserts the reason code.
-- [ ] 2.2 Add `pickTier(tiers, quantity)`. Verify: unit tests cover below the lowest tier, exactly on each threshold, between tiers, and above the highest.
+- [ ] 2.3 Add `pickTier(tiers, quantity)`. Verify: unit tests cover below the lowest tier, exactly on each threshold, between tiers, and above the highest.
 
 ## 3. The Function (`extensions/wholesale-tiers`)
 
@@ -59,23 +60,22 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - Regenerate the types.
   - Verify: `shopify app function typegen` succeeds, and the query cost (computed by hand from the documented costs) is within the limit; record it in design.md.
 - [ ] 3.2 Implement `run`: the class guard, the customer and tag guard, config parsing with a logged reason, per-product grouping, `pickTier`, and one candidate per qualifying product (design decisions 4–7).
-  - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy" and "CI run". Tests assert targets, percentages and the operation list, never the message.
+  - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy", "CI run", and "Missing configuration" (Shopify fails that run before our code executes; task 4.1 checks it). Tests assert targets, percentages and the operation list, never the message.
 - [ ] 3.3 Replace the template fixtures with fixtures for these carts:
   - tagged customer, mixed variants reaching a tier;
   - two products below the tier;
   - exactly on the top threshold;
   - guest;
   - untagged customer;
-  - invalid config;
-  - missing config;
+  - config with a tag but missing or invalid `tiers`;
   - a non-product line.
   - Add one fixture captured from a real `kuhrt-codes` run (input copied from the Dev Dashboard run log).
-  - Verify: the fixture suite passes, and editing one expected percentage in a fixture makes it fail.
+  - The candidate message comes from one constant, so a copy change is a single, visible fixture update. Verify: the fixture suite passes, and editing one expected percentage in a fixture makes it fail.
 
 ## 4. Integration check on `kuhrt-codes`
 
-- [ ] 4.1 With `shopify app dev` running, set the config on a test automatic discount via GraphiQL and check out three ways: as a customer tagged `wholesale`, as an untagged customer, and as a guest, each with 6 + 6 variants of one product. Then change the config's tag to `vip`, tag the second customer `vip`, and check out again.
-  - Verify: the discount applies only to the tagged customer, then only to the `vip` customer, with no redeploy in between. The Function logs in the Dev Dashboard match.
+- [ ] 4.1 With `shopify app dev` running, set the config on a test automatic discount via GraphiQL and check out three ways: as a customer tagged `wholesale`, as an untagged customer, and as a guest, each with 6 + 6 variants of one product. Then change the config's tag to `vip`, tag the second customer `vip`, and check out again. Finally, remove `tag` from the config and check out as the `vip` customer.
+  - Verify: the discount applies only to the tagged customer, then only to the `vip` customer, with no redeploy in between. The last checkout is at full price, and the Dev Dashboard shows that run failed with `InvalidVariableValueError`. The Function logs in the Dev Dashboard match.
 
 ## Workflow follow-up
 

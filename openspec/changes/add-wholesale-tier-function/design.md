@@ -46,9 +46,10 @@ See `proposal.md`, "Why". These platform facts come from shopify.dev, checked 20
 ```
 apps/wholesale-discount/
   shopify.app.toml                 extension-only app, dev store kuhrt-codes
-  shared/tier-config.ts            config shape, validate, pickTier   <-- also imported by
-  extensions/wholesale-tiers/                                              the settings UI
-    package.json                   its own workspace package (Shopify's layout)  (next change)
+  package.json                     lint/typecheck/test for shared/ (task 2.1)
+  shared/tier-config.ts            config shape, validate, pickTier   <-- also imported by the
+  extensions/wholesale-tiers/                                              settings UI (next change)
+    package.json                   its own workspace package (Shopify's layout)
     shopify.extension.toml         target + input_variables
     src/cart_lines_discounts_generate_run.graphql   input query ($tag variable)
     src/cart_lines_discounts_generate_run.ts        the Function: guard, group by product, candidates
@@ -185,7 +186,8 @@ Checked 2026-10-13 on `kuhrt-codes` (Partner development store, not Plus).
 
 **CI without credentials (1.2)**
 - The test helpers shell out to `shopify app function build` and `shopify app function info`.
-- With `APPDATA` and `LOCALAPPDATA` pointed at empty directories (no login, no cached binaries), the build and all fixture tests pass.
+- With `APPDATA` and `LOCALAPPDATA` pointed at empty directories (no login, no CLI session), the build and all fixture tests pass.
+- Network: on first build the CLI downloads Javy, function-runner, the Javy plugin Wasm and `wasm-opt` into its own package directory (`node_modules/.pnpm/@shopify+cli@*/node_modules/@shopify/cli/bin/`). They come from GitHub, need no credentials, and are re-downloaded on every CI run because `node_modules` is fresh. The local check reused binaries already in that directory, so the Linux CI run is the first real test of the download path.
 - `schema.graphql` is committed, because refreshing it (`shopify app function schema`) needs the linked app.
 
 **Input query variables (1.3)**

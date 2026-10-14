@@ -13,8 +13,5 @@
   },
   "devDependencies": {
     "@shopify/cli": "4.9.3"
-  },
-  "dependencies": {
-    "@shopify/shopify_function": "~2.0.1"
   }
 }

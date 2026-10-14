@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
-  buildFunction,
   type FunctionInfo,
   getFunctionInfo,
   loadFixture,
@@ -23,16 +22,16 @@ describe('compiled Function against recorded fixtures', () => {
   let schema: GraphQLSchema;
 
   beforeAll(async () => {
-    const build = await buildFunction(functionDir);
-    expect(build.error).toBeNull();
-    expect(build.success).toBe(true);
     info = await getFunctionInfo(functionDir);
+    expect(fs.existsSync(info.wasmPath), 'run the build before the tests').toBe(true);
     schema = await loadSchema(info.schemaPath);
-  }, 60_000);
+  }, 30_000);
 
   test.each(fixtureFiles)('%s', async (file) => {
     const fixture = await loadFixture(path.join(fixturesDir, file));
-    const inputQueryPath: string = info.targeting[fixture.target].inputQueryPath;
+    const target: { inputQueryPath: string } | undefined = info.targeting[fixture.target];
+    if (!target) throw new Error(`${file} names unknown target ${fixture.target}`);
+    const { inputQueryPath } = target;
     const inputQueryAST = await loadInputQuery(inputQueryPath);
 
     const validation = await validateTestAssets({ schema, fixture, inputQueryAST });
