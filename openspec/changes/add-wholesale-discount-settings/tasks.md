@@ -55,7 +55,7 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
     - an invalid submit rejects without calling it;
     - an `error` result shows a banner and rejects;
     - reset restores the last saved values and their issues.
-- [ ] 3.3 Check the settings on `kuhrt-codes`.
+- [x] 3.3 Check the settings on `kuhrt-codes`.
   - Create a new wholesale discount with the defaults.
   - Edit the test discount's second tier and save, then check out as the tagged customer.
   - Remove a tier and save, then add it back and save.

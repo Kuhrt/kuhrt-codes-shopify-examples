@@ -190,3 +190,5 @@ Checked 2026-10-14 on `kuhrt-codes` with Shopify CLI 4.9.3.
 - In the edit modal opened by the `edit:shopify/Discount` intent, changing the tag or a percentage showed no save bar. The same change on the full page did. Rows now link to the full page (decision 4).
 - With a non-wholesale automatic discount on the store and the test discount's config made non-increasing, App Home listed only the two wholesale discounts and marked the test discount as needing attention. A row link opened the full discount page.
 - The App Home bundle is 27.4 KB, about 9.6 KB compressed, well under 64 KB.
+- Checkout as the customer tagged `wholesale`, with "Wholesale live check" at 10+ for 12% next to the test discount at 10%: both 6-unit wax lines got "Wholesale 12% off", so the discount created through App Home applied with no further setup and its tier change took effect. The discount was then deleted.
+- `shopify app build` writes `manifest.json` in each UI extension; the root `.gitignore` (which Prettier also reads) now ignores it.
