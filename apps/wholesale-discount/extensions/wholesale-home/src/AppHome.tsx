@@ -1,4 +1,3 @@
-import type { Api } from '@shopify/ui-extensions/admin.app.home.render';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 
 import {
@@ -12,8 +11,6 @@ type State =
   | { status: 'loading' }
   | { status: 'error' }
   | { status: 'ready'; rows: DiscountRow[]; functionId: string };
-
-declare const shopify: Api;
 
 const STATUS_TONES = {
   ACTIVE: 'success',

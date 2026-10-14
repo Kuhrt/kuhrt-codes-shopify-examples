@@ -19,8 +19,6 @@ import {
   validateForm
 } from './form';
 
-declare const shopify: import('@shopify/ui-extensions/admin.discount-details.function-settings.render').Api;
-
 const t = (key: string): string => shopify.i18n.translate(key);
 
 interface InitialSettings {
