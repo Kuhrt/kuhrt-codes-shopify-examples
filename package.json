@@ -7,7 +7,6 @@
     "node": ">=24 <25"
   },
   "scripts": {
-    "dev": "turbo run dev",
     "format": "prettier --write .",
     "check": "prettier --check . && turbo build lint typecheck test"
   },

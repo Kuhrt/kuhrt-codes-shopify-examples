@@ -12,6 +12,6 @@
     "node": ">=24 <25"
   },
   "devDependencies": {
-    "@shopify/cli": "4.9.3"
+    "@shopify/cli": "catalog:"
   }
 }

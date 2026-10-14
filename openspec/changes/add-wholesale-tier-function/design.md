@@ -175,7 +175,9 @@ Checked 2026-10-13 on `kuhrt-codes` (Partner development store, not Plus).
 - Workspace changes:
   - `pnpm-workspace.yaml` adds `apps/*/extensions/*`, so extensions with their own `package.json` are workspace packages, as in Shopify's templates.
   - `allowBuilds` declines `core-js` (its postinstall only prints a funding message).
-  - `.prettierignore` skips `generated/` and the Shopify-provided `schema.graphql`.
+  - The root `.gitignore` (which Prettier also reads) and the shared ESLint preset ignore extensions' `generated/`. `.prettierignore` skips the Shopify-provided `schema.graphql`.
+  - A pnpm `catalog:` pins `@shopify/cli` once for every package.
+  - The root `dev` script is removed: each app's `shopify app dev` needs the terminal to itself, so apps are started one at a time (`pnpm --filter <app> dev`).
 - Versions:
   - `@shopify/cli` 4.9.3;
   - `@shopify/shopify_function` 2.0.1;

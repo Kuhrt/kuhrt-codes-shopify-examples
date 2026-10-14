@@ -162,6 +162,12 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@shopify/cli':
+      specifier: 4.9.3
+      version: 4.9.3
+
 importers:
 
   .:
@@ -234,7 +240,7 @@ importers:
         specifier: 0.7.2
         version: 0.7.2
       '@shopify/cli':
-        specifier: 4.9.3
+        specifier: 'catalog:'
         version: 4.9.3
       '@shopify/polaris-types':
         specifier: ^1.0.1
@@ -297,7 +303,7 @@ importers:
   apps/wholesale-discount:
     devDependencies:
       '@shopify/cli':
-        specifier: 4.9.3
+        specifier: 'catalog:'
         version: 4.9.3
 
   apps/wholesale-discount/extensions/wholesale-tiers:
@@ -319,7 +325,7 @@ importers:
         specifier: workspace:*
         version: link:../../../../packages/config
       '@shopify/cli':
-        specifier: 4.9.3
+        specifier: 'catalog:'
         version: 4.9.3
       '@shopify/shopify-function-test-helpers':
         specifier: ^1.1.0
