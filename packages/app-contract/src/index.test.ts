@@ -4,7 +4,23 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { appConfigFiles, scopesFromReadme, scopesFromToml } from './index';
+import {
+  appConfigFiles,
+  readAppConfig,
+  readReadme,
+  scopesFromReadme,
+  scopesFromToml
+} from './index';
+
+let dir: string;
+
+beforeEach(() => {
+  dir = mkdtempSync(path.join(tmpdir(), 'app-contract-'));
+});
+
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
 
 describe('scopesFromReadme', () => {
   const readme = [
@@ -57,16 +73,6 @@ describe('scopesFromToml', () => {
 });
 
 describe('appConfigFiles', () => {
-  let dir: string;
-
-  beforeEach(() => {
-    dir = mkdtempSync(path.join(tmpdir(), 'app-contract-'));
-  });
-
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
   it('finds the default and named app configs only', () => {
     for (const name of [
       'shopify.app.toml',
@@ -86,5 +92,48 @@ describe('appConfigFiles', () => {
     writeFileSync(path.join(dir, 'package.json'), '');
 
     expect(appConfigFiles(dir)).toEqual([]);
+  });
+});
+
+describe('readReadme', () => {
+  it('returns the README text', () => {
+    writeFileSync(path.join(dir, 'README.md'), '# App\n\n## Access scopes\n');
+
+    expect(readReadme(dir)).toBe('# App\n\n## Access scopes\n');
+  });
+
+  it('throws when there is no README', () => {
+    expect(() => readReadme(dir)).toThrow(/ENOENT/);
+  });
+});
+
+describe('readAppConfig', () => {
+  it('parses nested tables and arrays', () => {
+    const toml = [
+      'name = "App"',
+      '',
+      '[access_scopes]',
+      'scopes = "write_products"',
+      '',
+      '[[webhooks.subscriptions]]',
+      'topics = ["app/uninstalled"]'
+    ].join('\n');
+    writeFileSync(path.join(dir, 'shopify.app.toml'), toml);
+
+    expect(readAppConfig(dir, 'shopify.app.toml')).toEqual({
+      name: 'App',
+      access_scopes: { scopes: 'write_products' },
+      webhooks: { subscriptions: [{ topics: ['app/uninstalled'] }] }
+    });
+  });
+
+  it('throws on invalid TOML', () => {
+    writeFileSync(path.join(dir, 'shopify.app.toml'), 'name = ');
+
+    expect(() => readAppConfig(dir, 'shopify.app.toml')).toThrow();
+  });
+
+  it('throws when the config is missing', () => {
+    expect(() => readAppConfig(dir, 'shopify.app.toml')).toThrow(/ENOENT/);
   });
 });

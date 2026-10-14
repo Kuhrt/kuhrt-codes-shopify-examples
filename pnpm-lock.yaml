@@ -287,9 +287,6 @@ importers:
       liquidjs:
         specifier: 10.29.0
         version: 10.29.0
-      smol-toml:
-        specifier: 1.8.0
-        version: 1.8.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -320,9 +317,6 @@ importers:
       eslint:
         specifier: ^10.12.0
         version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
-      smol-toml:
-        specifier: 1.8.0
-        version: 1.8.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -439,6 +433,10 @@ importers:
         version: 5.0.3(@types/node@24.19.2)(happy-dom@20.14.6)(jsdom@30.1.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/app-contract:
+    dependencies:
+      smol-toml:
+        specifier: 1.8.0
+        version: 1.8.0
     devDependencies:
       '@repo/config':
         specifier: workspace:*

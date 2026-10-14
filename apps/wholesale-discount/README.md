@@ -20,16 +20,16 @@ Shopify Scripts stopped running on 2026-06-30. A Script edited line prices in Ru
 
 <!-- Demo recording coming soon. -->
 
-To recreate the demo on your own development store, sign in once as a developer. This is your own sign-in with the scopes below, not the app's access scopes, and it lasts 24 hours:
+To recreate the demo on your own development store, sign in once as a developer with these scopes (not the app's). The sign-in lasts 24 hours; when the setup reports an auth error, run the auth command again:
 
 ```sh
 pnpm --filter wholesale-discount exec shopify store auth -s your-dev-store.myshopify.com --scopes write_products,write_customers,write_publications
 pnpm --filter wholesale-discount demo:setup --store your-dev-store.myshopify.com --email you@example.com
 ```
 
-Use an address you can receive mail at: customer accounts sign in with an emailed code. The setup creates two products with three variants each (handles `wholesale-demo-t-shirt` and `wholesale-demo-cap`), published to the Online Store, and one customer tagged `wholesale`. Running it again changes nothing. If a customer with that email already exists, they keep their name and tags and just gain `wholesale`.
+Use an address you can receive mail at: customer accounts sign in with an emailed code. The setup creates two products with three variants each (handles `wholesale-demo-t-shirt` and `wholesale-demo-cap`), published to the Online Store, and one customer tagged `wholesale`. Running it again creates no duplicates. If a customer with that email already exists, they keep their name and tags and just gain `wholesale`.
 
-To remove the demo data, delete those two products and the customer in the admin.
+To remove the demo data, delete those two products and the customer in the admin, or remove the `wholesale` tag if the customer existed before.
 
 ## Shopify features shown
 
@@ -38,7 +38,7 @@ To remove the demo data, delete those two products and the customer in the admin
 - **App-owned metafield definition** with merchant read and write access, holding the tag and tiers
 - **Discount function settings UI extension** (Polaris web components, Preact) shown inside Shopify's discount pages, with validation shared with the Function
 - **App Home UI extension**, hosted by Shopify, listing the store's wholesale discounts and opening the create page through intents
-- **Extension-only app**: no server, no database, no hosted backend
+- **Extension-only app**: no server, no database
 
 ## Architecture
 
@@ -82,7 +82,7 @@ pnpm config:link
 pnpm dev --store your-dev-store.myshopify.com
 ```
 
-`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one). `pnpm dev` builds the extensions and starts a dev preview on your development store. Open the app from the admin, create a discount from App Home, then check out as a customer with the tag.
+`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one); the `shopify.app.*.toml` it writes may not include the `[discount.metafields.app.tier-config]` section. If it doesn't, copy it over from `shopify.app.toml`; without it the discount settings can't save. `pnpm test` checks every app config for it. `pnpm dev` builds the extensions and starts a dev preview on your development store. Open the app from the admin, create a discount from App Home, then check out as a customer with the tag (the [demo setup](#demo) creates one).
 
 ## Deploy
 
