@@ -38,8 +38,8 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
 
 ## 2. Tier configuration module (`shared/tier-config.ts`)
 
-- [ ] 2.1 Give `apps/wholesale-discount` its own `lint`, `typecheck` and `test` scripts, with tsconfig, eslint and Vitest configs that cover `shared/`, following App 1's package. Add `shared/**` to the Function build's turbo inputs, so editing it invalidates the cached Wasm. Verify: a failing test in `shared/` fails `pnpm check`, and editing a `shared/` file makes turbo rebuild `wholesale-tiers` instead of replaying its cache.
-- [ ] 2.2 Add the config type, `parseTierConfig`, and typed failure reason codes (design decision 3), following every rule in "Valid configuration".
+- [x] 2.1 Give `apps/wholesale-discount` its own `lint`, `typecheck` and `test` scripts, with tsconfig, eslint and Vitest configs that cover `shared/`, following App 1's package. Add `shared/**` to the Function build's turbo inputs, so editing it invalidates the cached Wasm. Verify: a failing test in `shared/` fails `pnpm check`, and editing a `shared/` file makes turbo rebuild `wholesale-tiers` instead of replaying its cache.
+- [x] 2.2 Add the config type, `parseTierConfig`, and typed issues, each with a code and the path of the field it belongs to (design decision 3), following every rule in "Valid configuration".
   - Verify: Vitest covers:
     - the valid example;
     - empty tag;
@@ -50,8 +50,8 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
     - non-increasing minimums;
     - non-increasing percentages;
     - wrong JSON types (`null`, string, missing keys).
-  - Each failure test asserts the reason code.
-- [ ] 2.3 Add `pickTier(tiers, quantity)`. Verify: unit tests cover below the lowest tier, exactly on each threshold, between tiers, and above the highest.
+  - Each failure test asserts the issue codes and paths, including several issues reported together.
+- [x] 2.3 Add `pickTier(tiers, quantity)`. Verify: unit tests cover below the lowest tier, exactly on each threshold, between tiers, and above the highest.
 
 ## 3. The Function (`extensions/wholesale-tiers`)
 
@@ -59,7 +59,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
   - It reads cart lines with quantity and `ProductVariant` product id, `hasTags(tags: [$tag])`, the config metafield, and `discountClasses`.
   - Regenerate the types.
   - Verify: `shopify app function typegen` succeeds, and the query cost (computed by hand from the documented costs) is within the limit; record it in design.md.
-- [ ] 3.2 Implement `run`: the class guard, the customer and tag guard, config parsing with a logged reason, per-product grouping, `pickTier`, and one candidate per qualifying product (design decisions 4–7).
+- [ ] 3.2 Implement `run`: the class guard, the customer and tag guard, config parsing with the issue codes logged, per-product grouping, `pickTier`, and one candidate per qualifying product (design decisions 4–7).
   - Verify: Vitest, importing `run` directly, covers every scenario in the `wholesale-tier-pricing` spec except "Tag changed without a redeploy", "CI run", and "Missing configuration" (Shopify fails that run before our code executes; task 4.1 checks it). Tests assert targets, percentages and the operation list, never the message.
 - [ ] 3.3 Replace the template fixtures with fixtures for these carts:
   - tagged customer, mixed variants reaching a tier;
