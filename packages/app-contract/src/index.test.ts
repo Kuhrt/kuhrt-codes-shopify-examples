@@ -17,11 +17,7 @@ describe('scopesFromReadme', () => {
     '| `write_products` | Edits products |',
     '| `read_customers` | Reads customers |',
     '',
-    'Trailing prose.',
-    '',
-    '## Next section',
-    '',
-    '| `read_orders` | Not a scope of this app |'
+    'Trailing prose.'
   ].join('\n');
 
   it('returns the backticked scopes from the table, sorted', () => {
@@ -29,7 +25,8 @@ describe('scopesFromReadme', () => {
   });
 
   it('ignores tables in later sections', () => {
-    expect(scopesFromReadme(readme)).not.toContain('read_orders');
+    const withLaterTable = `${readme}\n\n## Next section\n\n| Scope | Why |\n| --- | --- |\n| \`read_orders\` | Elsewhere |`;
+    expect(scopesFromReadme(withLaterTable)).toEqual(['read_customers', 'write_products']);
   });
 
   it('returns no scopes when the table has only a header', () => {
