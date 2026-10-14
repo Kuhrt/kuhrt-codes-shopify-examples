@@ -18,7 +18,7 @@ Shopify Scripts stopped running on 2026-06-30. A Script edited line prices in Ru
 
 ## Demo
 
-<!-- Demo recording coming soon. -->
+![App Home listing the wholesale discount, its tag and tier settings in the discount page, a signed-in wholesale customer's cart of 12 T-shirts at 10% off, then the same cart at full price after signing out](docs/demo.gif)
 
 To recreate the demo on your own development store, sign in once as a developer with these scopes (not the app's). The sign-in lasts 24 hours; when the setup reports an auth error, run the auth command again:
 

@@ -118,3 +118,5 @@ See `proposal.md`, "Why". The app's shape and platform facts come from `add-whol
 - One app is enough (decision 1). With `shopify app dev` running on `kuhrt-codes` and the Function's message changed, the `kuhrt-codes` cart showed the changed message while the demo store's cart kept the released one, before and after the session.
 - `shopify app dev clean` restores the released version on the dev store, but deletes the discounts created on it during dev previews: `kuhrt-codes`' test discount was gone afterwards. Discounts on stores with the released version installed were untouched.
 - On `kuhrt-codes-demo`, as the signed-in tagged customer, 6 + 6 variants of the T-shirt got 10% off those lines, and 25 + 25 got 15%. Signed out, the same 6 + 6 cart was at full price.
+
+**Recording (5.1)**: Claude in Chrome's recorder kept frames only around actions, dropped repeated screenshots, and captured App Home before its iframe drew. The GIF was assembled with ffmpeg from the recorder's frames plus a screenshot of the drawn App Home, with each scene held long enough to read: about 37 seconds, 1280 px wide, under 1 MB.

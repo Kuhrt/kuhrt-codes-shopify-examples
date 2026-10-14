@@ -56,9 +56,9 @@ Prerequisite: `add-wholesale-tier-function` and `add-wholesale-discount-settings
 
 ## 5. Recording and index
 
-- [ ] 5.1 Record a 30–60 second GIF on `kuhrt-codes-demo` (design decision 5) and add it as `apps/wholesale-discount/docs/demo.gif` in the README.
+- [x] 5.1 Record a 30–60 second GIF on `kuhrt-codes-demo` (design decision 5) and add it as `apps/wholesale-discount/docs/demo.gif` in the README.
   - Verify: the README renders the GIF on GitHub, and it shows App Home, the settings, a tagged checkout with the tier applied, and the guest cart at full price.
-- [ ] 5.2 Add the app to the root README's examples index.
+- [x] 5.2 Add the app to the root README's examples index.
   - Verify: the row links to the app README, and every link in the root and app READMEs resolves.
 
 ## Workflow follow-up
