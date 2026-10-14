@@ -74,7 +74,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` (quality gate, C
 
 ## 4. Integration check on `kuhrt-codes`
 
-- [ ] 4.1 With `shopify app dev` running, set the config on a test automatic discount via GraphiQL and check out three ways: as a customer tagged `wholesale`, as an untagged customer, and as a guest, each with 6 + 6 variants of one product. Then change the config's tag to `vip`, tag the second customer `vip`, and check out again. Finally, remove `tag` from the config and check out as the `vip` customer.
+- [x] 4.1 With `shopify app dev` running, set the config on a test automatic discount via GraphiQL and check out three ways: as a customer tagged `wholesale`, as an untagged customer, and as a guest, each with 6 + 6 variants of one product. Then change the config's tag to `vip`, tag the second customer `vip`, and check out again. Finally, remove `tag` from the config and check out as the `vip` customer.
   - Verify: the discount applies only to the tagged customer, then only to the `vip` customer, with no redeploy in between. The last checkout is at full price, and the Dev Dashboard shows that run failed with `InvalidVariableValueError`. The Function logs in the Dev Dashboard match.
 
 ## Workflow follow-up
