@@ -4,7 +4,7 @@
   "headings": {
     "settings": "Wholesale tiers",
     "tiers": "Tiers",
-    "saveFailed": "The wholesale settings could not be saved"
+    "classesFailed": "The discount could not be limited to product discounts"
   },
   "fields": {
     "tag": "Customer tag",

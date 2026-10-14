@@ -100,38 +100,27 @@ function TierRow({ index, tier, issues, canRemove, onChange, onRemove }: TierRow
 export function Settings() {
   const [initial] = useState(loadInitialSettings);
   const [form, setForm] = useState(initial.saved);
-  const [saveError, setSaveError] = useState<string>();
+  const [classesError, setClassesError] = useState<string>();
   const issues = issuesOf(form);
   const tierCountError = fieldError(issues, TIER_LIST_KEY);
 
   useEffect(() => {
     if (!initial.isCreate) return;
     const result = shopify.discounts.updateDiscountClasses(['product']);
-    if (!result.success) setSaveError(result.errors.map(({ message }) => message).join(' '));
+    if (!result.success) setClassesError(result.errors.map(({ message }) => message).join(' '));
   }, [initial]);
-
-  async function save(): Promise<void> {
-    setSaveError(undefined);
-    try {
-      await writeConfig(form);
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : t('errors.unavailable'));
-      throw error;
-    }
-  }
 
   function reset(): void {
     setForm(initial.saved);
-    setSaveError(undefined);
   }
 
   return (
-    <s-function-settings onSubmit={(event) => event.waitUntil?.(save())} onReset={reset}>
+    <s-function-settings onSubmit={(event) => event.waitUntil?.(writeConfig(form))} onReset={reset}>
       <s-section heading={t('headings.settings')}>
         <s-stack gap="base">
-          {saveError !== undefined && (
-            <s-banner tone="critical" heading={t('headings.saveFailed')}>
-              {saveError}
+          {classesError !== undefined && (
+            <s-banner tone="critical" heading={t('headings.classesFailed')}>
+              {classesError}
             </s-banner>
           )}
           <s-text-field

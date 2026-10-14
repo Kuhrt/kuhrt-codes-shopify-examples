@@ -7,6 +7,7 @@ export type TierSummary =
 
 export interface DiscountRow {
   id: string;
+  href: string;
   title: string;
   status: DiscountStatus;
   summary: TierSummary;
@@ -115,12 +116,32 @@ function isOwnedBy(functionId: string) {
     node.discount.appDiscountType?.functionId === functionId;
 }
 
+const DISCOUNT_NODE_ID_PATTERN = /^gid:\/\/shopify\/[A-Za-z]+\/(\d+)$/;
+
+/**
+ * Builds the App Home link to a discount's full admin page from its node GID. Throws an Error
+ * when the id is not a `gid://shopify/<Type>/<digits>` GID.
+ */
+export function discountAdminHref(nodeId: string): string {
+  const numericId = DISCOUNT_NODE_ID_PATTERN.exec(nodeId)?.[1];
+  if (numericId === undefined) {
+    throw new Error(`Loading discounts failed: "${nodeId}" is not a Shopify GID`);
+  }
+  return `shopify:admin/discounts/${numericId}`;
+}
+
 function toRow({ id, discount, metafield }: AppDiscountNode): DiscountRow {
   const parsed = parseTierConfig(metafield?.jsonValue);
   const summary: TierSummary = parsed.ok
     ? { kind: 'tiers', tag: parsed.config.tag, tiers: parsed.config.tiers }
     : { kind: 'needs-attention' };
-  return { id, title: discount.title, status: discount.status, summary };
+  return {
+    id,
+    href: discountAdminHref(id),
+    title: discount.title,
+    status: discount.status,
+    summary
+  };
 }
 
 function rowsForFunction(nodes: DiscountNode[], functionId: string): DiscountRow[] {

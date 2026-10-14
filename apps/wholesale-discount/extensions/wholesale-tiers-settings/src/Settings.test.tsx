@@ -8,6 +8,7 @@ import { DEFAULT_CONFIG, formFromConfig, serializeForm, TIER_CONFIG_KEY } from '
 
 const extension = getExtension('admin.discount-details.function-settings.render');
 const issueKey = (code: TierConfigIssueCode) => `issues.${code}`;
+const errorKey = (name: string) => `errors.${name}`;
 
 const applyMetafieldChange = vi.fn();
 const updateDiscountClasses = vi.fn();
@@ -320,31 +321,32 @@ describe('submit', () => {
     );
   });
 
-  test('rejects without writing while a field is invalid', async () => {
+  test('rejects without writing or showing a banner while a field is invalid', async () => {
     await renderCreate();
     await typeInto(percentageField(1), '10');
 
-    await expect(submit()).rejects.toThrow();
+    await expect(submit()).rejects.toThrow(errorKey('invalid'));
 
     expect(applyMetafieldChange).not.toHaveBeenCalled();
+    expect(banner()).toBeNull();
   });
 
-  test('rejects when the metafield change is unavailable', async () => {
+  test('rejects without a banner when the metafield change is unavailable', async () => {
     await renderCreate();
     extension.shopify.applyMetafieldChange = undefined as never;
 
-    await expect(submit()).rejects.toThrow();
+    await expect(submit()).rejects.toThrow(errorKey('unavailable'));
+
+    expect(banner()).toBeNull();
   });
 
-  test('shows a critical banner and rejects with the message when the write fails', async () => {
+  test('rejects with the write error message and shows no banner', async () => {
     writeFails();
     await renderCreate();
-    expect(banner()).toBeNull();
 
     await expect(submit()).rejects.toThrow('denied');
 
-    await waitFor(() => expect(banner()?.getAttribute('tone')).toBe('critical'));
-    expect(banner()?.textContent).toBe('denied');
+    expect(banner()).toBeNull();
   });
 
   test('shows no banner after a successful save', async () => {
@@ -381,16 +383,5 @@ describe('reset', () => {
 
     await waitFor(() => expect(valueOf(tagField())).toBe(DEFAULT_CONFIG.tag));
     expect(tierCount()).toBe(DEFAULT_CONFIG.tiers.length);
-  });
-
-  test('clears the save error banner', async () => {
-    writeFails();
-    await renderCreate();
-    await expect(submit()).rejects.toThrow();
-    await waitFor(() => expect(banner()).not.toBeNull());
-
-    await reset();
-
-    await waitFor(() => expect(banner()).toBeNull());
   });
 });

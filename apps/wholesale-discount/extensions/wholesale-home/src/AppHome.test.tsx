@@ -16,9 +16,11 @@ const VALID_CONFIG = { tag: 'wholesale', tiers: [{ minQuantity: 10, percentage: 
 
 type Extension = ReturnType<typeof setUpExtension<'admin.app.home.render'>>;
 
+const nodeGid = (id: string) => `gid://shopify/DiscountAutomaticNode/${id}`;
+
 function discountNode(id: string, config: unknown = VALID_CONFIG, status = 'ACTIVE') {
   return {
-    id,
+    id: nodeGid(id),
     discount: { title: `Title ${id}`, status, appDiscountType: { functionId: FUNCTION_ID } },
     metafield: { jsonValue: config }
   };
@@ -102,7 +104,7 @@ describe('AppHome states', () => {
 
   it('shows one row per discount with its status and tier summary or needs-attention mark', async () => {
     using extension = setUpExtension('admin.app.home.render');
-    mockQuery(extension, discountsResponse(discountNode('a'), discountNode('b', null, 'EXPIRED')));
+    mockQuery(extension, discountsResponse(discountNode('1'), discountNode('2', null, 'EXPIRED')));
 
     await extension.render();
 
@@ -117,10 +119,25 @@ describe('AppHome states', () => {
   });
 });
 
+describe('AppHome rows', () => {
+  it('links each row to the full admin page of its discount', async () => {
+    using extension = setUpExtension('admin.app.home.render');
+    mockQuery(extension, discountsResponse(discountNode('11'), discountNode('22')));
+
+    await extension.render();
+
+    await vi.waitFor(() => expect(rowLinks()).toHaveLength(2));
+    expect(rowLinks().map((link) => link.getAttribute('href'))).toEqual([
+      'shopify:admin/discounts/11',
+      'shopify:admin/discounts/22'
+    ]);
+  });
+});
+
 describe('AppHome retry', () => {
   it('runs the load again and shows the result', async () => {
     using extension = setUpExtension('admin.app.home.render');
-    const query = mockQuery(extension, 'reject', discountsResponse(discountNode('a')));
+    const query = mockQuery(extension, 'reject', discountsResponse(discountNode('1')));
     await extension.render();
     await vi.waitFor(() => expect(retryButton()).not.toBeNull());
 
@@ -135,7 +152,7 @@ describe('AppHome retry', () => {
 describe('AppHome intents', () => {
   it('invokes the create intent with the Function ID from the list state', async () => {
     using extension = setUpExtension('admin.app.home.render');
-    mockQuery(extension, discountsResponse(discountNode('a')), discountsResponse());
+    mockQuery(extension, discountsResponse(discountNode('1')), discountsResponse());
     const invoke = mockIntents(extension);
     await extension.render();
     await vi.waitFor(() => expect(rowLinks()).toHaveLength(1));
@@ -169,45 +186,19 @@ describe('AppHome intents', () => {
     await expectCreateIntent(invoke, undefined);
   });
 
-  it('invokes the edit intent with the discount node ID when a row is activated', async () => {
-    using extension = setUpExtension('admin.app.home.render');
-    mockQuery(
-      extension,
-      discountsResponse(
-        discountNode('gid://shopify/DiscountNode/1'),
-        discountNode('gid://shopify/DiscountNode/2')
-      ),
-      discountsResponse()
-    );
-    const invoke = mockIntents(extension);
-    await extension.render();
-    await vi.waitFor(() => expect(rowLinks()).toHaveLength(2));
-
-    click(rowLinks()[1]);
-
-    await vi.waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('edit:shopify/Discount', {
-        value: 'gid://shopify/DiscountNode/2'
-      })
-    );
-  });
-
-  it.each([
-    ['create', () => createButton()],
-    ['edit', () => rowLinks()[0]]
-  ])('reloads the list only after the %s intent completes', async (_intent, trigger) => {
+  it('reloads the list only after the create intent completes', async () => {
     using extension = setUpExtension('admin.app.home.render');
     const query = mockQuery(
       extension,
-      discountsResponse(discountNode('a')),
-      discountsResponse(discountNode('a'), discountNode('b'))
+      discountsResponse(discountNode('1')),
+      discountsResponse(discountNode('1'), discountNode('2'))
     );
     let finish: (value: undefined) => void = () => {};
     const invoke = mockIntents(extension, new Promise((resolve) => (finish = resolve)));
     await extension.render();
     await vi.waitFor(() => expect(rowLinks()).toHaveLength(1));
 
-    click(trigger());
+    click(createButton());
     await vi.waitFor(() => expect(invoke).toHaveBeenCalled());
     expect(query).toHaveBeenCalledTimes(1);
     finish(undefined);
@@ -218,7 +209,7 @@ describe('AppHome intents', () => {
 
   it('shows the error state when an intent cannot be opened', async () => {
     using extension = setUpExtension('admin.app.home.render');
-    mockQuery(extension, discountsResponse(discountNode('a')));
+    mockQuery(extension, discountsResponse(discountNode('1')));
     extension.shopify.intents.invoke = vi.fn().mockRejectedValue(new Error('blocked'));
     await extension.render();
     await vi.waitFor(() => expect(rowLinks()).toHaveLength(1));

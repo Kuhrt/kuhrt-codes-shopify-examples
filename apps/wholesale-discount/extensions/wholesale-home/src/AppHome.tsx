@@ -62,7 +62,6 @@ export function AppHome() {
       'create:shopify/Discount',
       state.status === 'ready' ? { data: { functionId: state.functionId } } : undefined
     );
-  const edit = (id: string) => runIntent('edit:shopify/Discount', { value: id });
 
   return (
     <s-page heading={t('page.heading')}>
@@ -74,9 +73,7 @@ export function AppHome() {
       {state.status === 'loading' && <Loading />}
       {state.status === 'error' && <LoadError onRetry={load} />}
       {state.status === 'ready' && state.rows.length === 0 && <Empty />}
-      {state.status === 'ready' && state.rows.length > 0 && (
-        <DiscountTable rows={state.rows} onOpen={edit} />
-      )}
+      {state.status === 'ready' && state.rows.length > 0 && <DiscountTable rows={state.rows} />}
     </s-page>
   );
 }
@@ -107,7 +104,7 @@ function LoadError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function DiscountTable({ rows, onOpen }: { rows: DiscountRow[]; onOpen: (id: string) => void }) {
+function DiscountTable({ rows }: { rows: DiscountRow[] }) {
   return (
     <s-section padding="none">
       <s-table>
@@ -118,7 +115,7 @@ function DiscountTable({ rows, onOpen }: { rows: DiscountRow[]; onOpen: (id: str
         </s-table-header-row>
         <s-table-body>
           {rows.map((row) => (
-            <DiscountTableRow key={row.id} row={row} onOpen={onOpen} />
+            <DiscountTableRow key={row.id} row={row} />
           ))}
         </s-table-body>
       </s-table>
@@ -126,11 +123,11 @@ function DiscountTable({ rows, onOpen }: { rows: DiscountRow[]; onOpen: (id: str
   );
 }
 
-function DiscountTableRow({ row, onOpen }: { row: DiscountRow; onOpen: (id: string) => void }) {
+function DiscountTableRow({ row }: { row: DiscountRow }) {
   return (
     <s-table-row>
       <s-table-cell>
-        <s-link onClick={() => onOpen(row.id)}>{row.title}</s-link>
+        <s-link href={row.href}>{row.title}</s-link>
       </s-table-cell>
       <s-table-cell>
         <s-badge tone={STATUS_TONES[row.status]}>{t(`status.${row.status}`)}</s-badge>

@@ -76,16 +76,16 @@ Prerequisite: `add-wholesale-tier-function` archived; the "Wholesale tiers (test
     - loading, empty, error with retry, and the list;
     - the create action in the empty, error and list states;
     - retry re-runs the load;
-    - a row invokes the edit intent with its node ID;
+    - a row links to its full discount page;
     - create invokes the create intent with the Function ID;
-    - the list reloads after either intent completes.
-- [ ] 4.3 Check App Home on `kuhrt-codes`.
+    - the list reloads after the create intent completes.
+- [x] 4.3 Check App Home on `kuhrt-codes`.
   - Create one non-wholesale automatic discount alongside the wholesale ones.
   - Break one wholesale discount's config with GraphiQL.
   - Verify:
     - the list shows exactly the wholesale discounts, with the broken one marked;
     - the create action opens the wholesale create page with defaults;
-    - a row opens its edit page;
+    - a row opens its full edit page, where a settings change can be saved;
     - the built App Home bundle is under 64 KB compressed (record its size in design.md).
     - Restore the broken config afterwards.
 
