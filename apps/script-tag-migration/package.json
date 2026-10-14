@@ -43,6 +43,7 @@
     "@cloudflare/vite-plugin": "^1.63.1",
     "@playwright/test": "1.63.0",
     "@react-router/dev": "7.18.2",
+    "@repo/app-contract": "workspace:*",
     "@repo/config": "workspace:*",
     "@shopify/api-codegen-preset": "^1.2.0",
     "@shopify/app-bridge-types": "0.7.2",

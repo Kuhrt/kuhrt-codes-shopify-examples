@@ -4,10 +4,10 @@ Prerequisite: `add-wholesale-tier-function` and `add-wholesale-discount-settings
 
 ## 1. Shared app contract helpers (`packages/app-contract`)
 
-- [ ] 1.1 Create `@repo/app-contract` with `scopesFromReadme`, `scopesFromToml` and `appConfigFiles`, moved from App 1's `scope-contract.test.ts` (design decision 3).
+- [x] 1.1 Create `@repo/app-contract` with `scopesFromReadme`, `scopesFromToml` and `appConfigFiles`, moved from App 1's `scope-contract.test.ts` (design decision 3).
   - Give it lint, typecheck and test scripts extending `@repo/config`.
   - Verify: its Vitest suite covers a README table with backticked scopes, a missing "Access scopes" section (throws), an empty `scopes` string, and only matching `shopify.app*.toml` files being found.
-- [ ] 1.2 Switch App 1's `scope-contract.test.ts` to the package. Its webhook checks stay where they are.
+- [x] 1.2 Switch App 1's `scope-contract.test.ts` to the package. Its webhook checks stay where they are.
   - Verify:
     - App 1's contract tests keep the same test names and assertions, and pass;
     - a scope missing from App 1's README still fails its contract test (checked once and reverted);
