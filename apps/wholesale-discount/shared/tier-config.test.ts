@@ -5,6 +5,7 @@ import {
   parseTierConfig,
   pickTier,
   type Tier,
+  type TierConfig,
   type TierConfigIssue
 } from './tier-config';
 
@@ -15,6 +16,11 @@ const validConfig = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 const tiersOfLength = (length: number) => Array.from({ length }, (_, i) => tier(i + 1, i + 1));
+const configOf = (json: unknown): TierConfig => {
+  const result = parseTierConfig(json);
+  if (!result.ok) throw new Error('expected configuration to be accepted');
+  return result.config;
+};
 const issuesOf = (json: unknown): TierConfigIssue[] => {
   const result = parseTierConfig(json);
   if (result.ok) throw new Error('expected configuration to be rejected');
@@ -33,13 +39,11 @@ describe('parseTierConfig', () => {
 
   test('returns a fresh object rather than the input', () => {
     const input = validConfig();
-    const result = parseTierConfig(input);
-    expect(result.ok && result.config.tiers).not.toBe(input.tiers);
+    expect(configOf(input).tiers).not.toBe(input.tiers);
   });
 
   test('keeps the tag exactly as given', () => {
-    const result = parseTierConfig(validConfig({ tag: '  Wholesale ' }));
-    expect(result.ok && result.config.tag).toBe('  Wholesale ');
+    expect(configOf(validConfig({ tag: 'Wholesale' })).tag).toBe('Wholesale');
   });
 
   test.each([
@@ -57,6 +61,7 @@ describe('parseTierConfig', () => {
   test.each([
     ['empty', ''],
     ['whitespace only', '   '],
+    ['padded with spaces', ' wholesale '],
     ['non-string', 5],
     ['null', null]
   ])('rejects tag that is %s', (_name, tag) => {
@@ -69,6 +74,7 @@ describe('parseTierConfig', () => {
 
   test.each([
     ['missing', undefined],
+    ['null', null],
     ['a string', 'tiers'],
     ['an object', { 0: tier(1, 1) }]
   ])('rejects tiers that are %s', (_name, tiers) => {
@@ -134,6 +140,31 @@ describe('parseTierConfig', () => {
   ])('rejects percentage %s the previous tier', (_name, second) => {
     expect(issuesOf(validConfig({ tiers: [tier(10, 10), second] }))).toEqual([
       { code: 'percentage-not-increasing', path: ['tiers', 1, 'percentage'] }
+    ]);
+  });
+
+  test.each([
+    [
+      'minimum quantity',
+      [tier(10, 10), tier(50, 15), tier(40, 20)],
+      'minQuantity',
+      'min-quantity-not-increasing'
+    ],
+    [
+      'percentage',
+      [tier(10, 10), tier(50, 15), tier(60, 12)],
+      'percentage',
+      'percentage-not-increasing'
+    ]
+  ] as const)('compares each tier with the one before it: %s', (_name, tiers, field, code) => {
+    expect(issuesOf(validConfig({ tiers }))).toEqual([{ code, path: ['tiers', 2, field] }]);
+  });
+
+  test('reports a hole in the tiers array as an invalid tier', () => {
+    const tiers: Tier[] = [];
+    tiers[1] = tier(10, 10);
+    expect(issuesOf(validConfig({ tiers }))).toEqual([
+      { code: 'tier-invalid', path: ['tiers', 0] }
     ]);
   });
 

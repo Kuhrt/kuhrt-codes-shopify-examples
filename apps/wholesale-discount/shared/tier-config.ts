@@ -69,7 +69,7 @@ function isValidField(value: unknown, field: TierField): value is number {
 }
 
 function validateTag(tag: unknown): TierConfigIssue[] {
-  const valid = typeof tag === 'string' && tag.trim() !== '';
+  const valid = typeof tag === 'string' && tag !== '' && tag.trim() === tag;
   return valid ? [] : [{ code: 'tag-invalid', path: ['tag'] }];
 }
 
@@ -111,7 +111,8 @@ function validateTiers(tiers: unknown): TierConfigIssue[] {
     tiers.length < MIN_TIERS || tiers.length > MAX_TIERS
       ? [{ code: 'tier-count', path: ['tiers'] }]
       : [];
-  return [...countIssues, ...tiers.flatMap((_, index) => validateTier(tiers, index))];
+  const tierIssues = Array.from(tiers, (_, index) => validateTier(tiers, index)).flat();
+  return [...countIssues, ...tierIssues];
 }
 
 /**
@@ -126,7 +127,7 @@ export function parseTierConfig(json: unknown): TierConfigResult {
   if (issues.length > 0) {
     return { ok: false, issues };
   }
-  const tiers = (json.tiers as Tier[]).map(({ minQuantity, percentage }) => ({
+  const tiers = Array.from(json.tiers as Tier[], ({ minQuantity, percentage }) => ({
     minQuantity,
     percentage
   }));
@@ -135,5 +136,9 @@ export function parseTierConfig(json: unknown): TierConfigResult {
 
 /** Returns the highest tier whose minimum quantity is met. Assumes tiers from a successful parse. */
 export function pickTier(tiers: readonly Tier[], quantity: number): Tier | null {
-  return tiers.findLast((tier) => quantity >= tier.minQuantity) ?? null;
+  for (let index = tiers.length - 1; index >= 0; index--) {
+    const tier = tiers[index];
+    if (tier && quantity >= tier.minQuantity) return tier;
+  }
+  return null;
 }

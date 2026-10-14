@@ -68,7 +68,7 @@ The discount SHALL reduce eligible product lines by a percentage. It SHALL NOT p
 
 ### Requirement: Valid configuration
 A configuration SHALL be valid only when all of these hold:
-- the tag is a non-empty string;
+- the tag is a non-empty string with no leading or trailing whitespace;
 - there are 1 to 5 tiers;
 - each minimum quantity is a whole number of at least 1;
 - each percentage is a whole number from 1 to 100;
@@ -79,7 +79,7 @@ A configuration SHALL be valid only when all of these hold:
 - **THEN** it is accepted
 
 #### Scenario: Out-of-range or malformed values
-- **WHEN** the configuration has an empty tag, zero tiers, more than 5 tiers, a minimum below 1, a percentage outside 1 to 100, or a non-whole number
+- **WHEN** the configuration has an empty tag, a tag with leading or trailing spaces, zero tiers, more than 5 tiers, a minimum below 1, a percentage outside 1 to 100, or a non-whole number
 - **THEN** it is rejected
 
 #### Scenario: Tiers out of order
