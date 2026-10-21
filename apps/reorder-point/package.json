@@ -10,7 +10,8 @@
     "shopify": "shopify",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "demo:setup": "node scripts/demo-setup.ts"
   },
   "engines": {
     "node": ">=24 <25"

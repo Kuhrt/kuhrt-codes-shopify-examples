@@ -1,0 +1,13 @@
+mutation LocationAdd($input: LocationAddInput!) {
+  locationAdd(input: $input) {
+    location {
+      id
+      name
+    }
+    userErrors {
+      field
+      message
+      code
+    }
+  }
+}

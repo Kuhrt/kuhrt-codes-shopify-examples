@@ -1,0 +1,11 @@
+query DemoOrders($after: String) {
+  orders(first: 250, after: $after, query: "tag:reorder-demo") {
+    nodes {
+      tags
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
