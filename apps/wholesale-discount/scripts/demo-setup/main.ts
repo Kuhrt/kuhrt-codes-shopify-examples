@@ -1,7 +1,9 @@
-import { parseArgs, UsageError } from './args.ts';
+import { StepError, UsageError } from '@repo/store-execute';
+
+import { parseArgs } from './args.ts';
 import { createCliExecutor } from './cli-executor.ts';
 import { DEMO_PRODUCTS, WHOLESALE_TAG } from './demo-data.ts';
-import { type Executor, runDemoSetup, StepError } from './run-demo-setup.ts';
+import { type Executor, runDemoSetup } from './run-demo-setup.ts';
 
 export const EXIT_OK = 0;
 export const EXIT_STEP_FAILED = 1;
