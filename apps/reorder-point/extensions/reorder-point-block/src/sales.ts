@@ -16,8 +16,6 @@ export const MAX_ORDER_PAGES = 30;
 export const FOLLOW_UP_LINE_ITEMS_PAGE_SIZE = 250;
 export const MAX_FOLLOW_UP_PAGES = 20;
 
-export const EXCLUDE_CANCELLED_ORDERS = true;
-
 export class SalesDataError extends Error {
   override name = 'SalesDataError';
 }
@@ -96,9 +94,9 @@ function quoteSearchValue(value: string): string {
 export function buildOrdersSearch({ today, skus }: Pick<SalesRequest, 'today' | 'skus'>): string {
   const clauses = [
     `processed_at:>=${addDays(today, -(LONG_WINDOW_DAYS + 1))}`,
-    `processed_at:<${addDays(today, 1)}`
+    `processed_at:<${addDays(today, 1)}`,
+    '-status:cancelled'
   ];
-  if (EXCLUDE_CANCELLED_ORDERS) clauses.push('-status:cancelled');
   if (skus !== null) {
     clauses.push(`(${skus.map((sku) => `sku:${quoteSearchValue(sku)}`).join(' OR ')})`);
   }

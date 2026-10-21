@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildOrdersSearch,
-  EXCLUDE_CANCELLED_ORDERS,
   loadDailySales,
   MAX_FOLLOW_UP_PAGES,
   MAX_ORDER_PAGES,
@@ -248,15 +247,6 @@ describe('loadDailySales', () => {
 
     expect(searchOf(query)).toBe(buildOrdersSearch({ ...request, skus: ['A'] }));
   });
-
-  it('excludes cancelled orders from the request when the switch is on', async () => {
-    const query = fakeStore({ pages: [ordersResponse([])] });
-
-    await loadDailySales(query, request);
-
-    expect(searchOf(query).includes('-status:cancelled')).toBe(EXCLUDE_CANCELLED_ORDERS);
-    expect(EXCLUDE_CANCELLED_ORDERS).toBe(true);
-  });
 });
 
 describe('buildOrdersSearch', () => {
@@ -265,6 +255,10 @@ describe('buildOrdersSearch', () => {
 
     expect(search).toContain('processed_at:>=2026-08-21');
     expect(search).toContain('processed_at:<2026-10-22');
+  });
+
+  it('leaves cancelled orders out', () => {
+    expect(buildOrdersSearch({ today: '2026-10-21', skus: null })).toContain('-status:cancelled');
   });
 
   it('has no SKU clause when the SKUs are unknown', () => {

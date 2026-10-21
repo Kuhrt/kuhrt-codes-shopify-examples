@@ -11,8 +11,8 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
   - the measured `requestedQueryCost` of the orders query at the chosen page sizes.
   - Verify: results recorded in design.md under "Check results"; decision 4's page sizes set from them. **Gate:** if `Intl` time zones are missing, use the Risks fallback and tell the user.
 
-- [ ] 1.3 Check what `currentQuantity` reports for a line item after a partial refund, and after the order is cancelled (use one `reorder-spike` order for each; both are dev-store test data). Pending the developer token check in `add-reorder-demo-history`.
-  - Verify: results recorded in design.md under "Check results"; decision 3's cancelled-order rule (`EXCLUDE_CANCELLED_ORDERS`) set from them.
+- [x] 1.3 Check what `currentQuantity` reports for a line item after a partial refund, and after the order is cancelled (use one `reorder-spike` order for each; both are dev-store test data).
+  - Verify: results recorded in design.md under "Check results"; decision 3's cancelled-order rule set from them.
 
 ## 2. Shared query helper (`packages/admin-query`)
 
