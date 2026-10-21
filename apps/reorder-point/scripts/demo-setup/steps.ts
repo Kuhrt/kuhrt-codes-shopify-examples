@@ -22,10 +22,6 @@ export const OPERATION_NAMES: OperationName[] = [
   ...(Object.keys(MUTATION_PAYLOAD_KEYS) as MutationName[])
 ];
 
-export function isMutation(operation: OperationName): operation is MutationName {
-  return operation in MUTATION_PAYLOAD_KEYS;
-}
-
 export function locationAddVariables(): Variables {
   return {
     input: {

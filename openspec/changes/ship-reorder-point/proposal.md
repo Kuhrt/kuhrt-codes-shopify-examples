@@ -19,7 +19,7 @@ After the first three changes, App 3 works on `kuhrt-codes`. It isn't a portfoli
 - **Release.**
   - Rename the app from "Reorder Point (dev)" to "Reorder Point".
   - Deploy a version, so the metafield definitions and the block ship, and install it on `kuhrt-codes-demo` from the Dev Dashboard.
-  - Run the demo setup there, add the block to a demo product's page, and check each demo product's status.
+  - Create a second seeder app with custom distribution to `kuhrt-codes-demo` (custom distribution is one store per app). Then run the demo setup there, add the block to a demo product's page, and check each demo product's status.
   - Whether one app can serve both stores is checked as it was for App 2, not assumed.
 - Record a 30–60 second GIF:
   - the block on a product due for reorder;

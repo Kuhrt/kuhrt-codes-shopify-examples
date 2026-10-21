@@ -4,16 +4,22 @@ Prerequisite: `add-reorder-forecast`, archived. App 2's demo setup (`apps/wholes
 
 ## 1. Checks (gate)
 
-- [ ] 1.1 With `shopify store auth -s kuhrt-codes.myshopify.com --scopes write_products,write_inventory,write_locations,write_orders,read_orders` (one browser sign-in, done by the user), run single operations through `shopify store execute` against `kuhrt-codes`:
+- [x] 1.1 With `shopify store auth -s kuhrt-codes.myshopify.com --scopes write_products,write_inventory,write_locations,write_orders,read_orders` (one browser sign-in, done by the user), run single operations through `shopify store execute` against `kuhrt-codes`:
   - `orders(query: "tag:reorder-spike")`: can the developer token read orders?
   - `inventorySetQuantities` with `@idempotent` and `changeFromQuantity: null` on one spike product;
-  - six `orderCreate` calls in under a minute (tagged `reorder-spike`): how the CLI reports throttling.
-  - Verify: results recorded in design.md under "Check results"; the token scope list and decision 4's throttling detection updated from them. **Gate:** if orders can't be read, follow design "Risks" and ask the user before continuing.
+  - one `orderCreate`.
+  - Verify: results recorded in design.md under "Check results". `orderCreate` was denied to the developer token, which led to design decision 6 (the seeder app).
+- [ ] 1.2 Create "Demo Seeder (dev)" (`tools/demo-seeder/shopify.app.toml`, design decision 6), deploy its config, and give it custom distribution to `kuhrt-codes` and install it there (the user does the Partners steps). Through `shopify app execute --path tools/demo-seeder`, run against `kuhrt-codes`:
+  - `orders(query: "tag:reorder-spike")`: can the seeder read orders?
+  - six `orderCreate` calls in under a minute (tagged `reorder-spike`): how `app execute` reports throttling.
+  - Verify: results recorded in design.md under "Check results"; decision 4's throttling detection updated from them.
 
 ## 2. Shared executor (`packages/store-execute`)
 
 - [x] 2.1 Create `@repo/store-execute` from App 2's generic code (design decision 1), with lint, typecheck and test wired into the workspace like `packages/app-contract`. Move the tests that cover the moved code.
   - Verify: the package's tests pass, including CLI argument building, JSON output parsing, CLI failure messages, user errors, missing payloads, and flag parsing.
+- [x] 2.3 Read `store execute` failures from stdout (design decision 7), and add `createAppExecutor` for `shopify app execute` (decision 6).
+  - Verify: Vitest covers a `store execute` failure whose stdout holds the GraphQL errors, one with no stdout (stderr fallback), an `app execute` success, an `app execute` failure with empty stdout and a boxed, coloured stderr message, non-JSON stdout, and the arguments built for `app execute`.
 - [ ] 2.2 Switch App 2's demo setup to the package.
   - Verify: App 2's remaining tests pass with assertions unchanged; a deliberately broken assertion still fails; `pnpm check` passes; `pnpm --filter wholesale-discount demo:setup --store kuhrt-codes.myshopify.com --email <the user's demo address>` changes nothing on `kuhrt-codes` (the user runs it, or supplies the address).
 

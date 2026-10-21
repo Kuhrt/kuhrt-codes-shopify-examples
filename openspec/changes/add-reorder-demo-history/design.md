@@ -14,7 +14,7 @@ See `proposal.md`, "Why". Facts carried in from earlier changes:
   - `orderCreate` with `processedAt`, `inventoryBehaviour: BYPASS` and receipts off creates an order that every reader (admin, the `orders` query, Shopify's sales card) places on its backdated day.
   - The app sees orders by creation date, and every demo order is created on the day the setup runs, so all 60 days are visible with `read_orders`.
 - **Development stores** allow 5 new orders per minute (`orderCreate` docs). Inventory mutations require an `@idempotent(key:)` directive on `2026-04` and later, and `inventorySetQuantities` takes `changeFromQuantity` (null opts out of the compare-and-swap check).
-- **Whether a `store auth` token can read orders** (protected customer data applies to the CLI's own app too) is **(check: task 1.1)**.
+- **`orderCreate` is only for offline tokens** (task 1.1). A `store auth` token is a developer's online token, so it can read orders, refund and cancel them, but never create one. The spike's orders were created through `app dev`'s GraphiQL proxy, with Reorder Point's offline token, while it briefly had `write_orders`. See decision 6.
 
 ## Goals / Non-Goals
 
@@ -32,8 +32,12 @@ See `proposal.md`, "Why". Facts carried in from earlier changes:
 ## Architecture
 
 ```
+tools/demo-seeder/
+  shopify.app.toml             "Demo Seeder (dev)": config only, holds the write scopes (decision 6)
+
 packages/store-execute/        @repo/store-execute
   src/cli-executor.ts          createCliExecutor(store, { queryFileFor, isMutation }), runShopifyCli
+  src/app-executor.ts          createAppExecutor(store, appPath, { queryFileFor }): `shopify app execute`
   src/steps.ts                 StepError, executeQuery, executeMutation (userErrors), idOf, isRecord
   src/args.ts                  parseStoreFlags(argv, allowed) + UsageError + the myshopify check
   src/fake-executor.ts         fakeExecutor(respond): records calls for tests
@@ -97,13 +101,27 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 - Products use `productSet` with a `handle` identifier (App 2's upsert), `inventoryItem { tracked: true, sku }`.
 - Each variant is activated at both locations (`inventoryActivate`, idempotent per item and location). Its `available` quantity is then set with `inventorySetQuantities`, `changeFromQuantity: null` and a fresh idempotency key, so every run resets stock to the designed numbers.
 
-### 6. Developer token scopes
+### 6. A seeder app holds the write scopes
 
-- `shopify store auth -s <shop> --scopes write_products,write_inventory,write_locations,write_orders,read_orders`. The exact list is confirmed by task 1.1 and documented in the README.
+- `tools/demo-seeder/shopify.app.toml` is "Demo Seeder (dev)": a config-only app with `write_products`, `write_inventory`, `write_locations` and `write_orders`, custom distribution to `kuhrt-codes`, and no extensions or code. It is not a workspace package.
+- The reorder setup runs every operation with `shopify app execute --path tools/demo-seeder`. That uses the seeder's offline token, through the developer's CLI login. There is no `store auth` step and no 24-hour token.
+- Reorder Point keeps its read-only scopes. A merchant installing the sample is never asked for write access that only seeds a demo.
+- Custom distribution is one store per app. `ship-reorder-point` creates a second seeder app for `kuhrt-codes-demo`, as Reorder Point itself has two apps.
+- `app execute` reports failure differently from `store execute`: it exits 0, prints nothing on stdout, and draws the error in a box on stderr (CLI 4.9.3). `createAppExecutor` treats empty stdout as a failure and takes the message from stderr, with the colour codes and box drawing removed.
+- **Alternatives considered:**
+  - Add the write scopes to Reorder Point. Rejected: the shipped app would ask merchants for write access it uses only for seeding.
+  - Products and stock with the developer token, orders by hand in GraphiQL. Rejected: the demo is no longer one command.
+  - The developer token for everything. Not possible: `orderCreate` requires an offline token.
+- App 2's demo setup stays on `store execute`. It creates no orders.
+
+### 7. Reading `store execute` failures from stdout
+
+- With `--json`, `shopify store execute` writes a failure to stdout as `{"error":{"message","details":{"errors":[…]}}}` and exits 1. stderr then holds only JSON progress lines (CLI 4.9.3, task 1.1).
+- The shared executor reads the GraphQL error messages from that object. It falls back to stderr only when stdout has none. Before this, App 2's failures named the step but showed progress lines as the reason.
 
 ## Risks / Trade-offs
 
-- **[The `store auth` token can't read orders (protected customer data)]** → **Fallback:** find existing days with `ordersCount(query: "tag:reorder-demo-<date>")` per day, if counts are allowed. Otherwise stop and ask the user before designing another idempotency key.
+- **[The seeder can't read orders without protected customer data]** → Custom distribution grants Level 1 automatically, as it did for Reorder Point. The setup reads existing days before creating any order, so a missing grant fails at that step, not after duplicating days.
 - **[Pacing makes the first run about 12 minutes]** → Progress lines, and resuming is free. Re-runs that only top up a few days take seconds.
 - **[Moving App 2's code breaks it]** → App 2's suites run in the same PR, and its setup is re-run against `kuhrt-codes` and changes nothing.
 - **[Reset stock overwrites a merchant's edits to demo products]** → Only the setup's own demo products are touched. The README says so.
@@ -115,4 +133,16 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 
 ## Open Questions
 
-None beyond the checks in task 1.1.
+None beyond the checks in task 1.2.
+
+## Check results
+
+Recorded on `kuhrt-codes`, API 2026-10, Shopify CLI 4.9.3.
+
+- **Task 1.1, with a `store auth` token:**
+  - `orders(query: "tag:reorder-spike")` returns the orders. The developer token can read orders.
+  - `inventorySetQuantities` with `@idempotent(key:)` and `changeFromQuantity: null` succeeds, and repeating it with the same key is harmless.
+  - `orderCreate` is denied: "This mutation is only accessible to apps authenticated using offline tokens". This led to decision 6.
+  - Failures with `--json` arrive on stdout, not stderr. This led to decision 7.
+  - `refundCreate` requires `@idempotent` on 2026-10.
+- **`shopify app execute`:** data on stdout and exit 0 on success. On failure it also exits 0, with empty stdout and the error box on stderr. `--path` to a directory holding only `shopify.app.toml` works, and so does `app deploy`.

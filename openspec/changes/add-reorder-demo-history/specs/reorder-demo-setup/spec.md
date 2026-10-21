@@ -73,6 +73,6 @@ The setup SHALL pace order creation to stay within the store's order creation li
 ### Requirement: Failures name the step
 When any request fails or returns user errors, the setup SHALL stop, exit non-zero, and name the step and the reason.
 
-#### Scenario: Missing token scope
-- **WHEN** the developer's store token lacks a scope a step needs
+#### Scenario: Missing scope
+- **WHEN** the seeder app lacks a scope a step needs
 - **THEN** the setup exits non-zero, naming that step and the error Shopify returned
