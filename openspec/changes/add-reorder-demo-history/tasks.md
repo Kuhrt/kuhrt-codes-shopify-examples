@@ -9,7 +9,7 @@ Prerequisite: `add-reorder-forecast`, archived. App 2's demo setup (`apps/wholes
   - `inventorySetQuantities` with `@idempotent` and `changeFromQuantity: null` on one spike product;
   - one `orderCreate`.
   - Verify: results recorded in design.md under "Check results". `orderCreate` was denied to the developer token, which led to design decision 6 (the seeder app).
-- [ ] 1.2 Create "Demo Seeder (dev)" (`tools/demo-seeder/shopify.app.toml`, design decision 6), deploy its config, and give it custom distribution to `kuhrt-codes` and install it there (the user does the Partners steps). Through `shopify app execute --path tools/demo-seeder`, run against `kuhrt-codes`:
+- [x] 1.2 Create "Demo Seeder (dev)" (`tools/demo-seeder/shopify.app.toml`, design decision 6), deploy its config, and give it custom distribution to `kuhrt-codes` and install it there (the user does the Partners steps). Through `shopify app execute --path tools/demo-seeder`, run against `kuhrt-codes`:
   - `orders(query: "tag:reorder-spike")`: can the seeder read orders?
   - six `orderCreate` calls in under a minute (tagged `reorder-spike`): how `app execute` reports throttling.
   - Verify: results recorded in design.md under "Check results"; decision 4's throttling detection updated from them.

@@ -22,7 +22,7 @@ import {
   productSetVariables,
   type SellableVariant
 } from './steps.ts';
-import { isThrottled } from './throttling.ts';
+import { isSafeToRetry, isThrottled } from './throttling.ts';
 
 export type Executor = StoreExecutor<OperationName>;
 
@@ -171,8 +171,10 @@ async function createWithRetries(
       await mutate(step, executor, 'order-create', variables);
       return;
     } catch (error: unknown) {
-      if (!isThrottled(error) || retries >= MAX_THROTTLE_RETRIES) throw error;
-      runtime.report(`Throttled; waiting ${THROTTLE_WAIT_MS / 1000}s before retrying ${step}`);
+      if (!isSafeToRetry(error) || retries >= MAX_THROTTLE_RETRIES) throw error;
+      runtime.report(
+        `${isThrottled(error) ? 'Throttled' : 'Could not get the app token'}; waiting ${THROTTLE_WAIT_MS / 1000}s before retrying ${step}`
+      );
       await runtime.sleep(THROTTLE_WAIT_MS);
     }
   }

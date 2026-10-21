@@ -92,7 +92,7 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 ### 4. Pacing and throttling
 
 - Orders are created one at a time, at least 12.5 seconds apart (under 5 per minute), with a progress line per order (`12/60 2026-09-03`).
-- If a create still fails with a throttling error, the setup waits 60 seconds and retries the same day, up to 3 times, then stops and names the step. How the CLI reports throttling (exit code or error text) is **(check: task 1.1)**.
+- If a create still fails with a throttling error, the setup waits 60 seconds and retries the same day, up to 3 times, then stops and names the step. A failed token exchange in the CLI is retried the same way. Both are known to create nothing. No other failure is retried, because `orderCreate` doesn't deduplicate and a retry could create a day twice (task 1.2).
 - The pacing delay is injected, so tests run instantly.
 
 ### 5. Locations and stock
@@ -145,4 +145,10 @@ Recorded on `kuhrt-codes`, API 2026-10, Shopify CLI 4.9.3.
   - `orderCreate` is denied: "This mutation is only accessible to apps authenticated using offline tokens". This led to decision 6.
   - Failures with `--json` arrive on stdout, not stderr. This led to decision 7.
   - `refundCreate` requires `@idempotent` on 2026-10.
+- **Task 1.2, through the seeder:**
+  - `orders(query: "tag:reorder-spike")` returns the orders, so custom distribution gave the seeder Level 1 protected customer data.
+  - Seven `orderCreate` calls about 6 seconds apart: five created orders, the seventh returned `order: null` with the user error "Too many attempts. Please try again later." and exit 0. Throttling is a user error, not a failed command. The throttle pattern now matches it.
+  - One call failed before the mutation was sent: "request to https://kuhrt-codes.myshopify.com/admin/oauth/access_token failed". `app execute` exchanges for a token on every call.
+  - `orderCreate` accepts `@idempotent(key:)` but does not deduplicate on it: two calls with the same key created two orders.
+  - So decision 4 retries only failures known to have created nothing: throttling and a failed token exchange. Any other failure stops the run, and re-running skips days whose tagged order exists.
 - **`shopify app execute`:** data on stdout and exit 0 on success. On failure it also exits 0, with empty stdout and the error box on stderr. `--path` to a directory holding only `shopify.app.toml` works, and so does `app deploy`.

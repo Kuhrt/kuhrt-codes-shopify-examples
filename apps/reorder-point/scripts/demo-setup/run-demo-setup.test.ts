@@ -228,13 +228,18 @@ describe('pacing and throttling', () => {
     expect(fixture.clock.lines.at(-1)).toMatch(`${HISTORY_DAYS}/${HISTORY_DAYS}`);
   });
 
-  it('waits and retries the same day when an order is throttled', async () => {
+  it('waits and retries the same day when the store rejects an order as too many attempts', async () => {
     const fixture = setup();
     let throttles = 2;
     const throttled: Respond<OperationName> = (call) => {
       if (call.operation === 'order-create' && throttles > 0) {
         throttles--;
-        throw new Error('Throttled');
+        return {
+          orderCreate: {
+            order: null,
+            userErrors: [{ field: null, message: 'Too many attempts. Please try again later.' }]
+          }
+        };
       }
       return fixture.store.respond(call);
     };
@@ -243,6 +248,23 @@ describe('pacing and throttling', () => {
 
     expect(creates(calls)).toBe(HISTORY_DAYS + 2);
     expect(fixture.clock.sleeps.filter((ms) => ms === THROTTLE_WAIT_MS)).toHaveLength(2);
+    expect(new Set(createdDates(fixture)).size).toBe(HISTORY_DAYS);
+  });
+
+  it('retries the same day when the CLI could not get the app token', async () => {
+    const fixture = setup();
+    let failures = 1;
+    const flaky: Respond<OperationName> = (call) => {
+      if (call.operation === 'order-create' && failures > 0) {
+        failures--;
+        throw new Error('request to https://shop.myshopify.com/admin/oauth/access_token failed');
+      }
+      return fixture.store.respond(call);
+    };
+
+    await runWith(fixture, flaky);
+
+    expect(createdDates(fixture)).toHaveLength(HISTORY_DAYS);
     expect(new Set(createdDates(fixture)).size).toBe(HISTORY_DAYS);
   });
 
