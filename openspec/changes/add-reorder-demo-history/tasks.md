@@ -37,7 +37,7 @@ Prerequisite: `add-reorder-forecast`, archived. App 2's demo setup (`apps/wholes
 
 ## 5. Live run on `kuhrt-codes`
 
-- [ ] 5.1 Run the setup against `kuhrt-codes` (a first run, then a second), then open each demo product with the block (if `add-reorder-point-block` is applied) or check the orders and stock in the admin.
+- [x] 5.1 Run the setup against `kuhrt-codes` (a first run, then a second), then open each demo product with the block (if `add-reorder-point-block` is applied) or check the orders and stock in the admin.
   - Verify: about 60 tagged orders on their backdated days, no duplicates after the second run, stock at both locations as designed, no customer emails sent, and each product's block status (or hand calculation) matching decision 2's table.
 
 ## Workflow follow-up

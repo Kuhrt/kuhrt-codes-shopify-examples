@@ -15,7 +15,8 @@ After the first three changes, App 3 works on `kuhrt-codes`. It isn't a portfoli
   - **its limits**: no incoming stock or purchase orders, no seasonality model, a product launched inside a window is under-estimated until the window fills, and settings are per product, not per variant;
   - **the Restock Mate link**: which parts were copied from it (days until stockout, status thresholds), and why the sales measure differs (orders instead of inventory snapshots);
   - **where it can be installed**: custom distribution, and what a public listing would need;
-  - an access-scopes table kept identical to the app configuration by a test, using `@repo/app-contract` as App 2 does.
+  - an access-scopes table kept identical to the app configuration by a test, using `@repo/app-contract` as App 2 does;
+  - **the demo setup**: the Demo Seeder app and why it exists, how to run it, that it resets the demo products' stock, how to remove the demo data by tag, and re-running on a fresh store once the seasonal product's shape fades.
 - **Release.**
   - Rename the app from "Reorder Point (dev)" to "Reorder Point".
   - Deploy a version, so the metafield definitions and the block ship, and install it on `kuhrt-codes-demo` from the Dev Dashboard.

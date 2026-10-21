@@ -27,7 +27,7 @@ See `proposal.md`, "Why". Facts carried in from earlier changes:
 - The shared seed script from the sample spec (40 products, customers, `--reset`). `packages/store-execute` is the piece it would build on.
 - Customers on the demo orders. They are guest orders; the block never reads customers.
 - Publishing the demo products to a sales channel. The block is in the admin.
-- Deleting demo data. The README says how to remove it by tag.
+- Deleting demo data. The app README, written in `ship-reorder-point`, says how to remove it by tag.
 
 ## Architecture
 
@@ -78,7 +78,7 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 
 - `unitsSold(age)` is a pure function of the day's age, so the shape is reproducible and testable. Products, titles and prices are picked in implementation; their exact names are copy.
 - A unit test computes each product's forecast with `shared/forecast.ts` from the data alone and asserts the designed status. The data can't drift from the demo's story without a failing test.
-- **Drift:** a re-run fills only missing days, so earlier orders keep their ages. The three steady profiles don't change. The seasonal one slowly fades as high days age out of the 60-day window, and it still shows "60-day at least twice 30-day" for at least 10 days after a full run, which a test pins. The README says to re-run on a fresh store (or delete the demo orders) when it has faded.
+- **Drift:** a re-run fills only missing days, so earlier orders keep their ages. The three steady profiles don't change. The seasonal one slowly fades as high days age out of the 60-day window, and it still shows "60-day at least twice 30-day" for at least 10 days after a full run, which a test pins. The app README (`ship-reorder-point`) says to re-run on a fresh store (or delete the demo orders) when it has faded.
 
 ### 3. One order per day, found again by tag
 
@@ -122,9 +122,9 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 ## Risks / Trade-offs
 
 - **[The seeder can't read orders without protected customer data]** → Custom distribution grants Level 1 automatically, as it did for Reorder Point. The setup reads existing days before creating any order, so a missing grant fails at that step, not after duplicating days.
-- **[Pacing makes the first run about 12 minutes]** → Progress lines, and resuming is free. Re-runs that only top up a few days take seconds.
+- **[Pacing makes the first run about 15 minutes]** → Progress lines, and resuming is free. A re-run that creates nothing still takes about 90 seconds, because every call starts the CLI.
 - **[Moving App 2's code breaks it]** → App 2's suites run in the same PR, and its setup is re-run against `kuhrt-codes` and changes nothing.
-- **[Reset stock overwrites a merchant's edits to demo products]** → Only the setup's own demo products are touched. The README says so.
+- **[Reset stock overwrites a merchant's edits to demo products]** → Only the setup's own demo products are touched. The app README (`ship-reorder-point`) says so.
 
 ## Migration Plan
 
@@ -151,4 +151,9 @@ Recorded on `kuhrt-codes`, API 2026-10, Shopify CLI 4.9.3.
   - One call failed before the mutation was sent: "request to https://kuhrt-codes.myshopify.com/admin/oauth/access_token failed". `app execute` exchanges for a token on every call.
   - `orderCreate` accepts `@idempotent(key:)` but does not deduplicate on it: two calls with the same key created two orders.
   - So decision 4 retries only failures known to have created nothing: throttling and a failed token exchange. Any other failure stops the run, and re-running skips days whose tagged order exists.
+- **Task 5.1, live runs on `kuhrt-codes` (2026-10-21):**
+  - The first run created 60 orders (2026-08-22 to 2026-10-20) in about 15 minutes. Five order creates were throttled and retried, and one token exchange failed and was retried. Even at 12.5 seconds apart, every fifth create was throttled once about 37 orders had been created.
+  - A second run failed at `product-set` on a failed token exchange, a step that wasn't retried. The next run created nothing and took 88 seconds, not seconds: each `app execute` call starts the CLI and exchanges for a token.
+  - The store held 60 orders tagged `reorder-demo` on 60 distinct days, and each product's stock totalled the designed numbers across two locations.
+  - The block on each demo product showed the designed status, reorder point and days until stockout: reorder now (42, 6 days), healthy (14, 60 days), healthy (2, 1,250 days), low (7, 10 days).
 - **`shopify app execute`:** data on stdout and exit 0 on success. On failure it also exits 0, with empty stdout and the error box on stderr. `--path` to a directory holding only `shopify.app.toml` works, and so does `app deploy`.
