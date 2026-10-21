@@ -35,7 +35,8 @@ None. The calculation is `reorder-forecast`'s, used unchanged.
   - the block;
   - a data layer that turns the GraphQL responses into `shared/forecast.ts` inputs;
   - its tests.
-- **Scopes:** the read scopes recorded in `add-reorder-forecast`'s "Spike results", already set in `shopify.app.toml` by that change.
+- **Shared code:** App 2's admin-extension query helper (`runQuery`, cursor paging) moves to a new `packages/admin-query`, used by both apps. App 2's tests must pass unchanged.
+- **Scopes:** the scopes recorded in `add-reorder-forecast`'s "Spike results", already set in `shopify.app.toml` by that change. Nothing is added.
 - **Depends on:** `add-reorder-forecast`, applied, including its spike results.
 - **Live check:** it needs a `kuhrt-codes` product with sales history. That comes from running `add-reorder-demo-history`'s setup against `kuhrt-codes`. The two changes can be built in parallel, but the block's live check waits for the setup.
 - **Planning:** `design.md` and `tasks.md` are written after the spike, with `/opsx:update`. The spike decides the sales query, the API version, and whether settings are edited in the card or in the block.

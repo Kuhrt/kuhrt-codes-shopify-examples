@@ -78,6 +78,25 @@ The block SHALL show a loading state while its data is fetched. It SHALL show an
 - **WHEN** none of the product's variants track inventory
 - **THEN** the block says so, and shows no forecast figures
 
+#### Scenario: More history than the block reads
+- **WHEN** the product's orders in the last 60 days exceed the number the block reads on one page view
+- **THEN** the block says the history is too large to forecast here, and shows no forecast figures
+
+### Requirement: Only this product's sales count
+Average daily sales SHALL count only the units of this product's variants, from orders processed in each window, after refunds and removals on those orders. Units of other products in the same orders SHALL NOT count, and dates SHALL be calendar days in the shop's timezone.
+
+#### Scenario: Mixed order
+- **WHEN** an order contains 3 units of this product and 5 of another
+- **THEN** only the 3 units count toward this product's sales
+
+#### Scenario: Refunded units
+- **WHEN** an order had 4 units of this product and 1 was refunded
+- **THEN** 3 units count, on the order's processed day
+
+#### Scenario: Late-evening order
+- **WHEN** an order is processed at 23:30 in the shop's timezone, which is the next day in UTC
+- **THEN** it counts on the shop's calendar day
+
 ### Requirement: The answer comes first
 The stock status, days until stockout and suggested reorder point SHALL be visible when the block first renders, without the merchant expanding it. Supporting detail (locations, averages, settings) MAY require expanding. For a product stocked at up to five locations, no content SHALL be cut off once expanded.
 
