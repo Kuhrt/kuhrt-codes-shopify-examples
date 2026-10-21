@@ -3,48 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LEAD_TIME_DAYS } from '../../../shared/reorder-settings';
 import { loadProduct, ProductDataError, productMetafieldsHref } from './product';
-
-const PRODUCT_ID = 'gid://shopify/Product/42';
-
-interface VariantOptions {
-  sku?: string | null;
-  tracked?: boolean;
-  levels?: [name: string, available: number][];
-  moreLevels?: boolean;
-}
-
-function variant({ sku = 'SKU', tracked = true, levels = [], moreLevels = false }: VariantOptions) {
-  return {
-    sku,
-    inventoryItem: {
-      tracked,
-      inventoryLevels: {
-        pageInfo: { hasNextPage: moreLevels },
-        nodes: levels.map(([name, quantity]) => ({
-          location: { id: `gid://shopify/Location/${name}`, name },
-          quantities: [{ name: 'available', quantity }]
-        }))
-      }
-    }
-  };
-}
-
-function productResponse(
-  variants: unknown[],
-  extras: { leadTime?: string | null; safetyStock?: string | null; moreVariants?: boolean } = {}
-) {
-  const { leadTime = null, safetyStock = null, moreVariants = false } = extras;
-  return {
-    data: {
-      shop: { ianaTimezone: 'America/Chicago' },
-      product: {
-        variants: { pageInfo: { hasNextPage: moreVariants }, nodes: variants },
-        leadTime: leadTime === null ? null : { value: leadTime },
-        safetyStock: safetyStock === null ? null : { value: safetyStock }
-      }
-    }
-  };
-}
+import { PRODUCT_ID, productResponse, variantNode } from './test-fixtures';
 
 const queryReturning = (response: object) => vi.fn<QueryFunction>().mockResolvedValue(response);
 
@@ -52,13 +11,11 @@ describe('loadProduct', () => {
   it('maps the time zone, tracked flags and available stock per location', async () => {
     const query = queryReturning(
       productResponse([
-        variant({
-          levels: [
-            ['North', 4],
-            ['South', 6]
-          ]
-        }),
-        variant({ tracked: false, levels: [['North', 99]] })
+        variantNode(true, [
+          ['North', 4],
+          ['South', 6]
+        ]),
+        variantNode(false, [['North', 99]])
       ])
     );
 
@@ -83,7 +40,7 @@ describe('loadProduct', () => {
   });
 
   it('asks for the product by id', async () => {
-    const query = queryReturning(productResponse([variant({})]));
+    const query = queryReturning(productResponse([variantNode(true, [])]));
 
     await loadProduct(query, PRODUCT_ID);
 
@@ -92,53 +49,75 @@ describe('loadProduct', () => {
 
   it('passes the stored settings through parseReorderSettings', async () => {
     const query = queryReturning(
-      productResponse([variant({})], { leadTime: '14', safetyStock: 'abc' })
+      productResponse([variantNode(true, [])], { leadTime: '14', safetyStock: 'abc' })
     );
 
-    const { settings, defaultsUsed } = await loadProduct(query, PRODUCT_ID);
+    const { settings } = await loadProduct(query, PRODUCT_ID);
 
-    expect(settings).toEqual({ leadTimeDays: 14, safetyStock: 0, invalid: ['safetyStock'] });
-    expect(defaultsUsed).toEqual([]);
+    expect(settings).toEqual({
+      leadTimeDays: 14,
+      safetyStock: 0,
+      invalid: ['safetyStock'],
+      defaulted: []
+    });
   });
 
   it('reports the defaults in use when no settings are stored', async () => {
-    const query = queryReturning(productResponse([variant({})]));
+    const query = queryReturning(productResponse([variantNode(true, [])]));
 
-    const { settings, defaultsUsed } = await loadProduct(query, PRODUCT_ID);
+    const { settings } = await loadProduct(query, PRODUCT_ID);
 
     expect(settings).toEqual({
       leadTimeDays: DEFAULT_LEAD_TIME_DAYS,
       safetyStock: 0,
-      invalid: []
+      invalid: [],
+      defaulted: ['leadTime', 'safetyStock']
     });
-    expect(defaultsUsed).toEqual(['leadTime', 'safetyStock']);
   });
 
   it('reports a product with no tracked variant as having no tracked inventory', async () => {
-    const query = queryReturning(productResponse([variant({ tracked: false })]));
+    const query = queryReturning(productResponse([variantNode(false, [])]));
 
-    const { variants, searchableSkus } = await loadProduct(query, PRODUCT_ID);
+    const { variants } = await loadProduct(query, PRODUCT_ID);
 
     expect(variants.some(({ tracked }) => tracked)).toBe(false);
-    expect(searchableSkus).toBeNull();
   });
 
   describe('searchableSkus', () => {
-    it('lists the distinct SKUs of the tracked variants only', async () => {
+    it('lists the distinct SKUs of every variant, tracked or not', async () => {
       const query = queryReturning(
         productResponse([
-          variant({ sku: 'A' }),
-          variant({ sku: 'A' }),
-          variant({ sku: ' B ' }),
-          variant({ sku: null, tracked: false })
+          variantNode(true, [], { sku: 'A' }),
+          variantNode(true, [], { sku: 'A' }),
+          variantNode(true, [], { sku: ' B ' }),
+          variantNode(false, [], { sku: 'C' })
         ])
       );
 
-      expect((await loadProduct(query, PRODUCT_ID)).searchableSkus).toEqual(['A', 'B']);
+      expect((await loadProduct(query, PRODUCT_ID)).searchableSkus).toEqual(['A', 'B', 'C']);
     });
 
-    it.each([null, '', '   '])('is null when a tracked variant has the SKU %j', async (sku) => {
-      const query = queryReturning(productResponse([variant({ sku: 'A' }), variant({ sku })]));
+    it.each([null, '', '   '])('is null when a variant has the SKU %j', async (sku) => {
+      const query = queryReturning(
+        productResponse([variantNode(true, [], { sku: 'A' }), variantNode(true, [], { sku })])
+      );
+
+      expect((await loadProduct(query, PRODUCT_ID)).searchableSkus).toBeNull();
+    });
+
+    it('is null when only an untracked variant has no SKU', async () => {
+      const query = queryReturning(
+        productResponse([
+          variantNode(true, [], { sku: 'A' }),
+          variantNode(false, [], { sku: null })
+        ])
+      );
+
+      expect((await loadProduct(query, PRODUCT_ID)).searchableSkus).toBeNull();
+    });
+
+    it('is null for a product with no variants', async () => {
+      const query = queryReturning(productResponse([]));
 
       expect((await loadProduct(query, PRODUCT_ID)).searchableSkus).toBeNull();
     });
@@ -175,7 +154,7 @@ describe('loadProduct', () => {
     });
 
     it('rejects when a level has no available quantity', async () => {
-      const broken = variant({ levels: [['North', 1]] });
+      const broken = variantNode(true, [['North', 1]]);
       broken.inventoryItem.inventoryLevels.nodes[0]!.quantities = [];
       const query = queryReturning(productResponse([broken]));
 
@@ -183,13 +162,15 @@ describe('loadProduct', () => {
     });
 
     it('rejects rather than read part of the variants', async () => {
-      const query = queryReturning(productResponse([variant({})], { moreVariants: true }));
+      const query = queryReturning(
+        productResponse([variantNode(true, [])], { moreVariants: true })
+      );
 
       await expect(loadProduct(query, PRODUCT_ID)).rejects.toBeInstanceOf(ProductDataError);
     });
 
     it('rejects rather than read part of a variant’s locations', async () => {
-      const query = queryReturning(productResponse([variant({ moreLevels: true })]));
+      const query = queryReturning(productResponse([variantNode(true, [], { moreLevels: true })]));
 
       await expect(loadProduct(query, PRODUCT_ID)).rejects.toBeInstanceOf(ProductDataError);
     });
@@ -204,7 +185,7 @@ describe('productMetafieldsHref', () => {
   it.each(['gid://shopify/Order/42', 'gid://shopify/Product/abc', '42', ''])(
     'throws for %j',
     (id) => {
-      expect(() => productMetafieldsHref(id)).toThrow(ProductDataError);
+      expect(() => productMetafieldsHref(id)).toThrow(Error);
     }
   );
 });

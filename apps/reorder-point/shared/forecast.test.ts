@@ -262,7 +262,7 @@ describe('stock that runs out within the lead time', () => {
 });
 
 describe('forecast', () => {
-  const settings: ReorderSettings = { leadTimeDays: 7, safetyStock: 0, invalid: [] };
+  const settings: ReorderSettings = { leadTimeDays: 7, safetyStock: 0, invalid: [], defaulted: [] };
   const inputOf = (overrides: Partial<ForecastInput> = {}): ForecastInput => ({
     today: TODAY,
     dailySales: [],
@@ -276,7 +276,7 @@ describe('forecast', () => {
       inputOf({
         dailySales: everyDay(1, 30, 3),
         variants: [tracked(level('a', 12), level('b', 13))],
-        settings: { leadTimeDays: 7, safetyStock: 10, invalid: [] }
+        settings: { leadTimeDays: 7, safetyStock: 10, invalid: [], defaulted: [] }
       })
     );
     expect(result).toEqual({
@@ -291,7 +291,7 @@ describe('forecast', () => {
       daysUntilStockout: 8,
       reorderPoint: 31,
       status: 'reorder-now',
-      settings: { leadTimeDays: 7, safetyStock: 10, invalid: [] }
+      settings: { leadTimeDays: 7, safetyStock: 10, invalid: [], defaulted: [] }
     });
   });
 
@@ -341,7 +341,7 @@ describe('forecast', () => {
     const result = forecast(
       inputOf({
         dailySales: [sale(0, 99)],
-        settings: { leadTimeDays: 7, safetyStock: 5, invalid: [] }
+        settings: { leadTimeDays: 7, safetyStock: 5, invalid: [], defaulted: [] }
       })
     );
     expect(result).toMatchObject({
@@ -368,7 +368,12 @@ describe('forecast', () => {
     );
     expect(result).toMatchObject({
       reorderPoint: 14,
-      settings: { leadTimeDays: 7, safetyStock: 0, invalid: ['leadTime'] }
+      settings: {
+        leadTimeDays: 7,
+        safetyStock: 0,
+        invalid: ['leadTime'],
+        defaulted: ['safetyStock']
+      }
     });
   });
 

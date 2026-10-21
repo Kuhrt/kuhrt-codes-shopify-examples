@@ -1,11 +1,7 @@
-import { type QueryFunction, runQuery } from '@repo/admin-query';
+import { numericIdOf, type QueryFunction, runQuery } from '@repo/admin-query';
 
 import type { VariantInventory } from '../../../shared/forecast';
-import {
-  type InvalidSetting,
-  parseReorderSettings,
-  type ReorderSettings
-} from '../../../shared/reorder-settings';
+import { parseReorderSettings, type ReorderSettings } from '../../../shared/reorder-settings';
 
 export const VARIANTS_PAGE_SIZE = 100;
 export const LOCATIONS_PAGE_SIZE = 20;
@@ -22,11 +18,9 @@ export class ProductDataError extends Error {
 export interface ProductDetails {
   timeZone: string;
   variants: VariantInventory[];
-  /** The SKUs of the tracked variants, or null when any of them has none. */
+  /** The SKUs of every variant, or null when any variant has none. */
   searchableSkus: string[] | null;
   settings: ReorderSettings;
-  /** Settings with no stored value, so the default is in use. */
-  defaultsUsed: InvalidSetting[];
 }
 
 interface ConnectionPageInfo {
@@ -85,15 +79,9 @@ const PRODUCT_QUERY = `
   }
 `;
 
-const PRODUCT_ID_PATTERN = /^gid:\/\/shopify\/Product\/(\d+)$/;
-
-/** Builds the admin link to a product's metafields page. Throws a ProductDataError for anything but a product GID. */
+/** Builds the admin link to a product's metafields page. Throws an Error for anything but a product GID. */
 export function productMetafieldsHref(productId: string): string {
-  const numericId = PRODUCT_ID_PATTERN.exec(productId)?.[1];
-  if (numericId === undefined) {
-    throw new ProductDataError(`"${productId}" is not a Shopify product GID`);
-  }
-  return `shopify:admin/products/${numericId}/metafields`;
+  return `shopify:admin/products/${numericIdOf(productId, 'Product')}/metafields`;
 }
 
 function toVariant({ inventoryItem }: VariantNode): VariantInventory {
@@ -117,21 +105,9 @@ function toVariant({ inventoryItem }: VariantNode): VariantInventory {
 }
 
 function searchableSkus(variants: VariantNode[]): string[] | null {
-  const skus = variants
-    .filter(({ inventoryItem }) => inventoryItem.tracked)
-    .map(({ sku }) => sku?.trim() ?? '');
+  const skus = variants.map(({ sku }) => sku?.trim() ?? '');
   if (skus.length === 0 || skus.some((sku) => sku === '')) return null;
   return [...new Set(skus)];
-}
-
-function settingsWithoutValue(
-  leadTime: Metafield | null,
-  safetyStock: Metafield | null
-): InvalidSetting[] {
-  const missing: InvalidSetting[] = [];
-  if (leadTime === null) missing.push('leadTime');
-  if (safetyStock === null) missing.push('safetyStock');
-  return missing;
 }
 
 /**
@@ -154,7 +130,6 @@ export async function loadProduct(
     timeZone: shop.ianaTimezone,
     variants: product.variants.nodes.map(toVariant),
     searchableSkus: searchableSkus(product.variants.nodes),
-    settings: parseReorderSettings(leadTime?.value, safetyStock?.value),
-    defaultsUsed: settingsWithoutValue(leadTime, safetyStock)
+    settings: parseReorderSettings(leadTime?.value, safetyStock?.value)
   };
 }

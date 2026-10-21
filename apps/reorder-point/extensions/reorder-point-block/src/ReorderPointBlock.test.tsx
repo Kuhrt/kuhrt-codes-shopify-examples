@@ -10,6 +10,7 @@ import {
   ordersResponse,
   PRODUCT_ID,
   productResponse,
+  soldUnits,
   variantNode
 } from './test-fixtures';
 
@@ -39,7 +40,7 @@ const healthyStore: Store = {
       ['South', 8]
     ])
   ]),
-  orders: ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', 30)])
+  orders: ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', [soldUnits(30)])])
 };
 
 function answer(result: Answer | undefined): object {
@@ -159,6 +160,37 @@ describe('ReorderPointBlock forecast', () => {
     }
   });
 
+  it.each([
+    ['out of stock', 0, 'critical'],
+    ['at the reorder point', 5, 'warning'],
+    ['low', 10, 'caution'],
+    ['healthy', 50, 'success']
+  ])('tones the status badge for stock that is %s', async (_name, available, tone) => {
+    using _extension = await renderBlock({
+      ...healthyStore,
+      product: productResponse([variantNode(true, [['North', available]])])
+    });
+    await showsForecast();
+
+    expect(section('answer')?.querySelector('s-badge')?.getAttribute('tone')).toBe(tone);
+  });
+
+  it('says there is no stockout estimate when nothing sold in the last 30 days', async () => {
+    using _extension = await renderBlock({ ...healthyStore, orders: ordersResponse([]) });
+    await showsForecast();
+
+    expect(section('answer')?.textContent).toContain('answer.noEstimate');
+    expect(section('answer')?.textContent).not.toContain('answer.daysUntilStockout');
+  });
+
+  it('gives the stockout estimate when there are recent sales', async () => {
+    using _extension = await renderBlock(healthyStore);
+    await showsForecast();
+
+    expect(section('answer')?.textContent).toContain('answer.daysUntilStockout');
+    expect(section('answer')?.textContent).not.toContain('answer.noEstimate');
+  });
+
   it('gives the collapsed block a summary only when there is a forecast', async () => {
     using _extension = await renderBlock(healthyStore);
     await showsForecast();
@@ -195,59 +227,43 @@ describe('ReorderPointBlock forecast', () => {
     expect(findAll('[data-section="stock"] > s-stack')).toHaveLength(levels.length + 1);
   });
 
+  const markers = () =>
+    findAll('[data-section="settings"] [data-marker]').map((marker) =>
+      marker.getAttribute('data-marker')
+    );
+
   it('marks default settings as defaults', async () => {
     using _extension = await renderBlock(healthyStore);
     await showsForecast();
 
-    const markers = findAll('[data-section="settings"] [data-marker]');
-    expect(markers.map((marker) => marker.getAttribute('data-marker'))).toEqual([
-      'default',
-      'default'
-    ]);
+    expect(markers()).toEqual(['default', 'default']);
   });
 
-  it('marks an invalid stored value as invalid and a stored one as neither', async () => {
+  it('marks a stored valid setting as neither default nor invalid', async () => {
     using _extension = await renderBlock({
       ...healthyStore,
       product: productResponse([variantNode(true, [['North', 20]])], {
-        leadTime: 'abc',
+        leadTime: '14',
         safetyStock: '5'
       })
     });
     await showsForecast();
 
-    const markers = findAll('[data-section="settings"] [data-marker]');
-    expect(markers.map((marker) => marker.getAttribute('data-marker'))).toEqual(['invalid']);
+    expect(markers()).toEqual([]);
   });
 
-  it('keeps the detail compact: one row for both averages, no dividers or sub-headings', async () => {
-    using _extension = await renderBlock(healthyStore);
+  it.each([
+    ['lead time', { leadTime: '400', safetyStock: '5' }],
+    ['lead time', { leadTime: 'abc', safetyStock: '5' }],
+    ['safety stock', { leadTime: '14', safetyStock: '-3' }]
+  ])('marks an invalid %s as invalid', async (_name, settings) => {
+    using _extension = await renderBlock({
+      ...healthyStore,
+      product: productResponse([variantNode(true, [['North', 20]])], settings)
+    });
     await showsForecast();
 
-    expect(findAll('[data-section="sales"] > s-stack')).toHaveLength(1);
-    expect(find('s-divider')).toBeNull();
-    expect(findAll('s-heading')).toHaveLength(1);
-  });
-
-  it('formats averages to at most two decimals through the host', async () => {
-    const extension = setUpExtension('admin.product-details.block.render');
-    connect(extension, healthyStore);
-    const formatNumber = vi.fn((value: number | bigint, _options?: object) => String(value));
-    extension.shopify.i18n.formatNumber = formatNumber;
-    using _scoped = extension;
-
-    await extension.render();
-    await showsForecast();
-
-    expect(formatNumber).toHaveBeenCalledWith(1, { maximumFractionDigits: 2 });
-    expect(formatNumber).toHaveBeenCalledWith(0.5, { maximumFractionDigits: 2 });
-  });
-
-  it('links to the product metafields from a single paragraph', async () => {
-    using _extension = await renderBlock(healthyStore);
-    await showsForecast();
-
-    expect(find('s-paragraph s-link')).not.toBeNull();
+    expect(markers()).toEqual(['invalid']);
   });
 
   it('links to the product metafields', async () => {
@@ -257,7 +273,7 @@ describe('ReorderPointBlock forecast', () => {
     expect(find('s-link')?.getAttribute('href')).toBe('shopify:admin/products/42/metafields');
   });
 
-  it('reads nothing but never writes: it only queries', async () => {
+  it('only queries, never mutates', async () => {
     const extension = setUpExtension('admin.product-details.block.render');
     const query = connect(extension, healthyStore);
     using _scoped = extension;

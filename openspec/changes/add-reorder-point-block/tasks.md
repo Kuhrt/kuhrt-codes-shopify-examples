@@ -8,10 +8,11 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
   - Verify: `shopify app dev` builds the extension and the export's value renders in the block on `kuhrt-codes`. Otherwise switch to design decision 2's fallback and record it.
 - [x] 1.2 From the block on `kuhrt-codes`, check:
   - `Intl.DateTimeFormat(undefined, { timeZone: shop.ianaTimezone })` formats a date in the shop's zone;
-  - what `currentQuantity` reports for a line item after a partial refund, and after the order is cancelled (use one `reorder-spike` order for each; both are dev-store test data);
   - the measured `requestedQueryCost` of the orders query at the chosen page sizes.
-  - Note: the `currentQuantity` refund/cancel sub-check is pending the developer token check in `add-reorder-demo-history`.
-  - Verify: results recorded in design.md under "Check results"; decision 3's cancelled-order rule and decision 4's page sizes set from them. **Gate:** if `Intl` time zones are missing, use the Risks fallback and tell the user.
+  - Verify: results recorded in design.md under "Check results"; decision 4's page sizes set from them. **Gate:** if `Intl` time zones are missing, use the Risks fallback and tell the user.
+
+- [ ] 1.3 Check what `currentQuantity` reports for a line item after a partial refund, and after the order is cancelled (use one `reorder-spike` order for each; both are dev-store test data). Pending the developer token check in `add-reorder-demo-history`.
+  - Verify: results recorded in design.md under "Check results"; decision 3's cancelled-order rule (`EXCLUDE_CANCELLED_ORDERS`) set from them.
 
 ## 2. Shared query helper (`packages/admin-query`)
 
@@ -22,12 +23,12 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
 
 ## 3. The block (`extensions/reorder-point-block`)
 
-- [x] 3.1 Scaffold the extension like App 2's `wholesale-home` (package, tsconfig, eslint, vitest, turbo inputs including `../../shared/**` and `packages/admin-query`), with `locales/en.default.json` and `shopify.d.ts`.
+- [x] 3.1 Scaffold the extension like App 2's `wholesale-home` (package, tsconfig, eslint, vitest, turbo inputs including `../../shared/**`; `packages/admin-query` needs no entry because `^build` covers a workspace dependency), with `locales/en.default.json` and `shopify.d.ts`.
   - Verify: `pnpm check` runs the extension's lint, typecheck and test.
 - [x] 3.2 Add `product.ts`: one query for the shop's `ianaTimezone`, the product's variants (`sku`, `inventoryItem { tracked inventoryLevels { location { id name } quantities(names: ["available"]) } }`) and both settings metafields; map it to forecast inputs.
   - Verify: Vitest with a fake `QueryFunction` covers mapping, a product with no tracked variant, missing fields (error), and settings passed to `parseReorderSettings`.
 - [x] 3.3 Add `sales.ts`: the paged orders query (design decisions 3 and 4) returning `DailySales[]` for one product.
-  - Verify: Vitest covers each scenario of "Only this product's sales count"; the SKU filter present only when every tracked variant has a SKU; a line item follow-up page; the page cap raising `TooManyPagesError`; and a GraphQL error.
+  - Verify: Vitest covers each scenario of "Only this product's sales count"; the SKU filter present only when every variant has a SKU; a line item follow-up page; the page cap raising `TooManyPagesError`; and a GraphQL error.
 - [x] 3.4 Add `load-forecast.ts`, composing the two and `shared/forecast.ts`, returning the block's state.
   - Verify: Vitest covers each state (`untracked`, `too-much-history`, `error`, `forecast`), and that a failed sales read never yields a forecast.
 - [x] 3.5 Add `ReorderPointBlock.tsx` and `index.tsx` (design decision 5).

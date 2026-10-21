@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'preact/hooks';
 
 import type { StockStatus } from '../../../shared/forecast';
-import type { InvalidSetting } from '../../../shared/reorder-settings';
+import type { SettingName } from '../../../shared/reorder-settings';
 import { type ForecastState, loadForecast } from './load-forecast';
 
 type State = { status: 'loading' } | ForecastState;
@@ -112,7 +112,7 @@ function Forecast({ view }: { view: ForecastView }) {
       <Answer forecast={view.forecast} />
       <StockByLocation forecast={view.forecast} />
       <AverageSales forecast={view.forecast} />
-      <Settings forecast={view.forecast} defaultsUsed={view.defaultsUsed} />
+      <Settings forecast={view.forecast} />
       <s-paragraph>
         <s-link href={view.metafieldsHref}>{t('settings.editLink')}</s-link>{' '}
         <s-text color="subdued">{t('settings.pinHint')}</s-text>
@@ -162,17 +162,11 @@ function AverageSales({ forecast }: { forecast: ForecastDetails }) {
   );
 }
 
-function Settings({
-  forecast,
-  defaultsUsed
-}: {
-  forecast: ForecastDetails;
-  defaultsUsed: InvalidSetting[];
-}) {
+function Settings({ forecast }: { forecast: ForecastDetails }) {
   const { settings } = forecast;
-  const markerOf = (setting: InvalidSetting) => {
+  const markerOf = (setting: SettingName) => {
     if (settings.invalid.includes(setting)) return 'invalid';
-    return defaultsUsed.includes(setting) ? 'default' : undefined;
+    return settings.defaulted.includes(setting) ? 'default' : undefined;
   };
   return (
     <s-stack data-section="settings" gap="small-200">

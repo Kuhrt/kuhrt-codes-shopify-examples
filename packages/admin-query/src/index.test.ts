@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AdminQueryError,
   collectPages,
+  numericIdOf,
   type Page,
   type QueryFunction,
   runQuery,
@@ -52,6 +53,36 @@ describe('runQuery', () => {
   });
 });
 
+describe('numericIdOf', () => {
+  it('returns the digits of a GID of the given type', () => {
+    expect(numericIdOf('gid://shopify/Product/42', 'Product')).toBe('42');
+  });
+
+  it('accepts any of several types', () => {
+    const types = ['DiscountAutomaticNode', 'DiscountCodeNode'];
+
+    expect(numericIdOf('gid://shopify/DiscountCodeNode/7', types)).toBe('7');
+    expect(numericIdOf('gid://shopify/DiscountAutomaticNode/8', types)).toBe('8');
+  });
+
+  it.each([
+    'gid://shopify/Order/42',
+    'gid://shopify/Product/abc',
+    'gid://shopify/Product/',
+    'gid://shopify/Product/1/2',
+    'gid://shopify/ProductVariant/42',
+    'prefix gid://shopify/Product/42',
+    '42',
+    ''
+  ])('throws an AdminQueryError for %j', (gid) => {
+    expect(() => numericIdOf(gid, 'Product')).toThrow(AdminQueryError);
+  });
+
+  it('does not treat the type as a pattern', () => {
+    expect(() => numericIdOf('gid://shopify/Product/42', 'Pro.*')).toThrow(AdminQueryError);
+  });
+});
+
 const page = (items: string[], endCursor: string | null): Page<string> => ({
   items,
   pageInfo: { hasNextPage: endCursor !== null, endCursor }
@@ -76,6 +107,15 @@ describe('collectPages', () => {
 
     await expect(collectPages(fetchPage, { maxPages: 3 })).resolves.toEqual(['a', 'b', 'c']);
     expect(fetchPage.mock.calls.map(([cursor]) => cursor)).toEqual([null, 'c1', 'c2']);
+  });
+
+  it('starts at the given cursor instead of the first page', async () => {
+    const fetchPage = pagesReturning(page(['b'], null));
+
+    await expect(collectPages(fetchPage, { maxPages: 3, startCursor: 'c1' })).resolves.toEqual([
+      'b'
+    ]);
+    expect(fetchPage).toHaveBeenCalledWith('c1');
   });
 
   it('accepts a walk that uses exactly maxPages pages', async () => {

@@ -3,7 +3,8 @@ import {
   type Page,
   type PageInfo,
   type QueryFunction,
-  runQuery
+  runQuery,
+  TooManyPagesError
 } from '@repo/admin-query';
 
 import { type DailySales, LONG_WINDOW_DAYS } from '../../../shared/forecast';
@@ -87,9 +88,16 @@ function quoteSearchValue(value: string): string {
   return `"${value.replace(/[\\"]/g, '\\$&')}"`;
 }
 
-/** The `orders` search string: processed in the 60-day window, not cancelled, and matching any of the SKUs. */
+/**
+ * The `orders` search string: processed within the 60-day window widened by a day at each end,
+ * not cancelled, and matching any of the SKUs. The widening makes the search's time zone for
+ * date bounds irrelevant; the forecast trims to the exact window.
+ */
 export function buildOrdersSearch({ today, skus }: Pick<SalesRequest, 'today' | 'skus'>): string {
-  const clauses = [`processed_at:>=${addDays(today, -LONG_WINDOW_DAYS)}`];
+  const clauses = [
+    `processed_at:>=${addDays(today, -(LONG_WINDOW_DAYS + 1))}`,
+    `processed_at:<${addDays(today, 1)}`
+  ];
   if (EXCLUDE_CANCELLED_ORDERS) clauses.push('-status:cancelled');
   if (skus !== null) {
     clauses.push(`(${skus.map((sku) => `sku:${quoteSearchValue(sku)}`).join(' OR ')})`);
@@ -97,24 +105,38 @@ export function buildOrdersSearch({ today, skus }: Pick<SalesRequest, 'today' | 
   return clauses.join(' ');
 }
 
-async function readAllLineItems(query: QueryFunction, orderId: string): Promise<LineItemNode[]> {
-  return collectPages(
-    async (cursor): Promise<Page<LineItemNode>> => {
-      const { order } = await runQuery<OrderLineItemsData>(query, ORDER_LINE_ITEMS_QUERY, {
-        id: orderId,
-        cursor
+async function readRemainingLineItems(
+  query: QueryFunction,
+  orderId: string,
+  startCursor: string | null
+): Promise<LineItemNode[]> {
+  try {
+    return await collectPages(
+      async (cursor): Promise<Page<LineItemNode>> => {
+        const { order } = await runQuery<OrderLineItemsData>(query, ORDER_LINE_ITEMS_QUERY, {
+          id: orderId,
+          cursor
+        });
+        if (!order?.lineItems) throw new SalesDataError(`order ${orderId} had no line items`);
+        return { items: order.lineItems.nodes, pageInfo: order.lineItems.pageInfo };
+      },
+      { maxPages: MAX_FOLLOW_UP_PAGES, startCursor }
+    );
+  } catch (error) {
+    if (error instanceof TooManyPagesError) {
+      throw new SalesDataError(`order ${orderId} has more line items than can be read`, {
+        cause: error
       });
-      if (!order?.lineItems) throw new SalesDataError(`order ${orderId} had no line items`);
-      return { items: order.lineItems.nodes, pageInfo: order.lineItems.pageInfo };
-    },
-    { maxPages: MAX_FOLLOW_UP_PAGES }
-  );
+    }
+    throw error;
+  }
 }
 
 async function lineItemsOf(query: QueryFunction, order: OrderNode): Promise<LineItemNode[]> {
   if (!order.lineItems) throw new SalesDataError(`order ${order.id} had no line items`);
-  if (!order.lineItems.pageInfo.hasNextPage) return order.lineItems.nodes;
-  return readAllLineItems(query, order.id);
+  const { nodes, pageInfo } = order.lineItems;
+  if (!pageInfo.hasNextPage) return nodes;
+  return [...nodes, ...(await readRemainingLineItems(query, order.id, pageInfo.endCursor))];
 }
 
 function unitsOfProduct(lineItems: LineItemNode[], productId: string): number {
@@ -155,11 +177,10 @@ export async function loadDailySales(
 
   const sales: DailySales[] = [];
   for (const order of orders) {
+    const date = shopDate(order.processedAt, request.timeZone);
+    if (date > request.today) continue;
     const lineItems = await lineItemsOf(query, order);
-    sales.push({
-      date: shopDate(order.processedAt, request.timeZone),
-      netUnits: unitsOfProduct(lineItems, request.productId)
-    });
+    sales.push({ date, netUnits: unitsOfProduct(lineItems, request.productId) });
   }
   return sumByDate(sales);
 }

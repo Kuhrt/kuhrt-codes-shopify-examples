@@ -1,6 +1,7 @@
 import {
   AdminQueryError,
   collectPages,
+  numericIdOf,
   type Page,
   type QueryFunction,
   runQuery
@@ -83,14 +84,17 @@ const DISCOUNT_NODES_QUERY = `
 
 const FAILURE_PREFIX = 'Loading discounts failed';
 
+function withFailurePrefix(error: unknown): unknown {
+  return error instanceof AdminQueryError
+    ? new Error(`${FAILURE_PREFIX}: ${error.message}`, { cause: error })
+    : error;
+}
+
 async function withDiscountsContext<Result>(work: () => Promise<Result>): Promise<Result> {
   try {
     return await work();
   } catch (error) {
-    if (error instanceof AdminQueryError) {
-      throw new Error(`${FAILURE_PREFIX}: ${error.message}`, { cause: error });
-    }
-    throw error;
+    throw withFailurePrefix(error);
   }
 }
 
@@ -111,18 +115,18 @@ function isOwnedBy(functionId: string) {
     node.discount.appDiscountType?.functionId === functionId;
 }
 
-const DISCOUNT_NODE_ID_PATTERN = /^gid:\/\/shopify\/[A-Za-z]+\/(\d+)$/;
+const DISCOUNT_NODE_TYPES = ['DiscountAutomaticNode', 'DiscountCodeNode'];
 
 /**
  * Builds the App Home link to a discount's full admin page from its node GID. Throws an Error
- * when the id is not a `gid://shopify/<Type>/<digits>` GID.
+ * when the id is not a discount node GID.
  */
 export function discountAdminHref(nodeId: string): string {
-  const numericId = DISCOUNT_NODE_ID_PATTERN.exec(nodeId)?.[1];
-  if (numericId === undefined) {
-    throw new Error(`Loading discounts failed: "${nodeId}" is not a Shopify GID`);
+  try {
+    return `shopify:admin/discounts/${numericIdOf(nodeId, DISCOUNT_NODE_TYPES)}`;
+  } catch (error) {
+    throw withFailurePrefix(error);
   }
-  return `shopify:admin/discounts/${numericId}`;
 }
 
 function toRow({ id, discount, metafield }: AppDiscountNode): DiscountRow {

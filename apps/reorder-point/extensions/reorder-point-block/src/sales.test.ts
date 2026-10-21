@@ -7,39 +7,26 @@ import {
   loadDailySales,
   MAX_FOLLOW_UP_PAGES,
   MAX_ORDER_PAGES,
+  SalesDataError,
   type SalesRequest
 } from './sales';
-import { isOrdersRequest } from './test-fixtures';
-
-const PRODUCT = 'gid://shopify/Product/1';
-const OTHER = 'gid://shopify/Product/2';
+import {
+  isOrdersRequest,
+  lineItem,
+  lineItemsResponse,
+  orderOf,
+  ordersResponse,
+  OTHER_PRODUCT_ID,
+  PRODUCT_ID,
+  soldUnits
+} from './test-fixtures';
 
 const request: SalesRequest = {
-  productId: PRODUCT,
+  productId: PRODUCT_ID,
   today: '2026-10-21',
   timeZone: 'America/Chicago',
   skus: null
 };
-
-const line = (product: string | null, currentQuantity: number) => ({
-  currentQuantity,
-  product: product === null ? null : { id: product }
-});
-
-const lineItems = (nodes: unknown[], endCursor: string | null = null) => ({
-  pageInfo: { hasNextPage: endCursor !== null, endCursor },
-  nodes
-});
-
-const order = (id: string, processedAt: string, nodes: unknown[], more: string | null = null) => ({
-  id: `gid://shopify/Order/${id}`,
-  processedAt,
-  lineItems: lineItems(nodes, more)
-});
-
-const ordersPage = (nodes: unknown[], endCursor: string | null = null) => ({
-  data: { orders: { pageInfo: { hasNextPage: endCursor !== null, endCursor }, nodes } }
-});
 
 function fakeStore({
   pages,
@@ -59,37 +46,28 @@ function fakeStore({
   });
 }
 
-const followUpPage = (nodes: unknown[], endCursor: string | null = null) => ({
-  data: { order: { lineItems: lineItems(nodes, endCursor) } }
-});
-
 const searchOf = (query: ReturnType<typeof fakeStore>, call = 0) =>
   String(query.mock.calls[call]?.[1]?.variables?.query);
 
 describe('loadDailySales', () => {
-  it('counts only this product’s units from an order that also holds another product', async () => {
+  it('counts only this product’s remaining quantity from a mixed order', async () => {
     const query = fakeStore({
-      pages: [ordersPage([order('1', '2026-10-10T15:00:00Z', [line(PRODUCT, 3), line(OTHER, 5)])])]
+      pages: [
+        ordersResponse([
+          orderOf('1', '2026-10-10T15:00:00Z', [soldUnits(3), lineItem(OTHER_PRODUCT_ID, 5)])
+        ])
+      ]
     });
 
     await expect(loadDailySales(query, request)).resolves.toEqual([
       { date: '2026-10-10', netUnits: 3 }
     ]);
-  });
-
-  it('uses the remaining quantity after refunds and removals', async () => {
-    const query = fakeStore({
-      pages: [ordersPage([order('1', '2026-10-10T15:00:00Z', [line(PRODUCT, 3)])])]
-    });
-
-    const [day] = await loadDailySales(query, request);
-
-    expect(day?.netUnits).toBe(3);
+    expect(query.mock.calls[0]?.[0]).toContain('currentQuantity');
   });
 
   it('puts a late-evening order on the shop calendar day, not the UTC day', async () => {
     const query = fakeStore({
-      pages: [ordersPage([order('1', '2026-10-11T04:30:00Z', [line(PRODUCT, 2)])])]
+      pages: [ordersResponse([orderOf('1', '2026-10-11T04:30:00Z', [soldUnits(2)])])]
     });
 
     await expect(loadDailySales(query, request)).resolves.toEqual([
@@ -97,13 +75,23 @@ describe('loadDailySales', () => {
     ]);
   });
 
+  it('puts an early-morning order of a UTC+ shop on the shop calendar day', async () => {
+    const query = fakeStore({
+      pages: [ordersResponse([orderOf('1', '2026-10-10T16:30:00Z', [soldUnits(2)])])]
+    });
+
+    await expect(loadDailySales(query, { ...request, timeZone: 'Asia/Tokyo' })).resolves.toEqual([
+      { date: '2026-10-11', netUnits: 2 }
+    ]);
+  });
+
   it('sums orders on the same shop day and keeps other days apart', async () => {
     const query = fakeStore({
       pages: [
-        ordersPage([
-          order('1', '2026-10-10T15:00:00Z', [line(PRODUCT, 2)]),
-          order('2', '2026-10-10T18:00:00Z', [line(PRODUCT, 1)]),
-          order('3', '2026-10-09T18:00:00Z', [line(PRODUCT, 4)])
+        ordersResponse([
+          orderOf('1', '2026-10-10T15:00:00Z', [soldUnits(2)]),
+          orderOf('2', '2026-10-10T18:00:00Z', [soldUnits(1)]),
+          orderOf('3', '2026-10-09T18:00:00Z', [soldUnits(4)])
         ])
       ]
     });
@@ -118,9 +106,9 @@ describe('loadDailySales', () => {
   it('adds nothing for orders without this product, deleted products or zero remaining units', async () => {
     const query = fakeStore({
       pages: [
-        ordersPage([
-          order('1', '2026-10-10T15:00:00Z', [line(OTHER, 9), line(null, 9)]),
-          order('2', '2026-10-09T15:00:00Z', [line(PRODUCT, 0)])
+        ordersResponse([
+          orderOf('1', '2026-10-10T15:00:00Z', [lineItem(OTHER_PRODUCT_ID, 9), lineItem(null, 9)]),
+          orderOf('2', '2026-10-09T15:00:00Z', [soldUnits(0)])
         ])
       ]
     });
@@ -130,11 +118,27 @@ describe('loadDailySales', () => {
     expect(days.reduce((sum, { netUnits }) => sum + netUnits, 0)).toBe(0);
   });
 
+  it('drops an order dated after today without reading its line items', async () => {
+    const query = fakeStore({
+      pages: [
+        ordersResponse([
+          orderOf('1', '2026-10-22T10:00:00Z', [soldUnits(9)], 'items-1'),
+          orderOf('2', '2026-10-10T15:00:00Z', [soldUnits(1)])
+        ])
+      ]
+    });
+
+    await expect(loadDailySales(query, request)).resolves.toEqual([
+      { date: '2026-10-10', netUnits: 1 }
+    ]);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('follows the cursors across order pages', async () => {
     const query = fakeStore({
       pages: [
-        ordersPage([order('1', '2026-10-10T15:00:00Z', [line(PRODUCT, 1)])], 'cursor-1'),
-        ordersPage([order('2', '2026-10-09T15:00:00Z', [line(PRODUCT, 2)])])
+        ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', [soldUnits(1)])], 'cursor-1'),
+        ordersResponse([orderOf('2', '2026-10-09T15:00:00Z', [soldUnits(2)])])
       ]
     });
 
@@ -145,26 +149,39 @@ describe('loadDailySales', () => {
     expect(query.mock.calls[1]?.[1]?.variables?.cursor).toBe('cursor-1');
   });
 
-  it('reads the rest of an order’s line items when they do not fit in one page', async () => {
+  it('reads the rest of an order’s line items from where the first page ended', async () => {
     const orderId = 'gid://shopify/Order/1';
     const query = fakeStore({
-      pages: [ordersPage([order('1', '2026-10-10T15:00:00Z', [line(OTHER, 1)], 'items-1')])],
+      pages: [
+        ordersResponse([
+          orderOf(
+            '1',
+            '2026-10-10T15:00:00Z',
+            [soldUnits(1), lineItem(OTHER_PRODUCT_ID, 1)],
+            'items-1'
+          )
+        ])
+      ],
       followUps: {
         [orderId]: [
-          followUpPage([line(OTHER, 1), line(PRODUCT, 2)], 'items-2'),
-          followUpPage([line(PRODUCT, 3)])
+          lineItemsResponse([lineItem(OTHER_PRODUCT_ID, 1), soldUnits(2)], 'items-2'),
+          lineItemsResponse([soldUnits(3)])
         ]
       }
     });
 
     await expect(loadDailySales(query, request)).resolves.toEqual([
-      { date: '2026-10-10', netUnits: 5 }
+      { date: '2026-10-10', netUnits: 6 }
     ]);
+    const followUpCursors = query.mock.calls
+      .filter(([document]) => !isOrdersRequest(document))
+      .map(([, options]) => options?.variables?.cursor);
+    expect(followUpCursors).toEqual(['items-1', 'items-2']);
   });
 
   it('does not issue follow-up queries when every line item was in the first page', async () => {
     const query = fakeStore({
-      pages: [ordersPage([order('1', '2026-10-10T15:00:00Z', [line(PRODUCT, 1)])])]
+      pages: [ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', [soldUnits(1)])])]
     });
 
     await loadDailySales(query, request);
@@ -173,27 +190,30 @@ describe('loadDailySales', () => {
   });
 
   it('raises TooManyPagesError when the orders exceed the pages read', async () => {
-    const endless = vi.fn<QueryFunction>().mockResolvedValue(ordersPage([], 'more'));
+    const endless = vi.fn<QueryFunction>().mockResolvedValue(ordersResponse([], 'more'));
 
     await expect(loadDailySales(endless, request)).rejects.toBeInstanceOf(TooManyPagesError);
     expect(endless).toHaveBeenCalledTimes(MAX_ORDER_PAGES);
   });
 
-  it('raises TooManyPagesError when one order’s line items exceed the pages read', async () => {
+  it('raises a SalesDataError, not TooManyPagesError, when one order’s line items exceed the pages read', async () => {
     const query = vi.fn<QueryFunction>(async (document) =>
       isOrdersRequest(document)
-        ? ordersPage([order('1', '2026-10-10T15:00:00Z', [], 'items')])
-        : followUpPage([], 'more')
+        ? ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', [], 'items')])
+        : lineItemsResponse([], 'more')
     );
 
-    await expect(loadDailySales(query, request)).rejects.toBeInstanceOf(TooManyPagesError);
+    const failure = await loadDailySales(query, request).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(SalesDataError);
+    expect(failure).not.toBeInstanceOf(TooManyPagesError);
     expect(query).toHaveBeenCalledTimes(1 + MAX_FOLLOW_UP_PAGES);
   });
 
   it('rejects with the GraphQL errors and returns no sales', async () => {
     const query = fakeStore({
       pages: [
-        ordersPage([order('1', '2026-10-10T15:00:00Z', [line(PRODUCT, 1)])], 'cursor-1'),
+        ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', [soldUnits(1)])], 'cursor-1'),
         { errors: [{ message: 'Throttled' }] }
       ]
     });
@@ -205,7 +225,7 @@ describe('loadDailySales', () => {
     const withoutItems = { id: 'gid://shopify/Order/1', processedAt: '2026-10-10T15:00:00Z' };
 
     await expect(
-      loadDailySales(fakeStore({ pages: [ordersPage([withoutItems])] }), request)
+      loadDailySales(fakeStore({ pages: [ordersResponse([withoutItems])] }), request)
     ).rejects.toThrow(Error);
     await expect(loadDailySales(fakeStore({ pages: [{ data: {} }] }), request)).rejects.toThrow(
       Error
@@ -214,7 +234,7 @@ describe('loadDailySales', () => {
 
   it('rejects when a follow-up page has no order', async () => {
     const query = fakeStore({
-      pages: [ordersPage([order('1', '2026-10-10T15:00:00Z', [], 'items')])],
+      pages: [ordersResponse([orderOf('1', '2026-10-10T15:00:00Z', [], 'items')])],
       followUps: { 'gid://shopify/Order/1': [{ data: { order: null } }] }
     });
 
@@ -222,19 +242,29 @@ describe('loadDailySales', () => {
   });
 
   it('sends the search built for the request', async () => {
-    const query = fakeStore({ pages: [ordersPage([])] });
+    const query = fakeStore({ pages: [ordersResponse([])] });
 
     await loadDailySales(query, { ...request, skus: ['A'] });
 
     expect(searchOf(query)).toBe(buildOrdersSearch({ ...request, skus: ['A'] }));
   });
+
+  it('excludes cancelled orders from the request when the switch is on', async () => {
+    const query = fakeStore({ pages: [ordersResponse([])] });
+
+    await loadDailySales(query, request);
+
+    expect(searchOf(query).includes('-status:cancelled')).toBe(EXCLUDE_CANCELLED_ORDERS);
+    expect(EXCLUDE_CANCELLED_ORDERS).toBe(true);
+  });
 });
 
 describe('buildOrdersSearch', () => {
-  it('starts at the shop-local day 60 days before today', () => {
-    expect(buildOrdersSearch({ today: '2026-10-21', skus: null })).toContain(
-      'processed_at:>=2026-08-22'
-    );
+  it('reaches a day past each end of the 60-day window', () => {
+    const search = buildOrdersSearch({ today: '2026-10-21', skus: null });
+
+    expect(search).toContain('processed_at:>=2026-08-21');
+    expect(search).toContain('processed_at:<2026-10-22');
   });
 
   it('has no SKU clause when the SKUs are unknown', () => {
@@ -251,11 +281,5 @@ describe('buildOrdersSearch', () => {
     const search = buildOrdersSearch({ today: '2026-10-21', skus: ['5" \\ pipe'] });
 
     expect(search).toContain('sku:"5\\" \\\\ pipe"');
-  });
-
-  it('excludes cancelled orders when the switch is on', () => {
-    const search = buildOrdersSearch({ today: '2026-10-21', skus: null });
-
-    expect(search.includes('-status:cancelled')).toBe(EXCLUDE_CANCELLED_ORDERS);
   });
 });

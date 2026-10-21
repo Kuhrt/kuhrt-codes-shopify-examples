@@ -1,7 +1,6 @@
 import { type QueryFunction, TooManyPagesError } from '@repo/admin-query';
 
 import { forecast, type ForecastResult, hasTrackedInventory } from '../../../shared/forecast';
-import type { InvalidSetting } from '../../../shared/reorder-settings';
 import { shopDate } from './dates';
 import { loadProduct, productMetafieldsHref } from './product';
 import { loadDailySales } from './sales';
@@ -15,7 +14,6 @@ export type ForecastState =
   | {
       status: 'forecast';
       forecast: ForecastDetails;
-      defaultsUsed: InvalidSetting[];
       metafieldsHref: string;
     };
 
@@ -48,7 +46,6 @@ async function computeState(
   return {
     status: 'forecast',
     forecast: result,
-    defaultsUsed: product.defaultsUsed,
     metafieldsHref
   };
 }

@@ -37,6 +37,21 @@ export async function runQuery<Data>(
   return data as Partial<Data>;
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The numeric part of a `gid://shopify/<type>/<digits>` GID. Throws an AdminQueryError when the
+ * GID is of another shape or type.
+ */
+export function numericIdOf(gid: string, type: string | readonly string[]): string {
+  const types = [type].flat().map(escapeRegExp).join('|');
+  const numericId = new RegExp(`^gid://shopify/(?:${types})/(\\d+)$`).exec(gid)?.[1];
+  if (numericId === undefined) {
+    throw new AdminQueryError(`"${gid}" is not a Shopify GID`);
+  }
+  return numericId;
+}
+
 function nextCursor({ hasNextPage, endCursor }: PageInfo): string | null {
   if (!hasNextPage) return null;
   if (endCursor === null) {
@@ -47,14 +62,15 @@ function nextCursor({ hasNextPage, endCursor }: PageInfo): string | null {
 
 /**
  * Follows cursors from the first page until the last, returning every item. Throws a
- * TooManyPagesError when more than `maxPages` pages would be needed.
+ * TooManyPagesError when more than `maxPages` pages would be needed. Reading starts at
+ * `startCursor` when given, otherwise from the first page.
  */
 export async function collectPages<Item>(
   fetchPage: (cursor: string | null) => Promise<Page<Item>>,
-  { maxPages }: { maxPages: number }
+  { maxPages, startCursor = null }: { maxPages: number; startCursor?: string | null }
 ): Promise<Item[]> {
   const items: Item[] = [];
-  let cursor: string | null = null;
+  let cursor = startCursor;
   for (let pagesRead = 0; ; pagesRead++) {
     if (pagesRead === maxPages) {
       throw new TooManyPagesError(`the result needs more than ${maxPages} pages`);
