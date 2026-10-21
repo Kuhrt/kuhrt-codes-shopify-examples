@@ -1,0 +1,39 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "ed90a46a8be9fad41c42cf13cfbff8a7"
+name = "Reorder Point (dev)"
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products,read_inventory,read_locations,read_orders"
+
+[access.admin]
+direct_api_mode = "online"
+
+[webhooks]
+api_version = "2026-10"
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+
+[build]
+dev_store_url = "kuhrt-codes.myshopify.com"
+include_config_on_deploy = true
+
+[product.metafields.app.lead-time]
+name = "Reorder lead time (days)"
+description = "Days between placing a reorder and the stock arriving. Used by the Reorder Point block."
+type = "number_integer"
+access.admin = "merchant_read_write"
+validations.min = 0
+validations.max = 365
+
+[product.metafields.app.safety-stock]
+name = "Reorder safety stock (units)"
+description = "Extra units to keep on hand beyond expected sales during the lead time. Used by the Reorder Point block."
+type = "number_integer"
+access.admin = "merchant_read_write"
+validations.min = 0
+validations.max = 100000

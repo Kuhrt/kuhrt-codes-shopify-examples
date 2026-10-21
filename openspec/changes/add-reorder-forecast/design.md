@@ -53,13 +53,16 @@ product id --> Admin GraphQL (direct API) --> variants' inventory levels, settin
 
 - The block reads data that the admin already exposes to it. There is no job to schedule, no data to store, and no webhook to receive. A backend would be code a reviewer reads for nothing.
 - **Cost:** custom distribution. Unlike App 2, there is no Plus restriction: that applies to Functions, and this app has none. `ship-reorder-point` states where it can be installed.
+- **Unlike App 2, a distribution method is chosen now.** Shopify only grants protected customer data (needed to read orders) to an app with a distribution method, even on a development store. "Reorder Point (dev)" uses custom distribution tied to `kuhrt-codes`. Because a custom-distribution app installs on one store, `ship-reorder-point` creates a second, production app tied to `kuhrt-codes-demo` (App 1's two-app shape). Approved by the user.
 - **Alternative considered:** Restock Mate's shape (webhooks, a database, nightly snapshots). Rejected: it exists to compute history the admin doesn't keep. Here the history is the store's orders, which the admin already has.
 
-### 2. Sales velocity comes from orders, not inventory snapshots
+### 2. Sales velocity comes from the `orders` query, not inventory snapshots or ShopifyQL
 
 - Restock Mate infers sales from day-over-day drops in stock. That under-counts when a restock and sales land on the same day, and it needs snapshots collected in advance.
 - Orders give the actual units sold, net of returns, for any window, from the first day the app is installed.
-- Which order source (ShopifyQL or `orders`) is decided by spike task 1.3, and the result is recorded under "Spike results". `shared/forecast.ts` takes `{ date, netUnits }[]` either way, so the decision doesn't reach it.
+- The block reads `orders` filtered by `processed_at` and sums each line item's quantity for the product, by day in the shop's timezone. Refunded quantities are subtracted on the day of the refund.
+- **Alternative considered:** ShopifyQL (`net_items_sold` by day). It is one call with returns already netted out. Rejected by the spike: it needs `read_reports` **and Level 2 protected customer data** (customer names, emails, phones, addresses). Asking a merchant for customer PII to count units is the opposite of this repo's minimal-scope rule. The `orders` query needs only Level 1 (no customer fields), which custom-distribution apps have.
+- `shared/forecast.ts` takes `{ date, netUnits }[]`, so the choice doesn't reach it.
 
 ### 3. Fixed calendar windows ending yesterday
 
@@ -91,10 +94,14 @@ product id --> Admin GraphQL (direct API) --> variants' inventory levels, settin
 ### 7. Settings are app-owned metafields edited in Shopify's own metafields card
 
 - Two definitions in `shopify.app.toml`: `[product.metafields.app.lead-time]` and `[product.metafields.app.safety-stock]`, both `number_integer`, with `min`/`max` validations matching the spec and `access.admin = "merchant_read_write"`.
-  - Shopify then validates the merchant's input itself, and the block needs no `write_products` scope.
+  - Shopify validates the merchant's input itself: the spike's `-3` lead time was refused on save.
   - `parseReorderSettings` still checks values, because a definition's validations don't cover values written before the definition existed, or by other means.
-- Confirmed or overturned by spike task 1.5. **Fallback** if the card doesn't show app-owned metafields: the block gets its own small edit form, writing with `metafieldsSet` under `write_products`, which `add-reorder-point-block` then specifies. The user is told before that scope is added.
-- **Alternative considered:** a merchant-owned `custom` namespace. Rejected: any app or theme could change or delete it, and the scope contract would have to explain metafields the app doesn't own.
+- **Declaring product metafield definitions requires `write_products`** (the spike's dev preview refused to start without it: "[product]: Requires the following access scope: write_products"). The user approved adding it. It also covers reading products, so `read_products` is not requested separately.
+- The block stays read-only. Merchants edit both settings in the product page's metafields list.
+  - The definitions arrive **unpinned**, so they show under the card's "View all", not on the card itself. The block's guidance and the README tell the merchant to pin them; the demo setup can't, because the definitions belong to the app.
+- **Alternatives considered:**
+  - The block's own edit form: same scope, more code and tests, for a smaller demo gain. Rejected by the user.
+  - A merchant-owned `custom` namespace, avoiding `write_products`: any app or theme could change or delete it, and the app couldn't rely on the definitions existing. Rejected.
 
 ### 8. Testing
 
@@ -108,7 +115,7 @@ Tests use inline arrays and fixed dates, in Restock Mate's style. No fixtures, n
 
 ## Risks / Trade-offs
 
-- **[ShopifyQL is unavailable to the extension, or needs protected customer data approval]** → Fall back to the `orders` query (decision 2). That adds pagination and refund netting, both inside the block's data layer, not `shared/`.
+- **[ShopifyQL is unavailable to the extension, or needs protected customer data approval]** → Happened: it needs Level 2. The `orders` query is used (decision 2). Pagination and refund netting live in the block's data layer, not `shared/`.
 - **[90 days of orders needs `read_all_orders`, and a custom app can't get it]** → Keep both averages but say in the block and README what the 90-day figure can see. **Gate:** if neither source can see past 60 days, stop and ask the user whether to drop the 90-day window or change it to 60.
 - **[Backdated orders don't land on their backdated day]** → `add-reorder-demo-history` can't produce believable history. **Gate:** stop and ask the user before planning that change differently.
 - **[Direct API calls use the extension's API version, and a needed field is newer]** → Recorded by the spike. The extension moves to `2026.10` only if it is stable by then.
@@ -124,4 +131,42 @@ None that change the spec. The spike decides the data source.
 
 ## Spike results
 
-To be filled in by task group 1.
+Checked 2026-10-21 on `kuhrt-codes` (Partner development store, not Plus) with Shopify CLI 4.9.3.
+
+**Scaffold (1.1)**
+- "Reorder Point (dev)" was created with `shopify app init --template none --name … --organization-id …`. The init's own install fails under pnpm 12 (`ERR_PNPM_IGNORED_BUILDS` for esbuild) and the CLI rolls the project back before creating the app, so it was run with `-d npm` in a scratch directory and only the app configuration was kept.
+- The template's App Home, Sidekick `app-tools` extension, FAQ metaobject and product metafield, and `write_products` scope were removed. Its new `[access.admin] direct_api_mode = "online"` was kept: direct API calls run as the signed-in staff member.
+- `kuhrt-codes`' timezone is now `America/Chicago`, not Eastern as the sample spec recorded.
+
+**Block and direct API (1.2)**
+- On `admin.product-details.block.render`, `shopify.data` is exactly `{ "selected": [{ "id": "gid://shopify/Product/…" }] }`.
+- Direct API calls succeed through `shopify:admin/api/graphql.json` and through version-pinned URLs (`shopify:admin/api/2026-10/graphql.json`, `…/2026-07/…`). The block pins `2026-10` explicitly, so which version the unpinned URL uses doesn't matter.
+- A new block appears in "Preview" until it is pinned. Pinning it applies to all staff.
+
+**Sales source (1.3)**: the `orders` query (decision 2).
+- `shopifyqlQuery` is denied without `read_reports` **and** Level 2 protected customer data, on both `2026-07` and `2026-10`.
+- The `orders` query returns nothing, with no error, until the app has protected customer data access; `orderCreate` likewise succeeds but can't return the order. Access requires a distribution method. Once custom distribution was set, Level 1 access applied with no request or review.
+- `orders(query: "processed_at:>=YYYY-MM-DD")` from the block returns each order with `processedAt` and line item `quantity` and `product { id }`.
+
+**60-day limit and backdating (1.4)**
+- Three orders created with `orderCreate` (`processedAt` 10, 75 and 85 days ago; 1, 2 and 3 units of "The Multi-location Snowboard"; `inventoryBehaviour: BYPASS`; receipts off; tagged `reorder-spike`) appear in the admin, in the `orders` query and in Shopify's own "Sales past 90 days" card on their backdated days. Orders #1001–#1003.
+- All three are visible with `read_orders` alone. The 60-day limit counts from when an order was **created**, and these were created today, so this does not show that real orders older than 60 days are visible. `read_all_orders` is still needed for a true 90-day window.
+- Adding `read_all_orders` to the scopes makes `shopify app dev` fail ("Failed to start dev preview": `read_all_orders`) until Shopify approves the app's request in the Partner Dashboard. **Pending: the user is requesting it.** If it is refused or unavailable for custom apps, the long window becomes 60 days (the user's fallback).
+- No rate limit was hit at three orders.
+
+**Settings storage (1.5)**: decision 7.
+- The definitions need `write_products`. They are created by `shopify app dev`, editable under the product's metafields "View all" (unpinned), and Shopify refused a `-3` lead time on save.
+- A value written with `metafieldsSet` (`$app` / `lead-time`) is read back by the block as `"14"`.
+
+**Scopes (1.6)**
+
+| Need | Scope | How it was confirmed |
+|---|---|---|
+| Product metafield definitions (lead time, safety stock) | `write_products` | `app dev` refuses to start without it |
+| Products and variants | covered by `write_products` | no separate scope requested |
+| `inventoryLevels` | `read_inventory` | "Access denied for inventoryLevels field" without it; `inventoryItem.tracked` alone needs no scope |
+| Location names | `read_locations` | "Access denied for name field. Required access: `read_locations`" with `read_inventory` alone |
+| Orders and line items | `read_orders`, plus protected customer data Level 1 | empty results without the protected data access |
+| Orders older than 60 days | `read_all_orders` | pending approval (above) |
+
+- The `reorder-spike` orders were kept rather than deleted: deleting them needs `write_orders`, which the app doesn't request, and they are harmless, tagged test data that the block's live check can use.
