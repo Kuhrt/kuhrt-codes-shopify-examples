@@ -12,7 +12,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` and App 2's conv
   - Record: the scope it needs, whether a development store asks for protected customer data access, the `product_id` filter syntax, and the response shape.
   - If it fails, run the `orders` fallback query instead and record its shape.
   - Verify: one source returns per-day units for a product with known sales. Record the choice under decision 2.
-- [ ] 1.4 Settle the 60-day limit and backdating. Create three orders on `kuhrt-codes` with `shopify store execute` and `orderCreate`, tagged `reorder-spike`, with `processedAt` 10, 75 and 85 days ago, for one product, with `inventoryBehaviour: BYPASS` and receipts off.
+- [x] 1.4 Settle the 60-day limit and backdating. Create three orders on `kuhrt-codes` with `shopify store execute` and `orderCreate`, tagged `reorder-spike`, with `processedAt` 10, 75 and 85 days ago, for one product, with `inventoryBehaviour: BYPASS` and receipts off.
   - Verify, from the source chosen in 1.3:
     - each order appears on its backdated day, not today;
     - the 75- and 85-day orders are visible, or record exactly which scope (`read_all_orders`) would be needed and whether the Partner Dashboard lets this custom app request it.
@@ -20,7 +20,7 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` and App 2's conv
   - Record the order rate limit actually hit, for `add-reorder-demo-history`.
 - [x] 1.5 Settle settings storage. Declare the `lead-time` and `safety-stock` product metafield definitions (design decision 7) and deploy them to the dev app.
   - Verify, on a `kuhrt-codes` product page: both appear in the metafields card, are editable, and a value outside the range is rejected on save. Then read both from the throwaway block. If the card doesn't show them, record it and switch to the decision 7 fallback, telling the user before adding `write_products`.
-- [ ] 1.6 Record the minimum scopes for the block's reads (product, inventory levels and locations, settings metafields, the sales source), each confirmed by removing it and observing the failure. Set `scopes` in `shopify.app.toml` to that list, and remove the throwaway extension. Keep the `reorder-spike` orders as tagged test data (deleting them would need `write_orders`).
+- [x] 1.6 Record the minimum scopes for the block's reads (product, inventory levels and locations, settings metafields, the sales source), each confirmed by removing it and observing the failure. Set `scopes` in `shopify.app.toml` to that list, and remove the throwaway extension. Keep the `reorder-spike` orders as tagged test data (deleting them would need `write_orders`).
   - Verify: design.md "Spike results" lists every scope with how it was confirmed, including the `read_all_orders` outcome, the throwaway extension is gone, and `pnpm check` passes.
 
 ## 2. Settings module (`shared/reorder-settings.ts`)

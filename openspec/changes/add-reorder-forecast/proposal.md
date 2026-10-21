@@ -21,7 +21,7 @@ Only `daysUntilStockout` and the stock-status thresholds carry over. Sharing cod
   - whether app-owned product metafields are editable in the product page's metafields card;
   - whether backdated orders (`processedAt`) land on their backdated day in that sales source.
 - Add `shared/forecast.ts`, a pure module that turns daily units sold, current stock, lead time and safety stock into:
-  - average daily sales over the last 30 and 90 days;
+  - average daily sales over the last 30 and 60 days (60, not the sample spec's 90: see design decision 3);
   - estimated days until stockout;
   - a suggested reorder point;
   - a stock status.

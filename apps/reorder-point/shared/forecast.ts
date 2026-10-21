@@ -1,7 +1,7 @@
 import type { ReorderSettings } from './reorder-settings';
 
 export const SHORT_WINDOW_DAYS = 30;
-export const LONG_WINDOW_DAYS = 90;
+export const LONG_WINDOW_DAYS = 60;
 const LOW_STOCK_FACTOR = 1.5;
 const MS_PER_DAY = 86_400_000;
 const FLOAT_NOISE_DECIMALS = 1e9;
@@ -38,7 +38,7 @@ export type ForecastResult =
   | {
       kind: 'forecast';
       averageDailySales30: number;
-      averageDailySales90: number;
+      averageDailySales60: number;
       availableStock: number;
       locations: InventoryLevel[];
       /** Null when there are no recent sales to project from. */
@@ -137,14 +137,14 @@ export function forecast(input: ForecastInput): ForecastResult {
   if (!hasTrackedInventory(variants)) return { kind: 'untracked' };
 
   const averageDailySales30 = averageDailySales(dailySales, SHORT_WINDOW_DAYS, today);
-  const averageDailySales90 = averageDailySales(dailySales, LONG_WINDOW_DAYS, today);
+  const averageDailySales60 = averageDailySales(dailySales, LONG_WINDOW_DAYS, today);
   const available = availableStock(variants);
   const point = reorderPoint(averageDailySales30, settings.leadTimeDays, settings.safetyStock);
 
   return {
     kind: 'forecast',
     averageDailySales30,
-    averageDailySales90,
+    averageDailySales60,
     availableStock: available,
     locations: stockByLocation(variants),
     daysUntilStockout: daysUntilStockout(available, averageDailySales30),

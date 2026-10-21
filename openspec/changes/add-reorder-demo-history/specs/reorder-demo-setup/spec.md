@@ -29,7 +29,7 @@ The setup SHALL create demo products with tracked inventory whose stock and sale
 - one product at reorder now;
 - one product healthy;
 - one product with far more stock than its sales need;
-- one product whose 90-day average is at least twice its 30-day average.
+- one product whose 60-day average is at least twice its 30-day average.
 
 Each product's stock SHALL be split across two locations.
 
@@ -38,7 +38,7 @@ Each product's stock SHALL be split across two locations.
 - **THEN** each product shows the status it was designed for
 
 ### Requirement: Backdated sales history
-The setup SHALL create orders dated on each of the last 90 days before today, containing the demo products' sales for that day. The orders SHALL be identifiable as demo orders, SHALL NOT send any notification to a customer, and SHALL NOT change inventory quantities.
+The setup SHALL create orders dated on each of the last 60 days before today, containing the demo products' sales for that day. The orders SHALL be identifiable as demo orders, SHALL NOT send any notification to a customer, and SHALL NOT change inventory quantities.
 
 #### Scenario: History visible to the forecast
 - **WHEN** the setup has run
@@ -49,7 +49,7 @@ The setup SHALL create orders dated on each of the last 90 days before today, co
 - **THEN** no order confirmation is sent, and each demo product's stock at each location equals the quantity the setup set
 
 ### Requirement: Re-running is safe and brings history up to date
-Running the setup again SHALL NOT duplicate any product, location or day's order. It SHALL create orders only for days in the last 90 that have none, and SHALL reset each demo product's stock to its designed quantities.
+Running the setup again SHALL NOT duplicate any product, location or day's order. It SHALL create orders only for days in the last 60 that have none, and SHALL reset each demo product's stock to its designed quantities.
 
 #### Scenario: Second run on the same day
 - **WHEN** the setup runs twice on the same day
@@ -66,8 +66,8 @@ Running the setup again SHALL NOT duplicate any product, location or day's order
 ### Requirement: Order creation respects the store's rate limit
 The setup SHALL pace order creation to stay within the store's order creation limit, and SHALL report its progress while doing so. When a request is throttled anyway, it SHALL wait and retry rather than fail.
 
-#### Scenario: Ninety missing days on a development store
-- **WHEN** the setup creates 90 orders on a development store
+#### Scenario: Sixty missing days on a development store
+- **WHEN** the setup creates 60 orders on a development store
 - **THEN** it finishes without a throttling failure, showing progress as it goes
 
 ### Requirement: Failures name the step

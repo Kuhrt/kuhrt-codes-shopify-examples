@@ -7,7 +7,7 @@ How the reorder point sample turns a product's sales history, stock and per-prod
 ## ADDED Requirements
 
 ### Requirement: Average daily sales over fixed windows
-Average daily sales SHALL be computed for two windows: the last 30 and the last 90 complete days before today, in the shop's timezone. Each average SHALL be the net units sold across all of the product's variants in the window, divided by the window's length in days. Days with no sales SHALL count as zero. A window whose net units sold are below zero (more returned than sold) SHALL average zero.
+Average daily sales SHALL be computed for two windows: the last 30 and the last 60 complete days before today, in the shop's timezone. Each average SHALL be the net units sold across all of the product's variants in the window, divided by the window's length in days. Days with no sales SHALL count as zero. A window whose net units sold are below zero (more returned than sold) SHALL average zero.
 
 #### Scenario: Steady seller
 - **WHEN** a product sold 3 units on each of the last 30 days
@@ -18,7 +18,7 @@ Average daily sales SHALL be computed for two windows: the last 30 and the last 
 - **THEN** its 30-day average is 2 units per day
 
 #### Scenario: Today is excluded
-- **WHEN** a product has sales today and none in the previous 90 days
+- **WHEN** a product has sales today and none in the previous 60 days
 - **THEN** both averages are zero
 
 #### Scenario: Returns reduce sales
@@ -30,10 +30,10 @@ Average daily sales SHALL be computed for two windows: the last 30 and the last 
 - **THEN** that window's average is zero
 
 ### Requirement: Forecast uses the 30-day average
-Days until stockout and the reorder point SHALL use the 30-day average. The 90-day average SHALL be shown for comparison and SHALL NOT change either value.
+Days until stockout and the reorder point SHALL use the 30-day average. The 60-day average SHALL be shown for comparison and SHALL NOT change either value.
 
 #### Scenario: Recent slowdown
-- **WHEN** a product's 30-day average is 1 and its 90-day average is 4
+- **WHEN** a product's 30-day average is 1 and its 60-day average is 4
 - **THEN** days until stockout and the reorder point are computed from 1
 
 ### Requirement: Available stock is totalled across locations and variants

@@ -47,7 +47,7 @@ describe('averageDailySales', () => {
   test('today is excluded from both windows', () => {
     const days = [sale(0, 500)];
     expect(averageDailySales(days, 30, TODAY)).toBe(0);
-    expect(averageDailySales(days, 90, TODAY)).toBe(0);
+    expect(averageDailySales(days, 60, TODAY)).toBe(0);
   });
 
   test('returns reduce sales: 40 sold and 10 returned averages 1', () => {
@@ -61,7 +61,7 @@ describe('averageDailySales', () => {
   test('a net-negative window does not offset another window', () => {
     const days = [sale(40, 90), sale(3, -10)];
     expect(averageDailySales(days, 30, TODAY)).toBe(0);
-    expect(averageDailySales(days, 90, TODAY)).toBeCloseTo(80 / 90);
+    expect(averageDailySales(days, 60, TODAY)).toBeCloseTo(80 / 60);
   });
 
   test('sums several entries for the same date', () => {
@@ -76,14 +76,14 @@ describe('averageDailySales', () => {
     expect(averageDailySales([sale(30, 30)], 30, TODAY)).toBe(1);
   });
 
-  test('a sale 31 days before today is outside the 30-day window but inside the 90-day one', () => {
+  test('a sale 31 days before today is outside the 30-day window but inside the 60-day one', () => {
     expect(averageDailySales([sale(31, 30)], 30, TODAY)).toBe(0);
-    expect(averageDailySales([sale(31, 90)], 90, TODAY)).toBe(1);
+    expect(averageDailySales([sale(31, 60)], 60, TODAY)).toBe(1);
   });
 
-  test('the 90-day window includes day 90 and excludes day 91', () => {
-    expect(averageDailySales([sale(90, 90)], 90, TODAY)).toBe(1);
-    expect(averageDailySales([sale(91, 90)], 90, TODAY)).toBe(0);
+  test('the 60-day window includes day 60 and excludes day 61', () => {
+    expect(averageDailySales([sale(60, 60)], 60, TODAY)).toBe(1);
+    expect(averageDailySales([sale(61, 60)], 60, TODAY)).toBe(0);
   });
 
   test('is zero when there is no history at all', () => {
@@ -282,7 +282,7 @@ describe('forecast', () => {
     expect(result).toEqual({
       kind: 'forecast',
       averageDailySales30: 3,
-      averageDailySales90: 1,
+      averageDailySales60: 1.5,
       availableStock: 25,
       locations: [
         { locationId: 'a', locationName: 'Location a', available: 12 },
@@ -295,26 +295,26 @@ describe('forecast', () => {
     });
   });
 
-  test('uses the 30-day average, not the 90-day one, for the forecast', () => {
-    const dailySales = [...everyDay(1, 30, 1), ...everyDay(31, 90, 5)];
+  test('uses the 30-day average, not the 60-day one, for the forecast', () => {
+    const dailySales = [...everyDay(1, 30, 1), ...everyDay(31, 60, 5)];
     const result = forecast(inputOf({ dailySales }));
     expect(result).toMatchObject({
       kind: 'forecast',
       averageDailySales30: 1,
-      averageDailySales90: 11 / 3,
+      averageDailySales60: 3,
       daysUntilStockout: 25,
       reorderPoint: 7
     });
   });
 
-  test('changing only the 31-to-90-day history changes neither forecast value', () => {
+  test('changing only the 31-to-60-day history changes neither forecast value', () => {
     const recent = everyDay(1, 30, 1);
     const withoutOlder = forecast(inputOf({ dailySales: recent }));
-    const withOlder = forecast(inputOf({ dailySales: [...recent, ...everyDay(31, 90, 9)] }));
+    const withOlder = forecast(inputOf({ dailySales: [...recent, ...everyDay(31, 60, 9)] }));
     if (withoutOlder.kind !== 'forecast' || withOlder.kind !== 'forecast') {
       throw new Error('expected forecasts');
     }
-    expect(withOlder.averageDailySales90).not.toBe(withoutOlder.averageDailySales90);
+    expect(withOlder.averageDailySales60).not.toBe(withoutOlder.averageDailySales60);
     expect(withOlder.daysUntilStockout).toBe(withoutOlder.daysUntilStockout);
     expect(withOlder.reorderPoint).toBe(withoutOlder.reorderPoint);
     expect(withOlder.status).toBe(withoutOlder.status);

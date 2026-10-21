@@ -43,7 +43,7 @@ The block (next change) fetches, then calls `shared/` with plain numbers:
 
 ```
 product id --> Admin GraphQL (direct API) --> variants' inventory levels, settings metafields
-           --> sales source (spike)       --> units sold per day, last 90 days
+           --> sales source (spike)       --> units sold per day, last 60 days
            --> forecast(...)              --> what the block shows
 ```
 
@@ -64,7 +64,10 @@ product id --> Admin GraphQL (direct API) --> variants' inventory levels, settin
 - **Alternative considered:** ShopifyQL (`net_items_sold` by day). It is one call with returns already netted out. Rejected by the spike: it needs `read_reports` **and Level 2 protected customer data** (customer names, emails, phones, addresses). Asking a merchant for customer PII to count units is the opposite of this repo's minimal-scope rule. The `orders` query needs only Level 1 (no customer fields), which custom-distribution apps have.
 - `shared/forecast.ts` takes `{ date, netUnits }[]`, so the choice doesn't reach it.
 
-### 3. Fixed calendar windows ending yesterday
+### 3. Fixed calendar windows of 30 and 60 days, ending yesterday
+
+- The sample spec asked for 30 and 90 days. Without `read_all_orders` an app sees only orders created in the last 60 days, and that scope needs Shopify's approval of a written request. For a demo app the user chose 60 days, which is accurate on any store with `read_orders` alone.
+  - **Alternative considered:** keep 90 days and document the gap. Rejected: the block would show a wrong number on any real store.
 
 - Today is a partial day; counting it would pull the average down in the morning and up in the evening.
 - Each window divides by its full length, even when the product is younger than the window.
@@ -73,7 +76,7 @@ product id --> Admin GraphQL (direct API) --> variants' inventory levels, settin
 
 ### 4. The forecast uses the 30-day average
 
-- It reacts to recent changes, and the 90-day figure is shown alongside it, so a merchant can see a slowdown or a spike for themselves.
+- It reacts to recent changes, and the 60-day figure is shown alongside it, so a merchant can see a slowdown or a spike for themselves.
 - **Alternatives considered:** the higher of the two (safer against stockouts), and a weighted blend. Rejected: both make "why is my reorder point 41?" harder to answer, and that answer has to fit in one README line.
 
 ### 5. Formulas
@@ -116,7 +119,7 @@ Tests use inline arrays and fixed dates, in Restock Mate's style. No fixtures, n
 ## Risks / Trade-offs
 
 - **[ShopifyQL is unavailable to the extension, or needs protected customer data approval]** → Happened: it needs Level 2. The `orders` query is used (decision 2). Pagination and refund netting live in the block's data layer, not `shared/`.
-- **[90 days of orders needs `read_all_orders`, and a custom app can't get it]** → Keep both averages but say in the block and README what the 90-day figure can see. **Gate:** if neither source can see past 60 days, stop and ask the user whether to drop the 90-day window or change it to 60.
+- **[90 days of orders needs `read_all_orders`, and a custom app can't get it]** → Happened: it needs Shopify's approval. The long window is 60 days (decision 3).
 - **[Backdated orders don't land on their backdated day]** → `add-reorder-demo-history` can't produce believable history. **Gate:** stop and ask the user before planning that change differently.
 - **[Direct API calls use the extension's API version, and a needed field is newer]** → Recorded by the spike. The extension moves to `2026.10` only if it is stable by then.
 
@@ -150,8 +153,8 @@ Checked 2026-10-21 on `kuhrt-codes` (Partner development store, not Plus) with S
 
 **60-day limit and backdating (1.4)**
 - Three orders created with `orderCreate` (`processedAt` 10, 75 and 85 days ago; 1, 2 and 3 units of "The Multi-location Snowboard"; `inventoryBehaviour: BYPASS`; receipts off; tagged `reorder-spike`) appear in the admin, in the `orders` query and in Shopify's own "Sales past 90 days" card on their backdated days. Orders #1001–#1003.
-- All three are visible with `read_orders` alone. The 60-day limit counts from when an order was **created**, and these were created today, so this does not show that real orders older than 60 days are visible. `read_all_orders` is still needed for a true 90-day window.
-- Adding `read_all_orders` to the scopes makes `shopify app dev` fail ("Failed to start dev preview": `read_all_orders`) until Shopify approves the app's request in the Partner Dashboard. **Pending: the user is requesting it.** If it is refused or unavailable for custom apps, the long window becomes 60 days (the user's fallback).
+- All three are visible with `read_orders` alone. The 60-day limit counts from when an order was **created**, and these were created today, so this does not show that real orders older than 60 days are visible. `read_all_orders` would still be needed for a true 90-day window.
+- Adding `read_all_orders` to the scopes makes `shopify app dev` fail ("Failed to start dev preview": `read_all_orders`) until Shopify approves the app's request in the Partner Dashboard. The user chose not to request it for a demo app; the long window is 60 days (decision 3).
 - No rate limit was hit at three orders.
 
 **Settings storage (1.5)**: decision 7.
@@ -167,6 +170,6 @@ Checked 2026-10-21 on `kuhrt-codes` (Partner development store, not Plus) with S
 | `inventoryLevels` | `read_inventory` | "Access denied for inventoryLevels field" without it; `inventoryItem.tracked` alone needs no scope |
 | Location names | `read_locations` | "Access denied for name field. Required access: `read_locations`" with `read_inventory` alone |
 | Orders and line items | `read_orders`, plus protected customer data Level 1 | empty results without the protected data access |
-| Orders older than 60 days | `read_all_orders` | pending approval (above) |
+| Orders older than 60 days | `read_all_orders`, not requested | needs Shopify approval; the window is 60 days instead |
 
 - The `reorder-spike` orders were kept rather than deleted: deleting them needs `write_orders`, which the app doesn't request, and they are harmless, tagged test data that the block's live check can use.

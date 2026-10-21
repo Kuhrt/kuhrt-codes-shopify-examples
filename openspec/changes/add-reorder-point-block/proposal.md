@@ -8,7 +8,7 @@ After `add-reorder-forecast`, the numbers exist only in tests. A merchant needs 
 
 - Add an **admin block** (`admin.product-details.block.render`) to `apps/reorder-point`, built with Polaris web components (Preact), as App 2's extensions are. It shows:
   - available stock at each location, and the total;
-  - average daily sales over the last 30 and 90 days;
+  - average daily sales over the last 30 and 60 days;
   - estimated days until stockout;
   - the suggested reorder point and the stock status;
   - the lead time and safety stock in use, saying when either is a default or an invalid stored value.
