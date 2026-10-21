@@ -209,6 +209,43 @@ importers:
         specifier: ^5.0.3
         version: 5.0.3(@types/node@24.19.2)(happy-dom@20.14.6)(jsdom@30.1.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  apps/reorder-point/extensions/reorder-point-block:
+    dependencies:
+      '@preact/signals':
+        specifier: 2.11.3
+        version: 2.11.3(preact@10.29.8)
+      '@repo/admin-query':
+        specifier: workspace:*
+        version: link:../../../../packages/admin-query
+      '@shopify/ui-extensions':
+        specifier: 2026.7.4
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+      preact:
+        specifier: 10.29.8
+        version: 10.29.8
+    devDependencies:
+      '@repo/config':
+        specifier: workspace:*
+        version: link:../../../../packages/config
+      '@shopify/ui-extensions-tester':
+        specifier: 2026.7.4
+        version: 2026.7.4(@preact/signals@2.11.3(preact@10.29.8))(preact@10.29.8)
+      '@testing-library/preact':
+        specifier: ^3.2.4
+        version: 3.2.4(preact@10.29.8)
+      eslint:
+        specifier: ^10.12.0
+        version: 10.12.0(jiti@2.7.0)(supports-color@10.2.2)
+      jsdom:
+        specifier: ^30.1.2
+        version: 30.1.2
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@24.19.2)(happy-dom@20.14.6)(jsdom@30.1.2)(vite@8.3.4(@types/node@24.19.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/script-tag-migration:
     dependencies:
       '@react-router/fs-routes':

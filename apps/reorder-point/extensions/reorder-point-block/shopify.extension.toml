@@ -1,0 +1,11 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "reorder-point-block"
+type = "ui_extension"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "admin.product-details.block.render"
+  module = "./src/index.tsx"

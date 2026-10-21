@@ -21,15 +21,15 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
 
 ## 3. The block (`extensions/reorder-point-block`)
 
-- [ ] 3.1 Scaffold the extension like App 2's `wholesale-home` (package, tsconfig, eslint, vitest, turbo inputs including `../../shared/**` and `packages/admin-query`), with `locales/en.default.json` and `shopify.d.ts`.
+- [x] 3.1 Scaffold the extension like App 2's `wholesale-home` (package, tsconfig, eslint, vitest, turbo inputs including `../../shared/**` and `packages/admin-query`), with `locales/en.default.json` and `shopify.d.ts`.
   - Verify: `pnpm check` runs the extension's lint, typecheck and test.
-- [ ] 3.2 Add `product.ts`: one query for the shop's `ianaTimezone`, the product's variants (`sku`, `inventoryItem { tracked inventoryLevels { location { id name } quantities(names: ["available"]) } }`) and both settings metafields; map it to forecast inputs.
+- [x] 3.2 Add `product.ts`: one query for the shop's `ianaTimezone`, the product's variants (`sku`, `inventoryItem { tracked inventoryLevels { location { id name } quantities(names: ["available"]) } }`) and both settings metafields; map it to forecast inputs.
   - Verify: Vitest with a fake `QueryFunction` covers mapping, a product with no tracked variant, missing fields (error), and settings passed to `parseReorderSettings`.
-- [ ] 3.3 Add `sales.ts`: the paged orders query (design decisions 3 and 4) returning `DailySales[]` for one product.
+- [x] 3.3 Add `sales.ts`: the paged orders query (design decisions 3 and 4) returning `DailySales[]` for one product.
   - Verify: Vitest covers each scenario of "Only this product's sales count"; the SKU filter present only when every tracked variant has a SKU; a line item follow-up page; the page cap raising `TooManyPagesError`; and a GraphQL error.
-- [ ] 3.4 Add `load-forecast.ts`, composing the two and `shared/forecast.ts`, returning the block's state.
+- [x] 3.4 Add `load-forecast.ts`, composing the two and `shared/forecast.ts`, returning the block's state.
   - Verify: Vitest covers each state (`untracked`, `too-much-history`, `error`, `forecast`), and that a failed sales read never yields a forecast.
-- [ ] 3.5 Add `ReorderPointBlock.tsx` and `index.tsx` (design decision 5).
+- [x] 3.5 Add `ReorderPointBlock.tsx` and `index.tsx` (design decision 5).
   - Verify: `@shopify/ui-extensions-tester` tests cover loading, error with Retry reloading, untracked, too-much-history, and forecast; the status, reorder point and days until stockout come before the supporting detail; default and invalid settings are marked; and the metafields link targets the product. Tests assert roles, structure and state, not copy.
 
 ## 4. Live check on `kuhrt-codes`
