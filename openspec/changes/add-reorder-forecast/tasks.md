@@ -20,13 +20,13 @@ Prerequisite: the workspace from `bootstrap-examples-workspace` and App 2's conv
   - Record the order rate limit actually hit, for `add-reorder-demo-history`.
 - [x] 1.5 Settle settings storage. Declare the `lead-time` and `safety-stock` product metafield definitions (design decision 7) and deploy them to the dev app.
   - Verify, on a `kuhrt-codes` product page: both appear in the metafields card, are editable, and a value outside the range is rejected on save. Then read both from the throwaway block. If the card doesn't show them, record it and switch to the decision 7 fallback, telling the user before adding `write_products`.
-- [x] 1.6 Record the minimum scopes for the block's reads (product, inventory levels and locations, settings metafields, the sales source), each confirmed by removing it and observing the failure. Set `scopes` in `shopify.app.toml` to that list, and remove the throwaway extension. Keep the `reorder-spike` orders as tagged test data (deleting them would need `write_orders`).
+- [x] 1.6 Record the minimum scopes for the block's reads (product, inventory levels and locations, settings metafields, the sales source), each confirmed by removing it and observing the failure. Set `scopes` in `shopify.app.toml` to that list, and remove the throwaway extension. Keep the `reorder-spike` orders as tagged test data for the block's live check.
   - Verify: design.md "Spike results" lists every scope with how it was confirmed, including the `read_all_orders` outcome, the throwaway extension is gone, and `pnpm check` passes.
 
 ## 2. Settings module (`shared/reorder-settings.ts`)
 
 - [x] 2.1 Add `parseReorderSettings` (design decision 6) with the defaults and ranges in "Per-product settings with defaults".
-  - Verify: Vitest covers both values missing, both valid, each at its minimum and maximum, and each invalid shape (negative, over the maximum, decimal, non-numeric string, `null`), asserting the values used and the `invalid` list.
+  - Verify: Vitest covers both values missing, both valid, each at its minimum and maximum, and each invalid shape (negative, over the maximum, decimal, non-numeric string, non-finite number), and `null` treated as missing, asserting the values used and the `invalid` list.
 
 ## 3. Forecast module (`shared/forecast.ts`)
 

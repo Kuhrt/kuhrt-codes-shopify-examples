@@ -4,7 +4,7 @@ export const SHORT_WINDOW_DAYS = 30;
 export const LONG_WINDOW_DAYS = 60;
 const LOW_STOCK_FACTOR = 1.5;
 const MS_PER_DAY = 86_400_000;
-const FLOAT_NOISE_DECIMALS = 1e9;
+const FLOAT_NOISE_SCALE = 1e9;
 
 /** Net units sold on one day (`YYYY-MM-DD` in the shop's timezone); negative when returns exceed sales. */
 export interface DailySales {
@@ -37,8 +37,8 @@ export type ForecastResult =
   | { kind: 'untracked' }
   | {
       kind: 'forecast';
-      averageDailySales30: number;
-      averageDailySales60: number;
+      shortWindowAverage: number;
+      longWindowAverage: number;
       availableStock: number;
       locations: InventoryLevel[];
       /** Null when there are no recent sales to project from. */
@@ -62,8 +62,14 @@ function dayNumber(date: string): number {
   return ms / MS_PER_DAY;
 }
 
+function assertFinite(value: number, name: string): void {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`Expected ${name} to be finite, received ${value}`);
+  }
+}
+
 function removeFloatNoise(value: number): number {
-  return Math.round(value * FLOAT_NOISE_DECIMALS) / FLOAT_NOISE_DECIMALS;
+  return Math.round(value * FLOAT_NOISE_SCALE) / FLOAT_NOISE_SCALE;
 }
 
 /**
@@ -75,9 +81,13 @@ export function averageDailySales(
   windowDays: number,
   today: string
 ): number {
+  if (!Number.isInteger(windowDays) || windowDays <= 0) {
+    throw new RangeError(`Expected windowDays to be a positive integer, received ${windowDays}`);
+  }
   const todayNumber = dayNumber(today);
   const total = days.reduce((sum, { date, netUnits }) => {
     const age = todayNumber - dayNumber(date);
+    if (age < 0) throw new RangeError(`Sales date "${date}" is after today (${today})`);
     return age >= 1 && age <= windowDays ? sum + netUnits : sum;
   }, 0);
   return Math.max(total, 0) / windowDays;
@@ -136,18 +146,20 @@ export function forecast(input: ForecastInput): ForecastResult {
   const { today, dailySales, variants, settings } = input;
   if (!hasTrackedInventory(variants)) return { kind: 'untracked' };
 
-  const averageDailySales30 = averageDailySales(dailySales, SHORT_WINDOW_DAYS, today);
-  const averageDailySales60 = averageDailySales(dailySales, LONG_WINDOW_DAYS, today);
+  for (const { netUnits } of dailySales) assertFinite(netUnits, 'netUnits');
+  const shortWindowAverage = averageDailySales(dailySales, SHORT_WINDOW_DAYS, today);
+  const longWindowAverage = averageDailySales(dailySales, LONG_WINDOW_DAYS, today);
   const available = availableStock(variants);
-  const point = reorderPoint(averageDailySales30, settings.leadTimeDays, settings.safetyStock);
+  assertFinite(available, 'available');
+  const point = reorderPoint(shortWindowAverage, settings.leadTimeDays, settings.safetyStock);
 
   return {
     kind: 'forecast',
-    averageDailySales30,
-    averageDailySales60,
+    shortWindowAverage,
+    longWindowAverage,
     availableStock: available,
     locations: stockByLocation(variants),
-    daysUntilStockout: daysUntilStockout(available, averageDailySales30),
+    daysUntilStockout: daysUntilStockout(available, shortWindowAverage),
     reorderPoint: point,
     status: stockStatus(available, point),
     settings

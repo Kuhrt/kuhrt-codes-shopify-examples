@@ -13,7 +13,7 @@ import {
   stockStatus,
   type VariantInventory
 } from './forecast';
-import { parseReorderSettings } from './reorder-settings';
+import { parseReorderSettings, type ReorderSettings } from './reorder-settings';
 
 const TODAY = '2026-10-21';
 
@@ -262,7 +262,7 @@ describe('stock that runs out within the lead time', () => {
 });
 
 describe('forecast', () => {
-  const settings = parseReorderSettings(null, null);
+  const settings: ReorderSettings = { leadTimeDays: 7, safetyStock: 0, invalid: [] };
   const inputOf = (overrides: Partial<ForecastInput> = {}): ForecastInput => ({
     today: TODAY,
     dailySales: [],
@@ -276,13 +276,13 @@ describe('forecast', () => {
       inputOf({
         dailySales: everyDay(1, 30, 3),
         variants: [tracked(level('a', 12), level('b', 13))],
-        settings: parseReorderSettings('7', '10')
+        settings: { leadTimeDays: 7, safetyStock: 10, invalid: [] }
       })
     );
     expect(result).toEqual({
       kind: 'forecast',
-      averageDailySales30: 3,
-      averageDailySales60: 1.5,
+      shortWindowAverage: 3,
+      longWindowAverage: 1.5,
       availableStock: 25,
       locations: [
         { locationId: 'a', locationName: 'Location a', available: 12 },
@@ -295,13 +295,13 @@ describe('forecast', () => {
     });
   });
 
-  test('uses the 30-day average, not the 60-day one, for the forecast', () => {
-    const dailySales = [...everyDay(1, 30, 1), ...everyDay(31, 60, 5)];
+  test('uses the short-window average, not the long-window one, for the forecast', () => {
+    const dailySales = [...everyDay(1, 30, 1), ...everyDay(31, 60, 7)];
     const result = forecast(inputOf({ dailySales }));
     expect(result).toMatchObject({
       kind: 'forecast',
-      averageDailySales30: 1,
-      averageDailySales60: 3,
+      shortWindowAverage: 1,
+      longWindowAverage: 4,
       daysUntilStockout: 25,
       reorderPoint: 7
     });
@@ -314,7 +314,7 @@ describe('forecast', () => {
     if (withoutOlder.kind !== 'forecast' || withOlder.kind !== 'forecast') {
       throw new Error('expected forecasts');
     }
-    expect(withOlder.averageDailySales60).not.toBe(withoutOlder.averageDailySales60);
+    expect(withOlder.longWindowAverage).not.toBe(withoutOlder.longWindowAverage);
     expect(withOlder.daysUntilStockout).toBe(withoutOlder.daysUntilStockout);
     expect(withOlder.reorderPoint).toBe(withoutOlder.reorderPoint);
     expect(withOlder.status).toBe(withoutOlder.status);
@@ -339,7 +339,10 @@ describe('forecast', () => {
 
   test('no recent sales: no days estimate, reorder point is the safety stock', () => {
     const result = forecast(
-      inputOf({ dailySales: [sale(0, 99)], settings: parseReorderSettings('7', '5') })
+      inputOf({
+        dailySales: [sale(0, 99)],
+        settings: { leadTimeDays: 7, safetyStock: 5, invalid: [] }
+      })
     );
     expect(result).toMatchObject({
       daysUntilStockout: null,
@@ -366,6 +369,28 @@ describe('forecast', () => {
     expect(result).toMatchObject({
       reorderPoint: 14,
       settings: { leadTimeDays: 7, safetyStock: 0, invalid: ['leadTime'] }
+    });
+  });
+
+  describe('input validation', () => {
+    test.each([0, -30, 1.5])('rejects a window of %s days', (windowDays) => {
+      expect(() => averageDailySales([], windowDays, TODAY)).toThrow(RangeError);
+    });
+
+    test.each([NaN, Infinity, -Infinity])('rejects a non-finite netUnits of %s', (netUnits) => {
+      const dailySales = [{ date: daysBefore(1), netUnits }];
+      expect(() => forecast(inputOf({ dailySales }))).toThrow(RangeError);
+    });
+
+    test.each([NaN, Infinity])('rejects non-finite available stock of %s', (available) => {
+      const variants = [tracked(level('a', available))];
+      expect(() => forecast(inputOf({ variants }))).toThrow(RangeError);
+    });
+
+    test('rejects a sale dated after today', () => {
+      const dailySales = [{ date: daysBefore(-1), netUnits: 1 }];
+      expect(() => averageDailySales(dailySales, 30, TODAY)).toThrow(RangeError);
+      expect(() => forecast(inputOf({ dailySales }))).toThrow(RangeError);
     });
   });
 

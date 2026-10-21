@@ -11,7 +11,7 @@ export interface ReorderSettings {
   invalid: InvalidSetting[];
 }
 
-/** A metafield value as the Admin API returns it: a string, absent, or (defensively) a number. */
+/** A metafield value: a string, a number, or absent. */
 export type SettingValue = string | number | null | undefined;
 
 interface SettingRule {

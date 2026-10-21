@@ -34,6 +34,17 @@ describe('parseReorderSettings', () => {
     });
   });
 
+  test.each([
+    ['surrounding whitespace', ' 14 ', 14],
+    ['leading zeros', '007', 7]
+  ])('accepts text with %s', (_label, value, expected) => {
+    expect(parseReorderSettings(value, value)).toEqual({
+      leadTimeDays: expected,
+      safetyStock: expected,
+      invalid: []
+    });
+  });
+
   test('accepts the minimum and maximum of each setting', () => {
     expect(parseReorderSettings('0', '0')).toEqual({
       leadTimeDays: 0,
@@ -58,7 +69,11 @@ describe('parseReorderSettings', () => {
     ['non-numeric', 'abc'],
     ['empty', ''],
     ['numeric with trailing text', '7 days'],
-    ['numeric but fractional', 7.5]
+    ['numeric but fractional', 7.5],
+    ['signed positive', '+7'],
+    ['exponent notation', '1e2'],
+    ['NaN', NaN],
+    ['Infinity', Infinity]
   ])('lead time that is %s uses the default and is reported', (_label, value) => {
     expect(parseReorderSettings(value, '5')).toEqual({
       leadTimeDays: DEFAULT_LEAD_TIME_DAYS,
@@ -72,7 +87,11 @@ describe('parseReorderSettings', () => {
     ['over the maximum', String(MAX_SAFETY_STOCK + 1)],
     ['decimal', '2.5'],
     ['non-numeric', 'many'],
-    ['empty', '']
+    ['empty', ''],
+    ['signed positive', '+7'],
+    ['exponent notation', '1e2'],
+    ['NaN', NaN],
+    ['Infinity', Infinity]
   ])('safety stock that is %s uses the default and is reported', (_label, value) => {
     expect(parseReorderSettings('10', value)).toEqual({
       leadTimeDays: 10,

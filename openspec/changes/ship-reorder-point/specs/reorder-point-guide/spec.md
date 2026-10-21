@@ -43,7 +43,8 @@ The README SHALL state that the forecast:
 - ignores incoming stock and purchase orders;
 - has no seasonality or trend model beyond showing both averages;
 - under-estimates a product launched inside a window until that window fills;
-- applies settings per product, not per variant or location.
+- applies settings per product, not per variant or location;
+- looks back 60 days, not 90, because older orders need Shopify-approved access (`read_all_orders`), and may miss part of the oldest day's sales.
 
 #### Scenario: New product question
 - **WHEN** a reader wonders why a product launched last week shows a low average

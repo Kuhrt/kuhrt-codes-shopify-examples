@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md`, "Why". These platform facts come from shopify.dev, checked 2026-10-21. Items marked **(spike)** are unconfirmed; task group 1 settles them.
+See `proposal.md`, "Why". These platform facts come from shopify.dev, checked 2026-10-21, before the spike. Items marked **(spike)** were unconfirmed; "Spike results" below supersedes this section wherever they differ.
 
 - **Admin block.** The target `admin.product-details.block.render` renders a card on the product page. The product ID arrives as `shopify.data.selected[0].id` (shown in examples, not formally documented). The block starts at 300px with a "Show more" button. Shopify asks for content under about 600px, and the bundle limit is 64 KB. The merchant adds and pins the block from the page's app blocks menu. The stable extension API is `2026-07`; `2026.10` is a release candidate. Source: shopify.dev/docs/api/admin-extensions/2026-07/targets/products
 - **Direct API access.** Admin extensions can call `fetch('shopify:admin/api/graphql.json')` with no backend. Calls run in online mode as the signed-in staff member, limited by the app's scopes and by that staff member's permissions. Which Admin API version they use isn't documented **(spike)**. Source: shopify.dev/docs/api/admin-extensions/2026-07
@@ -43,7 +43,7 @@ The block (next change) fetches, then calls `shared/` with plain numbers:
 
 ```
 product id --> Admin GraphQL (direct API) --> variants' inventory levels, settings metafields
-           --> sales source (spike)       --> units sold per day, last 60 days
+           --> orders (processed_at)      --> units sold per day, last 60 days
            --> forecast(...)              --> what the block shows
 ```
 
@@ -59,14 +59,16 @@ product id --> Admin GraphQL (direct API) --> variants' inventory levels, settin
 ### 2. Sales velocity comes from the `orders` query, not inventory snapshots or ShopifyQL
 
 - Restock Mate infers sales from day-over-day drops in stock. That under-counts when a restock and sales land on the same day, and it needs snapshots collected in advance.
-- Orders give the actual units sold, net of returns, for any window, from the first day the app is installed.
+- Orders give the actual units sold, net of returns, for any window within the last 60 days (decision 3), from the first day the app is installed.
 - The block reads `orders` filtered by `processed_at` and sums each line item's quantity for the product, by day in the shop's timezone. Refunded quantities are subtracted on the day of the refund.
 - **Alternative considered:** ShopifyQL (`net_items_sold` by day). It is one call with returns already netted out. Rejected by the spike: it needs `read_reports` **and Level 2 protected customer data** (customer names, emails, phones, addresses). Asking a merchant for customer PII to count units is the opposite of this repo's minimal-scope rule. The `orders` query needs only Level 1 (no customer fields), which custom-distribution apps have.
 - `shared/forecast.ts` takes `{ date, netUnits }[]`, so the choice doesn't reach it.
 
 ### 3. Fixed calendar windows of 30 and 60 days, ending yesterday
 
-- The sample spec asked for 30 and 90 days. Without `read_all_orders` an app sees only orders created in the last 60 days, and that scope needs Shopify's approval of a written request. For a demo app the user chose 60 days, which is accurate on any store with `read_orders` alone.
+- The sample spec asked for 30 and 90 days. Without `read_all_orders` an app sees only orders created in the last 60 days, and that scope needs Shopify's approval of a written request. For a demo app the user chose 60 days, which works on any store with `read_orders` alone.
+  - If Shopify's limit is a rolling 60 × 24 hours, the part of the oldest day that falls before it is not visible, so on a real store the 60-day average can miss a fraction of one day's sales (under 2% of the window). The README lists this under the forecast's limits. Demo orders are all created on the day the setup runs, so the demo is unaffected.
+  - **Alternative considered:** a 59-day window, which is exact. Rejected: a "59-day average" invites more questions than the gap it closes.
   - **Alternative considered:** keep 90 days and document the gap. Rejected: the block would show a wrong number on any real store.
 
 - Today is a partial day; counting it would pull the average down in the morning and up in the evening.
@@ -111,7 +113,7 @@ product id --> Admin GraphQL (direct API) --> variants' inventory levels, settin
 | Layer | Tool | Covers |
 |---|---|---|
 | Forecast unit | Vitest | every scenario in the `reorder-forecast` spec, window edges, the dropped-rule equivalence |
-| Settings unit | Vitest | defaults, every invalid shape (string, decimal, negative, over max, null) |
+| Settings unit | Vitest | defaults for missing values (`null`, absent), every invalid shape (non-numeric string, decimal, negative, over max, non-finite) |
 | Manual | `kuhrt-codes` admin | the metafields card shows and validates both settings (task 1.5) |
 
 Tests use inline arrays and fixed dates, in Restock Mate's style. No fixtures, no mocks.
@@ -126,11 +128,11 @@ Tests use inline arrays and fixed dates, in Restock Mate's style. No fixtures, n
 ## Migration Plan
 
 - Development is on `kuhrt-codes` only. There is no deploy in this change, other than the one that creates the metafield definitions on the dev app if `shopify app dev` doesn't.
-- Rollback: delete the test orders the spike created (they are tagged, see task 1.4) and uninstall the dev app.
+- Rollback: uninstall the dev app. The `reorder-spike` test orders are kept on purpose (see "Spike results"); they can be deleted from the `kuhrt-codes` admin.
 
 ## Open Questions
 
-None that change the spec. The spike decides the data source.
+None.
 
 ## Spike results
 
@@ -138,7 +140,7 @@ Checked 2026-10-21 on `kuhrt-codes` (Partner development store, not Plus) with S
 
 **Scaffold (1.1)**
 - "Reorder Point (dev)" was created with `shopify app init --template none --name … --organization-id …`. The init's own install fails under pnpm 12 (`ERR_PNPM_IGNORED_BUILDS` for esbuild) and the CLI rolls the project back before creating the app, so it was run with `-d npm` in a scratch directory and only the app configuration was kept.
-- The template's App Home, Sidekick `app-tools` extension, FAQ metaobject and product metafield, and `write_products` scope were removed. Its new `[access.admin] direct_api_mode = "online"` was kept: direct API calls run as the signed-in staff member.
+- The template's App Home, Sidekick `app-tools` extension, FAQ metaobject and product metafield, and `write_products` scope were removed (`write_products` was re-added for the settings definitions, decision 7). Its new `[access.admin] direct_api_mode = "online"` was kept: direct API calls run as the signed-in staff member.
 - `kuhrt-codes`' timezone is now `America/Chicago`, not Eastern as the sample spec recorded.
 
 **Block and direct API (1.2)**
@@ -172,4 +174,4 @@ Checked 2026-10-21 on `kuhrt-codes` (Partner development store, not Plus) with S
 | Orders and line items | `read_orders`, plus protected customer data Level 1 | empty results without the protected data access |
 | Orders older than 60 days | `read_all_orders`, not requested | needs Shopify approval; the window is 60 days instead |
 
-- The `reorder-spike` orders were kept rather than deleted: deleting them needs `write_orders`, which the app doesn't request, and they are harmless, tagged test data that the block's live check can use.
+- The `reorder-spike` orders were kept on purpose as tagged test data for the block's live check. They were created through the app's token while it temporarily held `write_orders`, which it no longer requests.

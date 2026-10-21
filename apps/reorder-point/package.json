@@ -16,6 +16,7 @@
     "node": ">=24 <25"
   },
   "devDependencies": {
+    "@repo/app-contract": "workspace:*",
     "@repo/config": "workspace:*",
     "@shopify/cli": "catalog:",
     "@types/node": "^24.0.0",
