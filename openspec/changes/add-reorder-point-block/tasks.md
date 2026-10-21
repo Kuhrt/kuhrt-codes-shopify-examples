@@ -14,9 +14,9 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
 
 ## 2. Shared query helper (`packages/admin-query`)
 
-- [ ] 2.1 Create `@repo/admin-query` with `QueryFunction`, `runQuery`, `AdminQueryError`, `collectPages` and `TooManyPagesError` (design decision 2), with lint, typecheck and test wired into the workspace like `packages/app-contract`.
+- [x] 2.1 Create `@repo/admin-query` with `QueryFunction`, `runQuery`, `AdminQueryError`, `collectPages` and `TooManyPagesError` (design decision 2), with lint, typecheck and test wired into the workspace like `packages/app-contract`.
   - Verify: Vitest covers GraphQL errors, missing `data`, a multi-page walk, a page with `hasNextPage` but no cursor, and exceeding `maxPages`.
-- [ ] 2.2 Move App 2's `wholesale-home/src/discounts.ts` onto it, keeping its error wording and behavior.
+- [x] 2.2 Move App 2's `wholesale-home/src/discounts.ts` onto it, keeping its error wording and behavior.
   - Verify: App 2's full test suites pass with assertions unchanged; a deliberately broken assertion in `discounts.test.ts` still fails; `pnpm check` passes.
 
 ## 3. The block (`extensions/reorder-point-block`)

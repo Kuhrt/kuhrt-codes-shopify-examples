@@ -1,4 +1,12 @@
 import {
+  AdminQueryError,
+  collectPages,
+  type Page,
+  type QueryFunction,
+  runQuery
+} from '@repo/admin-query';
+
+import {
   parseTierConfig,
   TIER_CONFIG_KEY,
   TIER_CONFIG_NAMESPACE,
@@ -18,10 +26,7 @@ export interface DiscountRow {
   summary: TierSummary;
 }
 
-export type QueryFunction = (
-  query: string,
-  options?: { variables?: { [key: string]: unknown } }
-) => Promise<{ data?: unknown; errors?: readonly { message: string }[] }>;
+export type { QueryFunction };
 
 interface AppDiscount {
   title: string;
@@ -76,24 +81,22 @@ const DISCOUNT_NODES_QUERY = `
   }
 `;
 
-async function runQuery<Data>(
-  query: QueryFunction,
-  document: string,
-  variables?: { [key: string]: unknown }
-): Promise<Partial<Data>> {
-  const { data, errors } = await query(document, variables && { variables });
-  if (errors && errors.length > 0) {
-    throw new Error(`Loading discounts failed: ${errors.map((error) => error.message).join('; ')}`);
+const FAILURE_PREFIX = 'Loading discounts failed';
+
+async function withDiscountsContext<Result>(work: () => Promise<Result>): Promise<Result> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof AdminQueryError) {
+      throw new Error(`${FAILURE_PREFIX}: ${error.message}`, { cause: error });
+    }
+    throw error;
   }
-  if (!data) {
-    throw new Error('Loading discounts failed: the response had no data');
-  }
-  return data as Partial<Data>;
 }
 
 /** Looks up this app's discount Function. Rejects with an Error when it cannot be found. */
 export async function findDiscountFunctionId(query: QueryFunction): Promise<string> {
-  const data = await runQuery<FunctionsData>(query, FUNCTIONS_QUERY);
+  const data = await withDiscountsContext(() => runQuery<FunctionsData>(query, FUNCTIONS_QUERY));
   const discountFunction = data.shopifyFunctions?.nodes.find(
     ({ apiType }) => apiType === DISCOUNT_FUNCTION_API_TYPE
   );
@@ -143,13 +146,7 @@ function readPage(data: Partial<DiscountNodesData>): DiscountNodesPage {
   return data.discountNodes;
 }
 
-function nextCursor({ pageInfo: { hasNextPage, endCursor } }: DiscountNodesPage): string | null {
-  if (!hasNextPage) return null;
-  if (endCursor === null) {
-    throw new Error('Loading discounts failed: the response has more pages but no end cursor');
-  }
-  return endCursor;
-}
+const UNLIMITED_PAGES = Number.POSITIVE_INFINITY;
 
 /**
  * Loads every automatic and code discount backed by the given discount Function, paging through
@@ -159,14 +156,11 @@ export async function loadDiscountRows(
   query: QueryFunction,
   functionId: string
 ): Promise<DiscountRow[]> {
-  const rows: DiscountRow[] = [];
-  let cursor: string | null = null;
-  do {
-    const page: DiscountNodesPage = readPage(
+  const fetchPage = async (cursor: string | null): Promise<Page<DiscountRow>> => {
+    const { nodes, pageInfo } = readPage(
       await runQuery<DiscountNodesData>(query, DISCOUNT_NODES_QUERY, { cursor })
     );
-    rows.push(...page.nodes.filter(isOwnedBy(functionId)).map(toRow));
-    cursor = nextCursor(page);
-  } while (cursor !== null);
-  return rows;
+    return { items: nodes.filter(isOwnedBy(functionId)).map(toRow), pageInfo };
+  };
+  return withDiscountsContext(() => collectPages(fetchPage, { maxPages: UNLIMITED_PAGES }));
 }
