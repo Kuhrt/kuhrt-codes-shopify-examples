@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { queryFileFor } from './cli-executor.ts';
-import { isMutation, OPERATION_NAMES } from './steps.ts';
+import { queryFileFor, SEEDER_APP_PATH } from './cli-executor.ts';
+import { OPERATION_NAMES } from './steps.ts';
 
 describe('queryFileFor', () => {
   it.each(OPERATION_NAMES)('points %s at a .graphql file that exists', (operation) => {
@@ -13,12 +14,8 @@ describe('queryFileFor', () => {
   });
 });
 
-describe('isMutation', () => {
-  it('treats the reads as queries and everything else as a mutation', () => {
-    expect(OPERATION_NAMES.filter((name) => !isMutation(name))).toEqual([
-      'shop',
-      'locations',
-      'demo-orders'
-    ]);
+describe('SEEDER_APP_PATH', () => {
+  it('is the Demo Seeder app directory, whatever the working directory', () => {
+    expect(existsSync(join(SEEDER_APP_PATH, 'shopify.app.toml'))).toBe(true);
   });
 });

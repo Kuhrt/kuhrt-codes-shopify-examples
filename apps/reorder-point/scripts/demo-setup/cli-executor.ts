@@ -1,15 +1,19 @@
 import { fileURLToPath } from 'node:url';
 
-import { createCliExecutor as createStoreExecutor } from '@repo/store-execute';
+import { createAppExecutor } from '@repo/store-execute';
 
 import type { Executor } from './run-demo-setup.ts';
-import { isMutation, type OperationName } from './steps.ts';
+import type { OperationName } from './steps.ts';
+
+export const SEEDER_APP_PATH = fileURLToPath(
+  new URL('../../../../tools/demo-seeder', import.meta.url)
+);
 
 export function queryFileFor(operation: OperationName): string {
   return fileURLToPath(new URL(`./${operation}.graphql`, import.meta.url));
 }
 
-/** An executor that runs each operation through `shopify store execute` as the signed-in developer. */
-export function createCliExecutor(store: string): Executor {
-  return createStoreExecutor(store, { queryFileFor, isMutation });
+/** An executor that runs each operation through `shopify app execute` as the Demo Seeder app. */
+export function createSeederExecutor(store: string): Executor {
+  return createAppExecutor(store, SEEDER_APP_PATH, { queryFileFor });
 }

@@ -3,7 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import { parseStoreFlags, StepError, UsageError } from '@repo/store-execute';
 
-import { createCliExecutor } from './cli-executor.ts';
+import { createSeederExecutor } from './cli-executor.ts';
 import { DEMO_PRODUCTS, HISTORY_DAYS } from './demo-data.ts';
 import { type Executor, runDemoSetup, type Runtime } from './run-demo-setup.ts';
 
@@ -20,7 +20,7 @@ function systemRuntime(report: (line: string) => void): Runtime {
 /** Runs the demo setup and returns the process exit code; the outcome is reported, never thrown. */
 export async function main(
   argv: string[],
-  createExecutor: (store: string) => Executor = createCliExecutor,
+  createExecutor: (store: string) => Executor = createSeederExecutor,
   report: (line: string) => void = console.error,
   runtimeFor: (report: (line: string) => void) => Runtime = systemRuntime
 ): Promise<number> {
