@@ -27,29 +27,37 @@
     "healthy": "Healthy"
   },
   "summary": {
-    "estimate": "{{status}}. Reorder at {{reorderPoint}} units. {{days}} days until stockout.",
-    "noEstimate": "{{status}}. Reorder at {{reorderPoint}} units. No stockout estimate."
+    "separator": ". "
   },
   "answer": {
-    "reorderPoint": "Reorder at or below {{reorderPoint}} units",
-    "daysUntilStockout": "{{days}} days until stockout",
+    "reorderPoint": {
+      "one": "Reorder at or below {{count}} unit",
+      "other": "Reorder at or below {{count}} units"
+    },
+    "daysUntilStockout": {
+      "one": "{{count}} day until stockout",
+      "other": "{{count}} days until stockout"
+    },
     "noEstimate": "No stockout estimate: no sales in the last 30 days"
   },
   "stock": {
-    "heading": "Available stock",
     "total": "Total"
   },
   "sales": {
-    "heading": "Average daily sales",
-    "last30": "Last 30 days",
-    "last60": "Last 60 days"
+    "average": "Avg. daily sales (30 / 60 days)",
+    "averageValue": "{{short}} / {{long}}"
   },
   "settings": {
-    "heading": "Settings used",
     "leadTime": "Lead time",
-    "leadTimeValue": "{{days}} days",
+    "leadTimeValue": {
+      "one": "{{count}} day",
+      "other": "{{count}} days"
+    },
     "safetyStock": "Safety stock",
-    "safetyStockValue": "{{units}} units",
+    "safetyStockValue": {
+      "one": "{{count}} unit",
+      "other": "{{count}} units"
+    },
     "default": "Default",
     "invalid": "Invalid value, default used",
     "editLink": "Edit in this product's metafields",

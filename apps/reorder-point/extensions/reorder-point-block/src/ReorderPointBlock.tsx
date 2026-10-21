@@ -6,6 +6,7 @@ import { type ForecastState, loadForecast } from './load-forecast';
 
 type State = { status: 'loading' } | ForecastState;
 type ForecastView = Extract<ForecastState, { status: 'forecast' }>;
+type ForecastDetails = ForecastView['forecast'];
 
 const STATUS_TONES = {
   'out-of-stock': 'critical',
@@ -17,7 +18,9 @@ const STATUS_TONES = {
 const t = (key: string, options?: { [key: string]: string | number }) =>
   shopify.i18n.translate(key, options);
 
-const formatAverage = (units: number) => units.toFixed(1);
+const formatCount = (value: number) => shopify.i18n.formatNumber(value);
+const formatAverage = (value: number) =>
+  shopify.i18n.formatNumber(value, { maximumFractionDigits: 2 });
 
 function currentProductId(): string | undefined {
   return shopify.data.selected[0]?.id;
@@ -44,13 +47,20 @@ function useForecast() {
   return { state, load };
 }
 
+function stockoutText({ daysUntilStockout }: ForecastDetails): string {
+  return daysUntilStockout === null
+    ? t('answer.noEstimate')
+    : t('answer.daysUntilStockout', { count: daysUntilStockout });
+}
+
 function summaryOf(state: State): string | undefined {
   if (state.status !== 'forecast') return undefined;
-  const { status, reorderPoint, daysUntilStockout } = state.forecast;
-  const options = { status: t(`status.${status}`), reorderPoint };
-  return daysUntilStockout === null
-    ? t('summary.noEstimate', options)
-    : t('summary.estimate', { ...options, days: daysUntilStockout });
+  const { forecast } = state;
+  return [
+    t(`status.${forecast.status}`),
+    t('answer.reorderPoint', { count: forecast.reorderPoint }),
+    stockoutText(forecast)
+  ].join(t('summary.separator'));
 }
 
 export function ReorderPointBlock() {
@@ -100,30 +110,25 @@ function Forecast({ view }: { view: ForecastView }) {
   return (
     <s-stack gap="base">
       <Answer forecast={view.forecast} />
-      <s-divider />
       <StockByLocation forecast={view.forecast} />
       <AverageSales forecast={view.forecast} />
       <Settings forecast={view.forecast} defaultsUsed={view.defaultsUsed} />
-      <s-link href={view.metafieldsHref}>{t('settings.editLink')}</s-link>
-      <s-text color="subdued">{t('settings.pinHint')}</s-text>
+      <s-paragraph>
+        <s-link href={view.metafieldsHref}>{t('settings.editLink')}</s-link>{' '}
+        <s-text color="subdued">{t('settings.pinHint')}</s-text>
+      </s-paragraph>
     </s-stack>
   );
 }
-
-type ForecastDetails = ForecastView['forecast'];
 
 function Answer({ forecast }: { forecast: ForecastDetails }) {
   return (
     <s-stack data-section="answer" gap="small-200">
       <s-stack direction="inline" gap="small" alignItems="center">
         <s-badge tone={STATUS_TONES[forecast.status]}>{t(`status.${forecast.status}`)}</s-badge>
-        <s-heading>{t('answer.reorderPoint', { reorderPoint: forecast.reorderPoint })}</s-heading>
+        <s-heading>{t('answer.reorderPoint', { count: forecast.reorderPoint })}</s-heading>
       </s-stack>
-      <s-text>
-        {forecast.daysUntilStockout === null
-          ? t('answer.noEstimate')
-          : t('answer.daysUntilStockout', { days: forecast.daysUntilStockout })}
-      </s-text>
+      <s-text>{stockoutText(forecast)}</s-text>
     </s-stack>
   );
 }
@@ -131,11 +136,14 @@ function Answer({ forecast }: { forecast: ForecastDetails }) {
 function StockByLocation({ forecast }: { forecast: ForecastDetails }) {
   return (
     <s-stack data-section="stock" gap="small-200">
-      <s-heading>{t('stock.heading')}</s-heading>
       {forecast.locations.map((location) => (
-        <Row key={location.locationId} label={location.locationName} value={location.available} />
+        <Row
+          key={location.locationId}
+          label={location.locationName}
+          value={formatCount(location.available)}
+        />
       ))}
-      <Row label={t('stock.total')} value={forecast.availableStock} emphasis />
+      <Row label={t('stock.total')} value={formatCount(forecast.availableStock)} emphasis />
     </s-stack>
   );
 }
@@ -143,9 +151,13 @@ function StockByLocation({ forecast }: { forecast: ForecastDetails }) {
 function AverageSales({ forecast }: { forecast: ForecastDetails }) {
   return (
     <s-stack data-section="sales" gap="small-200">
-      <s-heading>{t('sales.heading')}</s-heading>
-      <Row label={t('sales.last30')} value={formatAverage(forecast.shortWindowAverage)} />
-      <Row label={t('sales.last60')} value={formatAverage(forecast.longWindowAverage)} />
+      <Row
+        label={t('sales.average')}
+        value={t('sales.averageValue', {
+          short: formatAverage(forecast.shortWindowAverage),
+          long: formatAverage(forecast.longWindowAverage)
+        })}
+      />
     </s-stack>
   );
 }
@@ -164,15 +176,14 @@ function Settings({
   };
   return (
     <s-stack data-section="settings" gap="small-200">
-      <s-heading>{t('settings.heading')}</s-heading>
       <Row
         label={t('settings.leadTime')}
-        value={t('settings.leadTimeValue', { days: settings.leadTimeDays })}
+        value={t('settings.leadTimeValue', { count: settings.leadTimeDays })}
         marker={markerOf('leadTime')}
       />
       <Row
         label={t('settings.safetyStock')}
-        value={t('settings.safetyStockValue', { units: settings.safetyStock })}
+        value={t('settings.safetyStockValue', { count: settings.safetyStock })}
         marker={markerOf('safetyStock')}
       />
     </s-stack>
@@ -186,7 +197,7 @@ function Row({
   marker
 }: {
   label: string;
-  value: string | number;
+  value: string;
   emphasis?: boolean;
   marker?: 'default' | 'invalid';
 }) {

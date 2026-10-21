@@ -76,9 +76,9 @@ shopify.query --> product.ts --(skus, timeZone, today)--> sales.ts --> load-fore
 
 ### 4. Bounded reads, never partial results
 
-- Page sizes are chosen so each request's `requestedQueryCost` is at most 1,000. Task 2.2 records the measured cost. As an estimate, about 10 orders with 50 line items each.
+- Page sizes are chosen so each request's `requestedQueryCost` is at most 1,000. The measured costs are in "Check results": 100 orders with 100 line items each cost 191 and 100 variants with 20 locations each cost 175, so those are the page sizes.
 - An order whose line items don't fit in one page has its remaining line items read with a follow-up query (`order(id) { lineItems(after:) }`), using the same `collectPages`.
-- Orders are read in at most 30 pages. Beyond that, the block shows a **too-much-history** state instead of a forecast. That is roughly 300 orders containing the product in 60 days with the SKU filter, which is past what a demo needs, and an honest limit for a block that reads on every page view.
+- Orders are read in at most 30 pages. Beyond that, the block shows a **too-much-history** state instead of a forecast. That is roughly 3,000 orders containing the product in 60 days with the SKU filter, which is past what a demo needs, and an honest limit for a block that reads on every page view.
 - Any GraphQL error, any missing field, or the page cap stops the load. The spec's "never show figures computed from partial data" holds by construction: the forecast is computed only after every read succeeds.
 
 ### 5. Component states and layout
@@ -118,3 +118,22 @@ shopify.query --> product.ts --(skus, timeZone, today)--> sales.ts --> load-fore
 ## Open Questions
 
 None. Tasks 1.1 and 1.2 settle the two checks above before the code depends on them.
+
+## Check results
+
+Recorded 2026-10-21 on `kuhrt-codes`, API 2026-07.
+
+- **Workspace package in an extension build (task 1.1):** the extension build bundles an import from `@repo/admin-query`. The fallback in decision 2 is not needed.
+- **Time zones (task 1.2):** `Intl.DateTimeFormat` with `timeZone` formats dates in the shop's zone in the extension sandbox. The `shop.timezoneOffsetMinutes` fallback is not needed.
+- **Measured `requestedQueryCost`:**
+
+| Query | Page sizes | Cost |
+|---|---|---|
+| Product | 25 variants x 10 locations | 102 |
+| Product | 100 variants x 20 locations | 175 |
+| Orders | 10 orders x 45 line items | 70 |
+| Orders | 100 orders x 100 line items | 191 |
+| Line item follow-up | 250 line items | 25 |
+
+- **Chosen page sizes:** 100 orders x 100 line items, 100 variants x 20 locations, follow-up 250. At 30 order pages that is up to 3,000 orders.
+- **Cancelled orders:** `currentQuantity` after a partial refund or a cancellation is pending the developer token check in `add-reorder-demo-history`. Until then cancelled orders are excluded (`EXCLUDE_CANCELLED_ORDERS = true`).

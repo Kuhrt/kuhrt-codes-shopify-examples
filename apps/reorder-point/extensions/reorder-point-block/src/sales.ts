@@ -9,8 +9,8 @@ import {
 import { type DailySales, LONG_WINDOW_DAYS } from '../../../shared/forecast';
 import { addDays, shopDate } from './dates';
 
-export const ORDERS_PAGE_SIZE = 10;
-export const ORDER_LINE_ITEMS_PAGE_SIZE = 45;
+export const ORDERS_PAGE_SIZE = 100;
+export const ORDER_LINE_ITEMS_PAGE_SIZE = 100;
 export const MAX_ORDER_PAGES = 30;
 export const FOLLOW_UP_LINE_ITEMS_PAGE_SIZE = 250;
 export const MAX_FOLLOW_UP_PAGES = 20;

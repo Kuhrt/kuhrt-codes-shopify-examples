@@ -220,6 +220,36 @@ describe('ReorderPointBlock forecast', () => {
     expect(markers.map((marker) => marker.getAttribute('data-marker'))).toEqual(['invalid']);
   });
 
+  it('keeps the detail compact: one row for both averages, no dividers or sub-headings', async () => {
+    using _extension = await renderBlock(healthyStore);
+    await showsForecast();
+
+    expect(findAll('[data-section="sales"] > s-stack')).toHaveLength(1);
+    expect(find('s-divider')).toBeNull();
+    expect(findAll('s-heading')).toHaveLength(1);
+  });
+
+  it('formats averages to at most two decimals through the host', async () => {
+    const extension = setUpExtension('admin.product-details.block.render');
+    connect(extension, healthyStore);
+    const formatNumber = vi.fn((value: number | bigint, _options?: object) => String(value));
+    extension.shopify.i18n.formatNumber = formatNumber;
+    using _scoped = extension;
+
+    await extension.render();
+    await showsForecast();
+
+    expect(formatNumber).toHaveBeenCalledWith(1, { maximumFractionDigits: 2 });
+    expect(formatNumber).toHaveBeenCalledWith(0.5, { maximumFractionDigits: 2 });
+  });
+
+  it('links to the product metafields from a single paragraph', async () => {
+    using _extension = await renderBlock(healthyStore);
+    await showsForecast();
+
+    expect(find('s-paragraph s-link')).not.toBeNull();
+  });
+
   it('links to the product metafields', async () => {
     using _extension = await renderBlock(healthyStore);
     await showsForecast();

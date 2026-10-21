@@ -4,12 +4,13 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
 
 ## 1. Checks (gate)
 
-- [ ] 1.1 Confirm an admin UI extension in `apps/reorder-point` bundles an import from a workspace package (a throwaway export in a new `packages/admin-query`).
+- [x] 1.1 Confirm an admin UI extension in `apps/reorder-point` bundles an import from a workspace package (a throwaway export in a new `packages/admin-query`).
   - Verify: `shopify app dev` builds the extension and the export's value renders in the block on `kuhrt-codes`. Otherwise switch to design decision 2's fallback and record it.
-- [ ] 1.2 From the block on `kuhrt-codes`, check:
+- [x] 1.2 From the block on `kuhrt-codes`, check:
   - `Intl.DateTimeFormat(undefined, { timeZone: shop.ianaTimezone })` formats a date in the shop's zone;
   - what `currentQuantity` reports for a line item after a partial refund, and after the order is cancelled (use one `reorder-spike` order for each; both are dev-store test data);
   - the measured `requestedQueryCost` of the orders query at the chosen page sizes.
+  - Note: the `currentQuantity` refund/cancel sub-check is pending the developer token check in `add-reorder-demo-history`.
   - Verify: results recorded in design.md under "Check results"; decision 3's cancelled-order rule and decision 4's page sizes set from them. **Gate:** if `Intl` time zones are missing, use the Risks fallback and tell the user.
 
 ## 2. Shared query helper (`packages/admin-query`)

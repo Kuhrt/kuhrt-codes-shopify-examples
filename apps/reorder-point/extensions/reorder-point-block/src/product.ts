@@ -7,8 +7,8 @@ import {
   type ReorderSettings
 } from '../../../shared/reorder-settings';
 
-export const VARIANTS_PAGE_SIZE = 25;
-export const LOCATIONS_PAGE_SIZE = 10;
+export const VARIANTS_PAGE_SIZE = 100;
+export const LOCATIONS_PAGE_SIZE = 20;
 
 const SETTINGS_NAMESPACE = '$app';
 const LEAD_TIME_KEY = 'lead-time';
