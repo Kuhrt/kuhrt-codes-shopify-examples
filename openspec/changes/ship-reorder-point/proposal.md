@@ -50,7 +50,7 @@ None. `examples-workspace`'s "Examples index" requirement already requires the n
 - **External:**
   - an app version deployed in the Partner account;
   - an install on `kuhrt-codes-demo`;
-  - a second location, demo products and about 90 tagged orders created there by the demo setup.
+  - a second location, demo products and about 60 tagged orders created there by the demo setup.
 - **Depends on:** `add-reorder-forecast`, `add-reorder-point-block` and `add-reorder-demo-history`, applied.
 - **Planning:** `design.md` and `tasks.md` are written after the other three are applied, with `/opsx:update`.
 - **Website (follow-up in `kuhrt-codes-shopify`, not part of this change):** list the reorder point example as `live` with its repository URL.

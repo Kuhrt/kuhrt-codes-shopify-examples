@@ -8,13 +8,13 @@ After `add-reorder-forecast`, the numbers exist only in tests. A merchant needs 
 
 - Add an **admin block** (`admin.product-details.block.render`) to `apps/reorder-point`, built with Polaris web components (Preact), as App 2's extensions are. It shows:
   - available stock at each location, and the total;
-  - average daily sales over the last 30 and 90 days;
+  - average daily sales over the last 30 and 60 days;
   - estimated days until stockout;
   - the suggested reorder point and the stock status;
   - the lead time and safety stock in use, saying when either is a default or an invalid stored value.
 - The block reads everything through **direct Admin API access**: the product's variants and inventory levels, the two settings metafields, and the sales history from the source the spike chose. It writes nothing.
 - It has explicit **loading, error, no-tracked-inventory and no-sales states**, and stays within Shopify's recommended block height.
-- It points the merchant to the product's metafields card to change the settings. If the spike found the card can't show them, this change instead adds the in-block form from `add-reorder-forecast` design decision 7, and its scope.
+- It points the merchant to the product's metafields to change the settings, and to pin the two definitions so they show on the card (they arrive unpinned; `add-reorder-forecast` design decision 7).
 
 ## Capabilities
 

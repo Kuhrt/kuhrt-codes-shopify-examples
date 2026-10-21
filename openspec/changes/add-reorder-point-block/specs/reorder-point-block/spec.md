@@ -26,7 +26,7 @@ The block SHALL list each location that stocks any tracked variant of the produc
 
 ### Requirement: Forecast figures
 For a product with tracked inventory, the block SHALL show:
-- the 30-day and 90-day average daily sales;
+- the 30-day and 60-day average daily sales;
 - days until stockout, or that there is no estimate;
 - the suggested reorder point;
 - the stock status.
