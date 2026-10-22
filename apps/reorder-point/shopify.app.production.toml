@@ -20,7 +20,6 @@ redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 
 [build]
 dev_store_url = "kuhrt-codes-demo.myshopify.com"
-include_config_on_deploy = true
 
 [product.metafields.app.lead-time]
 name = "Reorder lead time (days)"
