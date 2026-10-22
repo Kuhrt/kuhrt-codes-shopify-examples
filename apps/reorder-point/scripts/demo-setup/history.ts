@@ -3,7 +3,7 @@ import { DEMO_ORDER_TAG, DEMO_PRODUCTS, type DemoProduct, HISTORY_DAYS } from '.
 const MS_PER_DAY = 86_400_000;
 const ORDER_HOUR = 12;
 const DAY_TAG_PREFIX = `${DEMO_ORDER_TAG}-`;
-const DAY_TAG = /^reorder-demo-(\d{4}-\d{2}-\d{2})$/;
+const DAY_TAG = new RegExp(`^${DAY_TAG_PREFIX}(\\d{4}-\\d{2}-\\d{2})$`);
 
 export interface OrderLine {
   handle: string;

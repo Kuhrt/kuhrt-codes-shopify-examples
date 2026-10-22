@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { seederConfigFor } from './cli-executor.ts';
 import { fakeStore, testRuntime } from './fake-store.ts';
 import { EXIT_OK, EXIT_STEP_FAILED, EXIT_USAGE, main } from './main.ts';
 import type { Executor } from './run-demo-setup.ts';
@@ -20,6 +21,17 @@ describe('main', () => {
     expect(code).toBe(EXIT_USAGE);
     expect(createExecutor).not.toHaveBeenCalled();
     expect(report).toHaveBeenCalledTimes(1);
+  });
+
+  it('exits with the usage code, reporting the missing config, for a store the seeder has none for', async () => {
+    const report = vi.fn();
+    const store = 'no-such-store.myshopify.com';
+
+    const code = await main(['--store', store], undefined, report);
+
+    expect(code).toBe(EXIT_USAGE);
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(String(report.mock.calls[0]?.[0])).toContain(seederConfigFor(store).file);
   });
 
   it('builds the executor for the given store and exits zero when every step succeeds', async () => {

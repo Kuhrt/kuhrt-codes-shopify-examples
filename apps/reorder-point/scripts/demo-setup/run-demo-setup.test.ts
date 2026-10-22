@@ -1,16 +1,24 @@
-import { fakeExecutor, type Respond, StepError } from '@repo/store-execute';
+import { CliFailure, fakeExecutor, type Respond, StepError } from '@repo/store-execute';
 import { describe, expect, it } from 'vitest';
 
-import { DEMO_PRODUCTS, HISTORY_DAYS } from './demo-data.ts';
-import { fakeStore, type FakeStoreOptions, testRuntime, TIME_ZONE } from './fake-store.ts';
-import { dayTag, processedAtFor, shiftDate } from './history.ts';
+import { DEMO_ORDER_TAG, DEMO_PRODUCTS, HISTORY_DAYS } from './demo-data.ts';
 import {
-  MAX_THROTTLE_RETRIES,
-  ORDER_INTERVAL_MS,
-  runDemoSetup,
-  THROTTLE_WAIT_MS
-} from './run-demo-setup.ts';
-import { MUTATION_PAYLOAD_KEYS, type MutationName, type OperationName } from './steps.ts';
+  fakeStore,
+  type FakeStoreOptions,
+  testRuntime,
+  TIME_ZONE,
+  TOKEN_EXCHANGE_OUTPUT
+} from './fake-store.ts';
+import { daysWithOrders, dayTag, processedAtFor, shiftDate } from './history.ts';
+import { ORDER_INTERVAL_MS } from './pacing.ts';
+import { MAX_RETRIES, RETRY_WAIT_MS } from './retry.ts';
+import { runDemoSetup } from './run-demo-setup.ts';
+import {
+  MUTATION_PAYLOAD_KEYS,
+  type MutationName,
+  OPERATION_NAMES,
+  type OperationName
+} from './steps.ts';
 
 const START = '2026-10-21T09:00:00Z';
 const TODAY = '2026-10-21';
@@ -44,11 +52,12 @@ function creates(calls: { operation: OperationName }[]): number {
   return calls.filter((call) => call.operation === 'order-create').length;
 }
 
+function dateOf(order: Record<string, unknown>): string {
+  return [...daysWithOrders([order['tags'] as string[]])][0] ?? '';
+}
+
 function createdDates(fixture: ReturnType<typeof setup>): string[] {
-  return fixture.store.createdOrders.map((order) => {
-    const tags = (order['tags'] as string[]).filter((tag) => tag !== 'reorder-demo');
-    return (tags[0] ?? '').replace('reorder-demo-', '');
-  });
+  return fixture.store.createdOrders.map(dateOf);
 }
 
 describe('locations', () => {
@@ -187,13 +196,13 @@ describe('order history', () => {
     await runWith(fixture);
 
     for (const order of fixture.store.createdOrders) {
-      const date = (order['tags'] as string[])[1]?.replace('reorder-demo-', '') ?? '';
+      const date = dateOf(order);
       expect(order['options']).toEqual({
         inventoryBehaviour: 'BYPASS',
         sendReceipt: false,
         sendFulfillmentReceipt: false
       });
-      expect(order['tags']).toEqual(['reorder-demo', dayTag(date)]);
+      expect(order['tags']).toEqual([DEMO_ORDER_TAG, dayTag(date)]);
       expect(order['processedAt']).toBe(processedAtFor(date, TIME_ZONE));
       expect(order['financialStatus']).toBe('PAID');
     }
@@ -217,7 +226,55 @@ describe('order history', () => {
   });
 });
 
-describe('pacing and throttling', () => {
+function throttledResponse() {
+  return {
+    orderCreate: {
+      order: null,
+      userErrors: [{ field: null, message: 'Too many attempts. Please try again later.' }]
+    }
+  };
+}
+
+function tokenExchangeFailure() {
+  return new CliFailure('Could not get a token', { output: TOKEN_EXCHANGE_OUTPUT });
+}
+
+/** A store that answers the first `times` calls to `operation` with `failure()`, then normally. */
+function failingFirst(
+  fixture: ReturnType<typeof setup>,
+  operation: OperationName,
+  failure: () => unknown,
+  times = 1
+): Respond<OperationName> {
+  let remaining = times;
+  return (call) => {
+    if (call.operation !== operation || remaining <= 0) return fixture.store.respond(call);
+    remaining--;
+    const answer = failure();
+    if (answer instanceof Error) throw answer;
+    return answer;
+  };
+}
+
+describe('pacing', () => {
+  const ORDER_DURATION_MS = 4000;
+
+  /** Answers like the store, with each order create taking `ORDER_DURATION_MS` on the clock. */
+  function timedRespond(
+    fixture: ReturnType<typeof setup>,
+    atFirstCreate: () => void = () => undefined
+  ): Respond<OperationName> {
+    let first = true;
+    return (call) => {
+      if (call.operation === 'order-create') {
+        if (first) atFirstCreate();
+        first = false;
+        fixture.clock.advance(ORDER_DURATION_MS);
+      }
+      return fixture.store.respond(call);
+    };
+  }
+
   it('waits out the rest of the interval between orders and reports progress', async () => {
     const fixture = setup();
 
@@ -228,68 +285,160 @@ describe('pacing and throttling', () => {
     expect(fixture.clock.lines.at(-1)).toMatch(`${HISTORY_DAYS}/${HISTORY_DAYS}`);
   });
 
-  it('waits and retries the same day when the store rejects an order as too many attempts', async () => {
+  it('counts the interval from the start of an order, so only the remainder is slept', async () => {
     const fixture = setup();
-    let throttles = 2;
-    const throttled: Respond<OperationName> = (call) => {
+    let sleepsBeforeFirstCreate = -1;
+
+    await runWith(
+      fixture,
+      timedRespond(fixture, () => {
+        sleepsBeforeFirstCreate = fixture.clock.sleeps.length;
+      })
+    );
+
+    expect(sleepsBeforeFirstCreate).toBe(0);
+    expect(fixture.clock.sleeps).toEqual(
+      Array(HISTORY_DAYS - 1).fill(ORDER_INTERVAL_MS - ORDER_DURATION_MS)
+    );
+  });
+
+  it('sleeps nothing between orders that already take longer than the interval', async () => {
+    const fixture = setup();
+    const slow: Respond<OperationName> = (call) => {
+      if (call.operation === 'order-create') fixture.clock.advance(ORDER_INTERVAL_MS);
+      return fixture.store.respond(call);
+    };
+
+    await runWith(fixture, slow);
+
+    expect(fixture.clock.sleeps).toEqual([]);
+  });
+
+  it('counts the interval from the retried create, not from before the throttle wait', async () => {
+    const fixture = setup();
+    const timed = timedRespond(fixture);
+    let throttles = 1;
+    const throttledOnce: Respond<OperationName> = (call) => {
       if (call.operation === 'order-create' && throttles > 0) {
         throttles--;
-        return {
-          orderCreate: {
-            order: null,
-            userErrors: [{ field: null, message: 'Too many attempts. Please try again later.' }]
-          }
-        };
+        timed(call);
+        return throttledResponse();
       }
-      return fixture.store.respond(call);
+      return timed(call);
     };
 
-    const calls = await runWith(fixture, throttled);
+    await runWith(fixture, throttledOnce);
+
+    expect(fixture.clock.sleeps).toEqual([
+      RETRY_WAIT_MS,
+      ...Array(HISTORY_DAYS - 1).fill(ORDER_INTERVAL_MS - ORDER_DURATION_MS)
+    ]);
+  });
+});
+
+describe('retrying', () => {
+  it('waits and retries the same day when the store rejects an order as too many attempts', async () => {
+    const fixture = setup();
+
+    const calls = await runWith(
+      fixture,
+      failingFirst(fixture, 'order-create', throttledResponse, 2)
+    );
 
     expect(creates(calls)).toBe(HISTORY_DAYS + 2);
-    expect(fixture.clock.sleeps.filter((ms) => ms === THROTTLE_WAIT_MS)).toHaveLength(2);
+    expect(fixture.clock.sleeps.filter((ms) => ms === RETRY_WAIT_MS)).toHaveLength(2);
     expect(new Set(createdDates(fixture)).size).toBe(HISTORY_DAYS);
   });
 
-  it('retries the same day when the CLI could not get the app token', async () => {
+  it('retries a create the CLI reports as THROTTLED', async () => {
     const fixture = setup();
-    let failures = 1;
-    const flaky: Respond<OperationName> = (call) => {
-      if (call.operation === 'order-create' && failures > 0) {
-        failures--;
-        throw new Error('request to https://shop.myshopify.com/admin/oauth/access_token failed');
-      }
-      return fixture.store.respond(call);
-    };
+    const throttled = () =>
+      new CliFailure('Throttled', { graphqlErrors: [{ message: 'Throttled', code: 'THROTTLED' }] });
 
-    await runWith(fixture, flaky);
+    await runWith(fixture, failingFirst(fixture, 'order-create', throttled));
 
-    expect(createdDates(fixture)).toHaveLength(HISTORY_DAYS);
+    expect(fixture.clock.sleeps.filter((ms) => ms === RETRY_WAIT_MS)).toHaveLength(1);
     expect(new Set(createdDates(fixture)).size).toBe(HISTORY_DAYS);
   });
+
+  it.each(OPERATION_NAMES)(
+    'retries %s once when the CLI could not get the app token',
+    async (operation) => {
+      const baseline = await runWith(setup({ locationCount: 1 }));
+      const fixture = setup({ locationCount: 1 });
+
+      const calls = await runWith(fixture, failingFirst(fixture, operation, tokenExchangeFailure));
+
+      const count = (list: { operation: OperationName }[]) =>
+        list.filter((call) => call.operation === operation).length;
+      expect(count(calls)).toBe(count(baseline) + 1);
+      expect(fixture.clock.sleeps.filter((ms) => ms === RETRY_WAIT_MS)).toHaveLength(1);
+      expect(new Set(createdDates(fixture)).size).toBe(HISTORY_DAYS);
+    }
+  );
 
   it('stops and names the step when throttling does not clear', async () => {
     const fixture = setup();
-    const throttled: Respond<OperationName> = (call) => {
-      if (call.operation === 'order-create') throw new Error('Too many requests');
-      return fixture.store.respond(call);
-    };
 
-    const error = await failureOf(() => runWith(fixture, throttled));
+    const error = await failureOf(() =>
+      runWith(fixture, failingFirst(fixture, 'order-create', throttledResponse, Infinity))
+    );
 
     expect(error.step).toBe(`order-create:${shiftDate(TODAY, -HISTORY_DAYS)}`);
-    expect(fixture.clock.sleeps).toEqual(Array(MAX_THROTTLE_RETRIES).fill(THROTTLE_WAIT_MS));
+    expect(fixture.clock.sleeps).toEqual(Array(MAX_RETRIES).fill(RETRY_WAIT_MS));
+  });
+
+  it('stops and names the step when the token exchange keeps failing', async () => {
+    const fixture = setup();
+
+    const error = await failureOf(() =>
+      runWith(fixture, failingFirst(fixture, 'product-set', tokenExchangeFailure, Infinity))
+    );
+
+    expect(error.step.startsWith('product-set')).toBe(true);
+    expect(fixture.clock.sleeps).toEqual(Array(MAX_RETRIES).fill(RETRY_WAIT_MS));
   });
 
   it('does not retry a failure that is not throttling', async () => {
     const fixture = setup();
-    const broken: Respond<OperationName> = (call) => {
-      if (call.operation === 'order-create') throw new Error('Not authenticated');
-      return fixture.store.respond(call);
-    };
 
-    await failureOf(() => runWith(fixture, broken));
+    await failureOf(() =>
+      runWith(
+        fixture,
+        failingFirst(fixture, 'order-create', () => new CliFailure('Not authenticated'))
+      )
+    );
 
+    expect(fixture.clock.sleeps).toEqual([]);
+  });
+
+  it.each(['order-create', 'product-set'] as const)(
+    'does not retry a timed-out %s whose command line names a store with 429 and throttle in it',
+    async (operation) => {
+      const fixture = setup();
+      const timeout = () =>
+        new CliFailure('Command failed: node run.js app execute -s throttle429.myshopify.com', {
+          cause: new Error('timed out')
+        });
+
+      const error = await failureOf(() =>
+        runWith(fixture, failingFirst(fixture, operation, timeout))
+      );
+
+      expect(error.step.startsWith(operation)).toBe(true);
+      expect(fixture.clock.sleeps).toEqual([]);
+    }
+  );
+
+  it('fails the step, without retrying, when a create comes back without an order or user errors', async () => {
+    const fixture = setup();
+    const noOrder = () => ({ orderCreate: { order: null, userErrors: [] } });
+
+    const error = await failureOf(() =>
+      runWith(fixture, failingFirst(fixture, 'order-create', noOrder))
+    );
+
+    expect(error.step).toBe(`order-create:${shiftDate(TODAY, -HISTORY_DAYS)}`);
     expect(fixture.clock.sleeps).toEqual([]);
   });
 });
@@ -335,5 +484,17 @@ describe('failures', () => {
     const error = await failureOf(() => runWith(fixture, noVariant));
 
     expect(error.step).toBe(`product-set:${DEMO_PRODUCTS[0]?.handle}`);
+  });
+
+  it('fails the step when the orders have a next page but no cursor to reach it', async () => {
+    const fixture = setup();
+    const noCursor: Respond<OperationName> = (call) =>
+      call.operation === 'demo-orders'
+        ? { orders: { nodes: [], pageInfo: { hasNextPage: true, endCursor: null } } }
+        : fixture.store.respond(call);
+
+    const error = await failureOf(() => runWith(fixture, noCursor));
+
+    expect(error.step).toBe('demo-orders');
   });
 });

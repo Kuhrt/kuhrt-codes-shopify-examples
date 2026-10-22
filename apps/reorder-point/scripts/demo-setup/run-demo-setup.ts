@@ -1,35 +1,32 @@
 import {
-  executeMutation,
+  createMutate,
   executeQuery,
   type Executor as StoreExecutor,
   failure,
+  field,
   idOf,
-  isRecord,
-  type Variables
+  nodesOf,
+  textField
 } from '@repo/store-execute';
 
 import { DEMO_PRODUCTS, type DemoProduct, REQUIRED_LOCATIONS } from './demo-data.ts';
 import { type DayOrder, daysWithOrders, missingOrders, todayIn } from './history.ts';
+import { createOrderPacer, type OrderPacer } from './pacing.ts';
+import { retrying, retryingTokenExchange } from './retry.ts';
 import {
   demoOrdersVariables,
   inventoryActivateVariables,
   inventorySetVariables,
   locationAddVariables,
   MUTATION_PAYLOAD_KEYS,
-  type MutationName,
   type OperationName,
   orderCreateVariables,
   productSetVariables,
   type SellableVariant
 } from './steps.ts';
-import { isSafeToRetry, isThrottled } from './throttling.ts';
+import { isThrottled } from './throttling.ts';
 
 export type Executor = StoreExecutor<OperationName>;
-
-/** Under the development store limit of 5 new orders per minute. */
-export const ORDER_INTERVAL_MS = 12_500;
-export const THROTTLE_WAIT_MS = 60_000;
-export const MAX_THROTTLE_RETRIES = 3;
 
 /** The clock, the waiting and the output, injected so tests run instantly. */
 export interface Runtime {
@@ -50,33 +47,7 @@ interface StockedProduct {
   variantId: string;
 }
 
-function mutate(
-  step: string,
-  executor: Executor,
-  operation: MutationName,
-  variables: Variables
-): Promise<Record<string, unknown>> {
-  return executeMutation(step, executor, operation, MUTATION_PAYLOAD_KEYS[operation], variables);
-}
-
-function field(step: string, source: unknown, key: string): unknown {
-  if (!isRecord(source) || source[key] === undefined) {
-    throw failure(step, `the response has no ${key}`);
-  }
-  return source[key];
-}
-
-function textField(step: string, source: unknown, key: string): string {
-  const value = field(step, source, key);
-  if (typeof value !== 'string') throw failure(step, `the response has no ${key}`);
-  return value;
-}
-
-function nodesOf(step: string, connection: unknown): unknown[] {
-  const nodes = field(step, connection, 'nodes');
-  if (!Array.isArray(nodes)) throw failure(step, 'the response has no nodes');
-  return nodes as unknown[];
-}
+const mutate = createMutate(MUTATION_PAYLOAD_KEYS);
 
 async function readShop(executor: Executor): Promise<Shop> {
   const step = 'shop';
@@ -160,56 +131,38 @@ async function findExistingDays(executor: Executor): Promise<Set<string>> {
   return daysWithOrders(tagLists);
 }
 
-async function createWithRetries(
-  executor: Executor,
-  runtime: Runtime,
-  step: string,
-  variables: Variables
-): Promise<void> {
-  for (let retries = 0; ; retries++) {
-    try {
-      await mutate(step, executor, 'order-create', variables);
-      return;
-    } catch (error: unknown) {
-      if (!isSafeToRetry(error) || retries >= MAX_THROTTLE_RETRIES) throw error;
-      runtime.report(
-        `${isThrottled(error) ? 'Throttled' : 'Could not get the app token'}; waiting ${THROTTLE_WAIT_MS / 1000}s before retrying ${step}`
-      );
-      await runtime.sleep(THROTTLE_WAIT_MS);
-    }
-  }
-}
-
 async function createOrders(
   executor: Executor,
   runtime: Runtime,
+  pacer: OrderPacer<OperationName>,
   shop: Shop,
   days: readonly DayOrder[],
   sellable: ReadonlyMap<string, SellableVariant>
 ): Promise<void> {
-  let lastStartedAt: number | null = null;
   for (const [index, day] of days.entries()) {
-    if (lastStartedAt !== null) {
-      const wait = ORDER_INTERVAL_MS - (runtime.now().getTime() - lastStartedAt);
-      if (wait > 0) await runtime.sleep(wait);
-    }
-    lastStartedAt = runtime.now().getTime();
+    await pacer.waitForSlot();
     runtime.report(`${index + 1}/${days.length} ${day.date}`);
-    await createWithRetries(
-      executor,
+    const step = `order-create:${day.date}`;
+    const variables = orderCreateVariables(day, sellable, shop.currencyCode, shop.timeZone);
+    const payload = await retrying(
       runtime,
-      `order-create:${day.date}`,
-      orderCreateVariables(day, sellable, shop.currencyCode, shop.timeZone)
+      step,
+      () => mutate(step, executor, 'order-create', variables),
+      (error) => (isThrottled(error) ? 'Throttled' : undefined)
     );
+    idOf(step, payload['order']);
   }
 }
 
 /**
  * Brings the store to the demo state: a second location if needed, the demo products stocked at
  * two locations, and an order for each of the last 60 days that has none.
- * Stops at the first failing step by throwing a `StepError`.
+ * A request that fails at the CLI's token exchange is retried, and so is an order create the
+ * store throttled. Stops at the first other failing step by throwing a `StepError`.
  */
-export async function runDemoSetup(executor: Executor, runtime: Runtime): Promise<void> {
+export async function runDemoSetup(store: Executor, runtime: Runtime): Promise<void> {
+  const pacer = createOrderPacer<OperationName>(runtime, 'order-create');
+  const executor = retryingTokenExchange(pacer.track(store), runtime);
   const shop = await readShop(executor);
   const locationIds = await ensureLocations(executor);
 
@@ -225,5 +178,5 @@ export async function runDemoSetup(executor: Executor, runtime: Runtime): Promis
   const sellable = new Map(
     stocked.map(({ product, variantId }) => [product.handle, { variantId, price: product.price }])
   );
-  await createOrders(executor, runtime, shop, missingOrders(today, existingDays), sellable);
+  await createOrders(executor, runtime, pacer, shop, missingOrders(today, existingDays), sellable);
 }

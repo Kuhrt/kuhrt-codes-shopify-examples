@@ -1,11 +1,16 @@
 import type { Respond } from '@repo/store-execute';
 
+import { DEMO_ORDER_TAG } from './demo-data.ts';
 import { dayTag } from './history.ts';
 import type { Runtime } from './run-demo-setup.ts';
 import type { OperationName } from './steps.ts';
 
 export const TIME_ZONE = 'UTC';
 export const CURRENCY = 'USD';
+
+/** What the CLI prints on stderr when it cannot exchange for the app token. */
+export const TOKEN_EXCHANGE_OUTPUT =
+  'request to https://demo.myshopify.com/admin/oauth/access_token\nfailed, reason: socket hang up';
 
 export interface FakeStoreOptions {
   locationCount?: number;
@@ -22,7 +27,7 @@ export function fakeStore(options: FakeStoreOptions = {}) {
     name: `Location ${i + 1}`
   }));
   const orderTags: string[][] = (options.existingDays ?? []).map((day) => [
-    'reorder-demo',
+    DEMO_ORDER_TAG,
     dayTag(day)
   ]);
   const pageSize = options.pageSize ?? 250;
@@ -87,16 +92,20 @@ export function fakeStore(options: FakeStoreOptions = {}) {
   return { respond, locations, createdOrders };
 }
 
-/** A runtime whose clock is set by the test, whose sleeps return at once and are recorded. */
+/** A runtime whose clock is set by the test, whose sleeps return at once, are recorded and move the clock. */
 export function testRuntime(start: string) {
   let current = new Date(start);
   const sleeps: number[] = [];
   const lines: string[] = [];
   let keyCount = 0;
+  const advance = (ms: number) => {
+    current = new Date(current.getTime() + ms);
+  };
   const runtime: Runtime = {
     now: () => current,
     sleep: (ms) => {
       sleeps.push(ms);
+      advance(ms);
       return Promise.resolve();
     },
     newIdempotencyKey: () => `key-${++keyCount}`,
@@ -106,6 +115,7 @@ export function testRuntime(start: string) {
     runtime,
     sleeps,
     lines,
+    advance,
     setNow: (iso: string) => {
       current = new Date(iso);
     }

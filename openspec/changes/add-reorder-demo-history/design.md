@@ -33,11 +33,11 @@ See `proposal.md`, "Why". Facts carried in from earlier changes:
 
 ```
 tools/demo-seeder/
-  shopify.app.toml             "Demo Seeder (dev)": config only, holds the write scopes (decision 6)
+  shopify.app.<handle>.toml    "Demo Seeder (dev)", one per store: config only, holds the write scopes (decision 6)
 
 packages/store-execute/        @repo/store-execute
   src/cli-executor.ts          createCliExecutor(store, { queryFileFor, isMutation }), runShopifyCli
-  src/app-executor.ts          createAppExecutor(store, appPath, { queryFileFor }): `shopify app execute`
+  src/app-executor.ts          createAppExecutor(store, { path, config }, { queryFileFor }): `shopify app execute`
   src/steps.ts                 StepError, executeQuery, executeMutation (userErrors), idOf, isRecord
   src/args.ts                  parseStoreFlags(argv, allowed) + UsageError + the myshopify check
   src/fake-executor.ts         fakeExecutor(respond): records calls for tests
@@ -91,8 +91,12 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 
 ### 4. Pacing and throttling
 
-- Orders are created one at a time, at least 12.5 seconds apart (under 5 per minute), with a progress line per order (`12/60 2026-09-03`).
-- If a create still fails with a throttling error, the setup waits 60 seconds and retries the same day, up to 3 times, then stops and names the step. A failed token exchange in the CLI is retried the same way. Both are known to create nothing. No other failure is retried, because `orderCreate` doesn't deduplicate and a retry could create a day twice (task 1.2).
+- Orders are created one at a time, at least 15 seconds apart, counted from the start of the previous create attempt, with a progress line per order (`12/60 2026-09-03`). That is 4 per minute, under the limit of 5.
+- Throttling is recognised only from the operation's own answer: a user error such as "Too many attempts", or a `THROTTLED` GraphQL error the CLI printed. It is never read from the command line, which holds the store name. The setup waits 60 seconds and retries the same day, up to 3 times, then stops and names the step.
+- A failed token exchange (the CLI's stderr says "request to https://<shop>/admin/oauth/access_token failed") is retried the same way, for every step, because nothing has been sent when it happens. The wait and the retry count are the same as for throttling.
+- No other failure is retried, because `orderCreate` doesn't deduplicate and a retry could create a day twice (task 1.2). That includes a CLI timeout, which may have created the order.
+- The executor's failures are `CliFailure`s carrying the GraphQL errors and the CLI's stderr separately from the message, so classification never reads the command line.
+- An order create that returns no order and no user errors fails its step.
 - The pacing delay is injected, so tests run instantly.
 
 ### 5. Locations and stock
@@ -103,11 +107,12 @@ Four products, each with one variant, a SKU and tracked inventory, so the block'
 
 ### 6. A seeder app holds the write scopes
 
-- `tools/demo-seeder/shopify.app.toml` is "Demo Seeder (dev)": a config-only app with `write_products`, `write_inventory`, `write_locations` and `write_orders`, custom distribution to `kuhrt-codes`, and no extensions or code. It is not a workspace package.
+- `tools/demo-seeder/shopify.app.kuhrt-codes.toml` is "Demo Seeder (dev)": a config-only app with `write_products`, `write_inventory`, `write_locations` and `write_orders`, custom distribution to `kuhrt-codes`, and no extensions or code. It is not a workspace package.
 - The reorder setup runs every operation with `shopify app execute --path tools/demo-seeder`. That uses the seeder's offline token, through the developer's CLI login. There is no `store auth` step and no 24-hour token.
 - Reorder Point keeps its read-only scopes. A merchant installing the sample is never asked for write access that only seeds a demo.
 - Custom distribution is one store per app. `ship-reorder-point` creates a second seeder app for `kuhrt-codes-demo`, as Reorder Point itself has two apps.
-- `app execute` reports failure differently from `store execute`: it exits 0, prints nothing on stdout, and draws the error in a box on stderr (CLI 4.9.3). `createAppExecutor` treats empty stdout as a failure and takes the message from stderr, with the colour codes and box drawing removed.
+- Each store has its own config file, `shopify.app.<handle>.toml`, where `<handle>` is the part of `--store` before `.myshopify.com`. The setup passes `-c <handle>` to `app execute`, which the CLI resolves to that file. A store with no config file fails with a usage error naming the expected file, before any store call.
+- `app execute` reports failure differently from `store execute`: it exits 0, prints nothing on stdout, and draws the error in a box on stderr (CLI 4.9.3). `createAppExecutor` treats empty stdout as a failure and takes the message from stderr, with the colour codes, box drawing and the box's title removed. A non-zero exit gets the same cleaning.
 - **Alternatives considered:**
   - Add the write scopes to Reorder Point. Rejected: the shipped app would ask merchants for write access it uses only for seeding.
   - Products and stock with the developer token, orders by hand in GraphiQL. Rejected: the demo is no longer one command.

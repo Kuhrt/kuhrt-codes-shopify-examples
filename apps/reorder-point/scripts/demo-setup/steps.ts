@@ -57,7 +57,7 @@ export function productSetVariables(product: DemoProduct): Variables {
   };
 }
 
-/** Activation is the same request every time for an item and location, so its key is too. */
+/** The idempotency key is derived from the item and location. */
 export function inventoryActivateVariables(inventoryItemId: string, locationId: string): Variables {
   return {
     inventoryItemId,
