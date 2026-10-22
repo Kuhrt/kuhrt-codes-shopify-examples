@@ -8,7 +8,7 @@ A merchant who reorders too late runs out of stock, and one who reorders too ear
 
 ### How each figure is worked out
 
-- **Average daily sales** are net units sold per day over the complete days before today, in the shop's time zone. The block shows two: **30 days** and **60 days**. Days without sales count as zero, and returns, refunds and cancellations are netted off. The 30-day average drives the forecast; the 60-day one is there so you can see a slowdown or a spike.
+- **Average daily sales** are net units sold per day over the complete days before today, in the shop's time zone. The block shows two: **30 days** and **60 days**. Days without sales count as zero, and refunded and cancelled units are netted off. The 30-day average drives the forecast; the 60-day one is there so you can see a slowdown or a spike.
 - **Reorder point** = `ceil(avg30 × lead time + safety stock)`. Lead time is the days between ordering and the stock arriving. It defaults to 7 and accepts 0 to 365. Safety stock defaults to 0 units and accepts 0 to 100,000. Both are product metafields.
 - **Days until stockout** = `floor(available / avg30)`, with `available` summed over every location of every tracked variant. It is 0 when nothing is available and has no estimate when the 30-day average is 0. The reorder point then equals the safety stock.
 - **Status**, from the stock available and the reorder point:
@@ -37,11 +37,13 @@ The days-until-stockout formula and the status thresholds are taken from Restock
 
 ### Where it can be installed
 
-Reading orders needs protected customer data, which Shopify grants only to an app with a distribution method. This app uses custom distribution, which grants Level 1 access with no review but ties an app to one store. So it installs on one store per app, on any Shopify plan: the Plus restriction applies to Functions, and this app has none. Another store needs another app from the same code.
+Reading orders needs protected customer data, which Shopify grants only to an app with a distribution method. This app uses custom distribution, which grants Level 1 access with no review but ties an app to one store, or to stores in one Plus organization. It runs on any Shopify plan: the Plus restriction applies to Functions, and this app has none. Another store needs another app from the same code.
 
-<!-- check: task 2.2 -->
+A public App Store listing would need a separate app with public distribution, plus:
 
-A public listing would need public distribution, App Store review, and a protected customer data request with a justification for reading orders.
+- a protected customer data request explaining why it reads orders;
+- App Store review;
+- the mandatory compliance webhooks. These need an HTTPS endpoint that verifies Shopify's signature, so the app would need a hosted backend. [Script Tag to App Embed](../script-tag-migration/README.md) shows that shape.
 
 ## Demo
 
@@ -55,12 +57,13 @@ The demo data comes from a script. It runs as a separate app, Demo Seeder, becau
    pnpm --filter reorder-point exec shopify app config link --path ../../tools/demo-seeder
    ```
 
-2. In the Partner Dashboard, give that app custom distribution to your store and install it from the link.
-3. Deploy its config:
+2. Deploy its config:
 
    ```sh
    pnpm --filter reorder-point exec shopify app deploy --path ../../tools/demo-seeder -c your-dev-store
    ```
+
+3. In the Partner Dashboard, give that app custom distribution to your store and install it from the link.
 
 Then run the setup, which stops with exit 2 before any store call when there is no config for the store:
 
@@ -141,7 +144,7 @@ This releases a version with the app configuration, the metafield definitions an
 
 `pnpm check` from the repository root runs the full suite. It covers:
 
-- unit tests for the forecast and settings maths, including zero sales, returns, untracked stock and invalid settings;
+- unit tests for the forecast and settings maths, including zero sales, refunds, untracked stock and invalid settings;
 - the block's data layer (paging, refund netting, time zones) and component states, run without a store;
 - the demo setup's steps, pacing and retries against a fake store, and a test that each demo product's designed status comes out of the forecast code;
 - the contract tests, which compare the scope table below and the metafield definitions with every app configuration.

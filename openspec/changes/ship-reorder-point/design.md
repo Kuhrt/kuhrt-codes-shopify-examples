@@ -53,7 +53,7 @@ Items marked **(check)** are unconfirmed and settled by the task that first reli
   - the formula, as "How each figure is worked out": both windows, the 30-day average driving the forecast, `ceil(avg30 × lead time + safety stock)`, `floor(available / avg30)`, the four statuses and their thresholds, the defaults (14 days, 0 units) and the bounds;
   - its limits, as listed in the `reorder-point-guide` spec;
   - the Restock Mate relationship: days until stockout and the status thresholds are taken from it; Restock Mate infers sales from day-over-day stock drops in nightly snapshots, which needs a backend and miscounts a day with both a restock and sales, while this sample reads orders the store already has and nets refunds;
-  - where it can be installed: custom distribution, one store per app, any plan (no Plus restriction, which applies to Functions). A public listing needs a public distribution, App Store review, and a protected customer data request with a justification **(check: task 2.2, against shopify.dev, before the README states it)**.
+  - where it can be installed: custom distribution (one store, or stores in one Plus organization), any plan (no Plus restriction, which applies to Functions), and what a public listing would need (see "Check results", task 2.2).
 - **Run locally** in five commands: clone, `cd`, `pnpm install`, `pnpm config:link`, `pnpm dev --store <shop>`. The prose after it says the block shows no sales until the reader's app has a distribution method, and how to choose custom distribution.
 - **Demo setup**, after the GIF: why a separate seeder app exists (Reorder Point stays read-only), creating one per store (`shopify app config link --path tools/demo-seeder`, named after the store's handle, then custom distribution and install), the run command, the first run's 15 minutes, that it resets the demo products' stock and adds a location only when the store has fewer than two, removing the data (orders tagged `reorder-demo`, the demo products by handle), and re-running on a fresh store once the seasonal product's shape fades.
 - The GIF is a placeholder until the recording.
@@ -81,3 +81,11 @@ Items marked **(check)** are unconfirmed and settled by the task that first reli
 ## Open Questions
 
 None beyond the **(check)** items.
+
+## Check results
+
+**Public listing (2.2)**, checked 2026-10-21 on shopify.dev:
+- Custom distribution covers a single store, several stores in one Plus organization, or development stores. The method can't be changed once chosen ([About app distribution](https://shopify.dev/docs/apps/launch/distribution)).
+- Level 1 protected customer data is always available to a custom app but needs review for a public app. A public app requests it in the Partner Dashboard with its reasons and data protection details ([Work with protected customer data](https://shopify.dev/docs/apps/launch/protected-customer-data)).
+- Every App Store app must subscribe to `customers/data_request`, `customers/redact` and `shop/redact`, answer them over HTTPS, and return 401 for an invalid HMAC. An app without the URLs is rejected ([Privacy law compliance](https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance)). So a public version of this extension-only app would need a hosted backend.
+- The README states these three needs, plus App Store review, and links App 1 for the backend shape.

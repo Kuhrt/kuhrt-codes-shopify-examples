@@ -13,7 +13,7 @@ Prerequisite: `add-reorder-forecast`, `add-reorder-point-block` and `add-reorder
 
 - [ ] 2.1 Create "Reorder Point" (`shopify.app.production.toml`) and "Demo Seeder" (`tools/demo-seeder/shopify.app.kuhrt-codes-demo.toml`), each tied to `kuhrt-codes-demo` (design decisions 1 and 2). The user gives each custom distribution to `kuhrt-codes-demo` and installs it.
   - Verify: `pnpm check` passes with the new config (the contract test covers it); both apps appear in `kuhrt-codes-demo`'s admin.
-- [ ] 2.2 Check what a public listing of this app would need, on shopify.dev.
+- [x] 2.2 Check what a public listing of this app would need, on shopify.dev.
   - Verify: the README's installability section matches what was found, with sources recorded in design.md.
 - [ ] 2.3 Deploy both configs: `pnpm app:deploy --config production --allow-updates`, and the seeder's config with `-c kuhrt-codes-demo`.
   - Verify: the lead time and safety stock definitions exist on `kuhrt-codes-demo`, and the block can be added to a product page there.
