@@ -69,3 +69,37 @@ export function idOf(step: string, entity: unknown): string {
   if (typeof id !== 'string') throw failure(step, 'the response has no id');
   return id;
 }
+
+/** Binds `executeMutation` to the response key each of an app's mutations returns its result under. */
+export function createMutate<Mutation extends string>(
+  payloadKeys: Readonly<Record<Mutation, string>>
+) {
+  return (
+    step: string,
+    executor: Executor<Mutation>,
+    operation: Mutation,
+    variables: Variables
+  ): Promise<Record<string, unknown>> =>
+    executeMutation(step, executor, operation, payloadKeys[operation], variables);
+}
+
+/** The value under `key` in a response object, failing the step when it is missing. */
+export function field(step: string, source: unknown, key: string): unknown {
+  if (!isRecord(source) || source[key] === undefined) {
+    throw failure(step, `the response has no ${key}`);
+  }
+  return source[key];
+}
+
+export function textField(step: string, source: unknown, key: string): string {
+  const value = field(step, source, key);
+  if (typeof value !== 'string') throw failure(step, `the response has no ${key}`);
+  return value;
+}
+
+/** The `nodes` list of a connection in a response. */
+export function nodesOf(step: string, connection: unknown): unknown[] {
+  const nodes = field(step, connection, 'nodes');
+  if (!Array.isArray(nodes)) throw failure(step, 'the response has no nodes');
+  return nodes as unknown[];
+}

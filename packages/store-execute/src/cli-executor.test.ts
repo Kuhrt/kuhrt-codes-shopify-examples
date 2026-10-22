@@ -6,9 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildExecuteArgs,
+  CliFailure,
+  cliFailureFrom,
   createCliExecutor,
-  describeCliFailure,
-  describeExecuteFailure,
   type OperationCatalog,
   parseExecuteOutput,
   type RunCli
@@ -81,27 +81,25 @@ describe('parseExecuteOutput', () => {
   });
 });
 
-describe('describeCliFailure', () => {
-  it('strips terminal colour codes from stderr', () => {
-    expect(describeCliFailure('\u001b[31mNot authenticated\u001b[39m\n', 'exit 1')).toBe(
-      'Not authenticated'
+describe('cliFailureFrom', () => {
+  it('joins the GraphQL error messages from stdout and ignores stderr', () => {
+    const failure = cliFailureFrom({ stdout: GRAPHQL_FAILURE_STDOUT, stderr: PROGRESS_STDERR });
+    expect(failure.message).toBe(
+      "Field 'noSuchField' doesn't exist on type 'Shop'; Second problem"
     );
   });
 
-  it('falls back when stderr is empty', () => {
-    expect(describeCliFailure('  \n', 'exit 1')).toBe('exit 1');
-  });
-});
-
-describe('describeExecuteFailure', () => {
-  it('joins the GraphQL error messages from stdout and ignores stderr', () => {
-    const message = describeExecuteFailure(GRAPHQL_FAILURE_STDOUT, PROGRESS_STDERR, 'exit 1');
-    expect(message).toBe("Field 'noSuchField' doesn't exist on type 'Shop'; Second problem");
+  it('keeps each GraphQL error with its extension code', () => {
+    const failure = cliFailureFrom({ stdout: GRAPHQL_FAILURE_STDOUT });
+    expect(failure.graphqlErrors).toEqual([
+      { message: "Field 'noSuchField' doesn't exist on type 'Shop'", code: 'undefinedField' },
+      { message: 'Second problem' }
+    ]);
   });
 
   it("uses the error's own message when it lists no GraphQL errors", () => {
     const stdout = JSON.stringify({ error: { message: 'Not authenticated', details: {} } });
-    expect(describeExecuteFailure(stdout, PROGRESS_STDERR, 'exit 1')).toBe('Not authenticated');
+    expect(cliFailureFrom({ stdout, stderr: PROGRESS_STDERR }).message).toBe('Not authenticated');
   });
 
   it.each([
@@ -109,13 +107,32 @@ describe('describeExecuteFailure', () => {
     ['not JSON', 'Please sign in'],
     ['JSON without an error', '{"ok":true}'],
     ['an error without a message', '{"error":{"details":{"errors":[{"code":1}]}}}']
-  ])('falls back to stderr when stdout is %s', (_name, stdout) => {
+  ])('falls back to stderr without colour codes when stdout is %s', (_name, stdout) => {
     const stderr = '\u001b[31mNot authenticated\u001b[39m\n';
-    expect(describeExecuteFailure(stdout, stderr, 'exit 1')).toBe('Not authenticated');
+    const failure = cliFailureFrom({ stdout, stderr });
+    expect(failure.message).toBe('Not authenticated');
+    expect(failure.output).toBe('Not authenticated');
   });
 
   it('falls back to the thrown error when stdout and stderr say nothing', () => {
-    expect(describeExecuteFailure('', ' \n', 'exit 1')).toBe('exit 1');
+    const failure = cliFailureFrom(
+      Object.assign(new Error('exit 1'), { stdout: '', stderr: ' \n' })
+    );
+    expect(failure.message).toBe('exit 1');
+    expect(failure.output).toBe('');
+  });
+
+  it('keeps the thrown error as the cause and its message out of the output', () => {
+    const thrown = new Error('Command failed: node run.js store execute -s shop429.myshopify.com');
+    const failure = cliFailureFrom(thrown);
+    expect(failure.cause).toBe(thrown);
+    expect(failure.output).toBe('');
+    expect(failure.graphqlErrors).toEqual([]);
+  });
+
+  it('returns a CliFailure unchanged', () => {
+    const existing = new CliFailure('already described');
+    expect(cliFailureFrom(existing)).toBe(existing);
   });
 });
 
@@ -177,7 +194,7 @@ describe('createCliExecutor', () => {
       run
     )('read-things', {}).catch((e: unknown) => e);
 
-    expect(failure).toBeInstanceOf(Error);
+    expect(failure).toBeInstanceOf(CliFailure);
     expect((failure as Error).message).toBe('Not authenticated');
     expect((failure as Error).cause).toBe(cliError);
     expect(existsSync(directory)).toBe(false);

@@ -1,11 +1,10 @@
 import {
-  executeMutation,
+  createMutate,
   executeQuery,
   type Executor as StoreExecutor,
   failure,
   idOf,
-  isRecord,
-  type Variables
+  isRecord
 } from '@repo/store-execute';
 
 import type { DemoSetupArgs } from './args.ts';
@@ -13,7 +12,6 @@ import { DEMO_PRODUCTS, ONLINE_STORE_PUBLICATION } from './demo-data.ts';
 import {
   customerSetVariables,
   MUTATION_PAYLOAD_KEYS,
-  type MutationName,
   type OperationName,
   productSetVariables,
   publishVariables,
@@ -22,14 +20,7 @@ import {
 
 export type Executor = StoreExecutor<OperationName>;
 
-function mutate(
-  step: string,
-  executor: Executor,
-  operation: MutationName,
-  variables: Variables
-): Promise<Record<string, unknown>> {
-  return executeMutation(step, executor, operation, MUTATION_PAYLOAD_KEYS[operation], variables);
-}
+const mutate = createMutate(MUTATION_PAYLOAD_KEYS);
 
 async function findOnlineStorePublicationId(executor: Executor): Promise<string> {
   const step = 'publications';

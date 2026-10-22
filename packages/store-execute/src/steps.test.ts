@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { fakeExecutor } from './fake-executor.ts';
-import { executeMutation, executeQuery, idOf, StepError } from './steps.ts';
+import {
+  createMutate,
+  executeMutation,
+  executeQuery,
+  field,
+  idOf,
+  nodesOf,
+  StepError,
+  textField
+} from './steps.ts';
 import type { Executor } from './types.ts';
 
 async function failureOf(run: () => Promise<unknown>): Promise<StepError> {
@@ -86,4 +95,57 @@ describe('idOf', () => {
   it.each([null, undefined, {}, { id: 3 }, 'text'])('fails the step for %j', (entity) => {
     expect(() => idOf('step', entity)).toThrow(StepError);
   });
+});
+
+describe('createMutate', () => {
+  it('reads each mutation under the key it was bound to', async () => {
+    const { executor, calls } = fakeExecutor<'thing-set' | 'other-set'>(() => ({
+      thingSet: { thing: { id: 'a' }, userErrors: [] },
+      otherSet: { other: { id: 'b' }, userErrors: [] }
+    }));
+    const mutate = createMutate({ 'thing-set': 'thingSet', 'other-set': 'otherSet' });
+
+    expect(await mutate('s', executor, 'thing-set', { a: 1 })).toEqual({
+      thing: { id: 'a' },
+      userErrors: []
+    });
+    expect(await mutate('s', executor, 'other-set', {})).toEqual({
+      other: { id: 'b' },
+      userErrors: []
+    });
+    expect(calls.map((call) => call.operation)).toEqual(['thing-set', 'other-set']);
+  });
+
+  it('names the step when the bound key is missing from the response', async () => {
+    const { executor } = fakeExecutor<'thing-set'>(() => ({ otherSet: {} }));
+    const mutate = createMutate({ 'thing-set': 'thingSet' });
+
+    const error = await failureOf(() => mutate('thing-set', executor, 'thing-set', {}));
+
+    expect(error.step).toBe('thing-set');
+  });
+});
+
+describe('response fields', () => {
+  it('reads a field, a text field and the nodes of a connection', () => {
+    const shop = { name: 'Demo', things: { nodes: [{ id: 'a' }] } };
+    expect(field('s', shop, 'name')).toBe('Demo');
+    expect(textField('s', shop, 'name')).toBe('Demo');
+    expect(nodesOf('s', shop['things'])).toEqual([{ id: 'a' }]);
+  });
+
+  it.each([null, 'text', {}, { name: undefined }])('fails the step for a field of %j', (source) => {
+    expect(() => field('s', source, 'name')).toThrow(StepError);
+  });
+
+  it.each([null, 3, {}])('fails the step when a text field is %j', (value) => {
+    expect(() => textField('s', { name: value }, 'name')).toThrow(StepError);
+  });
+
+  it.each([undefined, null, {}, { nodes: 'a' }])(
+    'fails the step for connection %j',
+    (connection) => {
+      expect(() => nodesOf('s', connection)).toThrow(StepError);
+    }
+  );
 });

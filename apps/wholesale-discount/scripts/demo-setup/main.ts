@@ -1,37 +1,21 @@
-import { StepError, UsageError } from '@repo/store-execute';
+import { runSetupMain } from '@repo/store-execute';
 
 import { parseArgs } from './args.ts';
 import { createCliExecutor } from './cli-executor.ts';
 import { DEMO_PRODUCTS, WHOLESALE_TAG } from './demo-data.ts';
 import { type Executor, runDemoSetup } from './run-demo-setup.ts';
 
-export const EXIT_OK = 0;
-export const EXIT_STEP_FAILED = 1;
-export const EXIT_USAGE = 2;
+export { EXIT_OK, EXIT_STEP_FAILED, EXIT_USAGE } from '@repo/store-execute';
 
 /** Runs the demo setup and returns the process exit code; the outcome is reported, never thrown. */
-export async function main(
+export function main(
   argv: string[],
   createExecutor: (store: string) => Executor = createCliExecutor,
   report: (line: string) => void = console.error
 ): Promise<number> {
-  try {
+  return runSetupMain(async () => {
     const args = parseArgs(argv);
     await runDemoSetup(args, createExecutor(args.store));
-    report(
-      `Demo data is ready on ${args.store}: ${DEMO_PRODUCTS.length} products and the customer ${args.email}, tagged ${WHOLESALE_TAG}.`
-    );
-    return EXIT_OK;
-  } catch (error: unknown) {
-    if (error instanceof UsageError) {
-      report(error.message);
-      return EXIT_USAGE;
-    }
-    if (error instanceof StepError) {
-      report(`Demo setup failed at step "${error.step}":\n${error.messages.join('\n')}`);
-    } else {
-      report(String(error));
-    }
-    return EXIT_STEP_FAILED;
-  }
+    return `Demo data is ready on ${args.store}: ${DEMO_PRODUCTS.length} products and the customer ${args.email}, tagged ${WHOLESALE_TAG}.`;
+  }, report);
 }
