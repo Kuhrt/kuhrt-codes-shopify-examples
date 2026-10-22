@@ -6,16 +6,12 @@ import {
   type ForecastResult,
   type StockStatus
 } from '../../shared/forecast.ts';
-import { DEFAULT_LEAD_TIME_DAYS, DEFAULT_SAFETY_STOCK } from '../../shared/reorder-settings.ts';
+import { parseReorderSettings } from '../../shared/reorder-settings.ts';
 import { DEMO_PRODUCTS, type DemoProduct, HISTORY_DAYS } from './demo-data.ts';
 import { missingOrders, shiftDate } from './history.ts';
 
 const SETUP_DAY = '2026-10-21';
-const SETTINGS = {
-  leadTimeDays: DEFAULT_LEAD_TIME_DAYS,
-  safetyStock: DEFAULT_SAFETY_STOCK,
-  invalid: []
-};
+const SETTINGS = parseReorderSettings(undefined, undefined);
 
 function productWithSku(prefix: string): DemoProduct {
   const product = DEMO_PRODUCTS.find((candidate) => candidate.sku.startsWith(prefix));
