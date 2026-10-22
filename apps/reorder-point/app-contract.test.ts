@@ -1,4 +1,10 @@
-import { appConfigFiles, readAppConfig } from '@repo/app-contract';
+import {
+  appConfigFiles,
+  readAppConfig,
+  readReadme,
+  scopesFromReadme,
+  scopesFromToml
+} from '@repo/app-contract';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_LEAD_TIME_DAYS, MAX_SAFETY_STOCK } from './shared/reorder-settings';
@@ -13,6 +19,7 @@ interface MetafieldDefinition {
 }
 
 interface AppConfig {
+  access_scopes: { scopes: string };
   product?: { metafields?: { app?: Record<string, MetafieldDefinition> } };
 }
 
@@ -32,7 +39,17 @@ describe('app contract', () => {
     expect(CONFIG_FILES).toContain(DEFAULT_CONFIG);
   });
 
+  it('documents at least one scope in the README', () => {
+    expect(scopesFromReadme(readReadme(APP_ROOT)).length).toBeGreaterThan(0);
+  });
+
   describe.each(CONFIG_FILES)('%s', (name) => {
+    it('requests exactly the scopes listed in the README', () => {
+      expect(scopesFromReadme(readReadme(APP_ROOT))).toEqual(
+        scopesFromToml(readConfig(name).access_scopes.scopes)
+      );
+    });
+
     describe.each(Object.entries(EXPECTED_MAX))('product metafield %s', (key, max) => {
       const definition = () => readConfig(name).product?.metafields?.app?.[key];
 
