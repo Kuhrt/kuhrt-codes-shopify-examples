@@ -96,3 +96,11 @@ None beyond the **(check)** items.
 - The first setup run created 60 orders in 18 minutes, with two failed token exchanges retried and no throttling. The second run created nothing in 85 seconds.
 - The second run swapped the two locations' stock: the first had one location and added "Demo warehouse" after it, while the second read both back in the API's default order, which isn't creation order. The locations query now sorts by `ID`, and a third run restored the designed split (water bottle: 25 at Shop location, 15 at Demo warehouse).
 - The block, added and pinned once for all staff, showed on every demo product: water bottle reorder now (42, 6 days, 6 / 6 a day), tote healthy (14, 60 days, 2 / 2), planter healthy (2, 1,250 days, 0.2 / 0.2), gloves low (7, 10 days, 1 / 4.5). Each matches `kuhrt-codes`. Shopify's own sales card shows 360 units for the water bottle over 90 days.
+
+**Recording (3.1, 3.2)**: four full-size screenshots from `kuhrt-codes-demo`, assembled with ffmpeg at 1280 px wide, about 38 seconds and 230 KB:
+- the water bottle due for reorder at 42 with its figures;
+- its lead time set to 14 in the product's metafields;
+- the block after reload, now reordering at 84, with the lead time no longer marked as the default;
+- the canvas tote bag, healthy.
+
+The lead time was cleared again afterwards, so the water bottle is back on the 7-day default.

@@ -22,9 +22,9 @@ Prerequisite: `add-reorder-forecast`, `add-reorder-point-block` and `add-reorder
 
 ## 3. Recording and index
 
-- [ ] 3.1 Record a 30–60 second GIF on `kuhrt-codes-demo` (design decision 5), add it as `apps/reorder-point/docs/demo.gif`, and put back any lead time changed for it.
+- [x] 3.1 Record a 30–60 second GIF on `kuhrt-codes-demo` (design decision 5), add it as `apps/reorder-point/docs/demo.gif`, and put back any lead time changed for it.
   - Verify: the README renders the GIF on GitHub, and it shows a product due for reorder with its figures, a lead time edit moving the reorder point, and a healthy product.
-- [ ] 3.2 Add the app to the root README's examples index.
+- [x] 3.2 Add the app to the root README's examples index.
   - Verify: the row links to the app README, and every link in the root and app READMEs resolves.
 
 ## Workflow follow-up
