@@ -38,7 +38,7 @@ Prerequisite: `add-reorder-forecast`, archived, with `apps/reorder-point/shared/
 
 - [x] 4.1 With `shopify app dev`, remove the spike block from "The Multi-location Snowboard", add and pin the new block, and compare its figures against a hand calculation from the `reorder-spike` orders and the product's stock. Change the lead time in the product's metafields and reload.
   - Verify: every figure matches the hand calculation; the reorder point moves with the lead time; the answer is visible before "Show more". Repeat on one demo product after `add-reorder-demo-history`'s setup has run on `kuhrt-codes`, if it has by then.
-  - Done 2026-10-21 on the spike product: healthy, reorder point 1 then 3 after the lead time went from 14 to 70 days, 3,000 days until stockout, 50 + 50 stock; no tall-block warning, nothing behind "Show more". The demo-product repeat is pending the demo setup run.
+  - Done 2026-10-21 on the spike product: healthy, reorder point 1 then 3 after the lead time went from 14 to 70 days, 3,000 days until stockout, 50 + 50 stock; no tall-block warning, nothing behind "Show more". Repeated after the demo setup ran: the water bottle shows reorder now (reorder point 42, 6 days until stockout, 6 a day over 30 and 60 days), the tote and planter healthy, and the gloves low, each matching a hand calculation.
 
 ## Workflow follow-up
 

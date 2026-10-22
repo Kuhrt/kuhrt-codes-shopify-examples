@@ -18,10 +18,9 @@ After the first three changes, App 3 works on `kuhrt-codes`. It isn't a portfoli
   - an access-scopes table kept identical to the app configuration by a test, using `@repo/app-contract` as App 2 does;
   - **the demo setup**: the Demo Seeder app and why it exists, how to run it, that it resets the demo products' stock, how to remove the demo data by tag, and re-running on a fresh store once the seasonal product's shape fades.
 - **Release.**
-  - Rename the app from "Reorder Point (dev)" to "Reorder Point".
-  - Deploy a version, so the metafield definitions and the block ship, and install it on `kuhrt-codes-demo` from the Dev Dashboard.
-  - Create a second seeder app with custom distribution to `kuhrt-codes-demo` (custom distribution is one store per app). Then run the demo setup there, add the block to a demo product's page, and check each demo product's status.
-  - Whether one app can serve both stores is checked as it was for App 2, not assumed.
+  - Create a production app, "Reorder Point", with custom distribution to `kuhrt-codes-demo`, since custom distribution is one store per app. "Reorder Point (dev)" stays on `kuhrt-codes`.
+  - Deploy a version of it, so the metafield definitions and the block ship, and install it on `kuhrt-codes-demo`.
+  - Create a second seeder app with custom distribution to `kuhrt-codes-demo`. Then run the demo setup there, add the block to the demo products' pages, and check each demo product's status.
 - Record a 30–60 second GIF:
   - the block on a product due for reorder;
   - its figures;
@@ -46,11 +45,12 @@ None. `examples-workspace`'s "Examples index" requirement already requires the n
 - **Code and docs:**
   - `apps/reorder-point/README.md`;
   - `apps/reorder-point/app-contract.test.ts`;
+  - `apps/reorder-point/shopify.app.production.toml` and `tools/demo-seeder/shopify.app.kuhrt-codes-demo.toml`;
   - `docs/demo.gif`;
   - a root `README.md` row.
 - **External:**
-  - an app version deployed in the Partner account;
-  - an install on `kuhrt-codes-demo`;
+  - two new apps in the Partner account, "Reorder Point" and "Demo Seeder", each with custom distribution to `kuhrt-codes-demo` and installed there;
+  - a deployed version of each;
   - a second location, demo products and about 60 tagged orders created there by the demo setup.
 - **Depends on:** `add-reorder-forecast`, `add-reorder-point-block` and `add-reorder-demo-history`, applied.
 - **Planning:** `design.md` and `tasks.md` are written after the other three are applied, with `/opsx:update`.
