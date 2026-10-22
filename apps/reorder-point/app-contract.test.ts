@@ -1,4 +1,10 @@
-import { appConfigFiles, readAppConfig } from '@repo/app-contract';
+import {
+  appConfigFiles,
+  readAppConfig,
+  readReadme,
+  scopesFromReadme,
+  scopesFromToml
+} from '@repo/app-contract';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_LEAD_TIME_DAYS, MAX_SAFETY_STOCK } from './shared/reorder-settings';
@@ -13,6 +19,8 @@ interface MetafieldDefinition {
 }
 
 interface AppConfig {
+  access_scopes: { scopes: string };
+  access?: { admin?: { direct_api_mode?: string } };
   product?: { metafields?: { app?: Record<string, MetafieldDefinition> } };
 }
 
@@ -32,7 +40,31 @@ describe('app contract', () => {
     expect(CONFIG_FILES).toContain(DEFAULT_CONFIG);
   });
 
+  it('documents at least one scope in the README', () => {
+    expect(scopesFromReadme(readReadme(APP_ROOT)).length).toBeGreaterThan(0);
+  });
+
+  it('lets the block query the Admin API directly', () => {
+    expect(readConfig(DEFAULT_CONFIG).access?.admin?.direct_api_mode).toBe('online');
+  });
+
   describe.each(CONFIG_FILES)('%s', (name) => {
+    it('requests exactly the scopes listed in the README', () => {
+      expect(scopesFromReadme(readReadme(APP_ROOT))).toEqual(
+        scopesFromToml(readConfig(name).access_scopes.scopes)
+      );
+    });
+
+    it('grants the same Admin API access as shopify.app.toml', () => {
+      expect(readConfig(name).access).toEqual(readConfig(DEFAULT_CONFIG).access);
+    });
+
+    it('declares the same product metafield definitions as shopify.app.toml', () => {
+      expect(readConfig(name).product?.metafields).toEqual(
+        readConfig(DEFAULT_CONFIG).product?.metafields
+      );
+    });
+
     describe.each(Object.entries(EXPECTED_MAX))('product metafield %s', (key, max) => {
       const definition = () => readConfig(name).product?.metafields?.app?.[key];
 

@@ -1,5 +1,5 @@
 query Locations {
-  locations(first: 10, query: "active:true") {
+  locations(first: 10, query: "active:true", sortKey: ID) {
     nodes {
       id
       name
