@@ -3,19 +3,21 @@ export const MAX_LEAD_TIME_DAYS = 365;
 export const DEFAULT_SAFETY_STOCK = 0;
 export const MAX_SAFETY_STOCK = 100_000;
 
-export type InvalidSetting = 'leadTime' | 'safetyStock';
+export type SettingName = 'leadTime' | 'safetyStock';
 
 export interface ReorderSettings {
   leadTimeDays: number;
   safetyStock: number;
-  invalid: InvalidSetting[];
+  invalid: SettingName[];
+  /** Settings with no stored value, so the default is in use. */
+  defaulted: SettingName[];
 }
 
 /** A metafield value: a string, a number, or absent. */
 export type SettingValue = string | number | null | undefined;
 
 interface SettingRule {
-  name: InvalidSetting;
+  name: SettingName;
   max: number;
   fallback: number;
 }
@@ -38,18 +40,24 @@ function toInteger(value: string | number): number | null {
   return INTEGER_TEXT.test(value.trim()) ? Number(value) : null;
 }
 
-function parseSetting(value: SettingValue, rule: SettingRule): { value: number; invalid: boolean } {
-  if (value === null || value === undefined) return { value: rule.fallback, invalid: false };
+function parseSetting(
+  value: SettingValue,
+  rule: SettingRule
+): { value: number; invalid: boolean; absent: boolean } {
+  if (value === null || value === undefined) {
+    return { value: rule.fallback, invalid: false, absent: true };
+  }
   const parsed = toInteger(value);
   if (parsed === null || parsed < 0 || parsed > rule.max) {
-    return { value: rule.fallback, invalid: true };
+    return { value: rule.fallback, invalid: true, absent: false };
   }
-  return { value: parsed, invalid: false };
+  return { value: parsed, invalid: false, absent: false };
 }
 
 /**
  * Turns the two settings metafield values into the settings to use. A missing value takes its
- * default; a present but invalid value takes its default and is listed in `invalid`.
+ * default and is listed in `defaulted`; a present but invalid value takes its default and is
+ * listed in `invalid`.
  */
 export function parseReorderSettings(
   leadTimeValue: SettingValue,
@@ -57,8 +65,14 @@ export function parseReorderSettings(
 ): ReorderSettings {
   const leadTime = parseSetting(leadTimeValue, LEAD_TIME_RULE);
   const safetyStock = parseSetting(safetyStockValue, SAFETY_STOCK_RULE);
-  const invalid: InvalidSetting[] = [];
-  if (leadTime.invalid) invalid.push(LEAD_TIME_RULE.name);
-  if (safetyStock.invalid) invalid.push(SAFETY_STOCK_RULE.name);
-  return { leadTimeDays: leadTime.value, safetyStock: safetyStock.value, invalid };
+  const namesWhere = (flag: 'invalid' | 'absent'): SettingName[] => [
+    ...(leadTime[flag] ? [LEAD_TIME_RULE.name] : []),
+    ...(safetyStock[flag] ? [SAFETY_STOCK_RULE.name] : [])
+  ];
+  return {
+    leadTimeDays: leadTime.value,
+    safetyStock: safetyStock.value,
+    invalid: namesWhere('invalid'),
+    defaulted: namesWhere('absent')
+  };
 }

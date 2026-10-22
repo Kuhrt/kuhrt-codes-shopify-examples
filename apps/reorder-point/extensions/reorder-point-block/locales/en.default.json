@@ -1,0 +1,66 @@
+{
+  "name": "Reorder point",
+  "description": "See stock, sales pace and a suggested reorder point on the product page",
+  "heading": "Reorder point",
+  "actions": {
+    "retry": "Try again"
+  },
+  "loading": {
+    "label": "Loading the reorder forecast"
+  },
+  "error": {
+    "heading": "The reorder forecast could not be loaded",
+    "body": "Check your connection and try again."
+  },
+  "untracked": {
+    "heading": "Inventory is not tracked",
+    "body": "Turn on inventory tracking for this product to see a reorder forecast."
+  },
+  "tooMuchHistory": {
+    "heading": "Too much sales history to forecast here",
+    "body": "This product has more recent orders than this block can read."
+  },
+  "status": {
+    "out-of-stock": "Out of stock",
+    "reorder-now": "Reorder now",
+    "low": "Low stock",
+    "healthy": "Healthy"
+  },
+  "summary": {
+    "separator": ". "
+  },
+  "answer": {
+    "reorderPoint": {
+      "one": "Reorder at or below {{count}} unit",
+      "other": "Reorder at or below {{count}} units"
+    },
+    "daysUntilStockout": {
+      "one": "{{count}} day until stockout",
+      "other": "{{count}} days until stockout"
+    },
+    "noEstimate": "No stockout estimate: no sales in the last 30 days"
+  },
+  "stock": {
+    "total": "Total"
+  },
+  "sales": {
+    "average": "Avg. daily sales (30 / 60 days)",
+    "averageValue": "{{short}} / {{long}}"
+  },
+  "settings": {
+    "leadTime": "Lead time",
+    "leadTimeValue": {
+      "one": "{{count}} day",
+      "other": "{{count}} days"
+    },
+    "safetyStock": "Safety stock",
+    "safetyStockValue": {
+      "one": "{{count}} unit",
+      "other": "{{count}} units"
+    },
+    "default": "Default",
+    "invalid": "Invalid value, default used",
+    "editLink": "Edit in this product's metafields",
+    "pinHint": "Pin the two reorder settings in the metafields page to show them on the product page."
+  }
+}

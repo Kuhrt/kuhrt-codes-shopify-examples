@@ -13,16 +13,22 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings(null, null)).toEqual({
       leadTimeDays: DEFAULT_LEAD_TIME_DAYS,
       safetyStock: DEFAULT_SAFETY_STOCK,
-      invalid: []
+      invalid: [],
+      defaulted: ['leadTime', 'safetyStock']
     });
     expect(parseReorderSettings(undefined, undefined).invalid).toEqual([]);
+    expect(parseReorderSettings(undefined, undefined).defaulted).toEqual([
+      'leadTime',
+      'safetyStock'
+    ]);
   });
 
   test('uses both values when valid', () => {
     expect(parseReorderSettings('14', '25')).toEqual({
       leadTimeDays: 14,
       safetyStock: 25,
-      invalid: []
+      invalid: [],
+      defaulted: []
     });
   });
 
@@ -30,7 +36,8 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings(14, 25)).toEqual({
       leadTimeDays: 14,
       safetyStock: 25,
-      invalid: []
+      invalid: [],
+      defaulted: []
     });
   });
 
@@ -41,7 +48,8 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings(value, value)).toEqual({
       leadTimeDays: expected,
       safetyStock: expected,
-      invalid: []
+      invalid: [],
+      defaulted: []
     });
   });
 
@@ -49,13 +57,26 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings('0', '0')).toEqual({
       leadTimeDays: 0,
       safetyStock: 0,
-      invalid: []
+      invalid: [],
+      defaulted: []
     });
     expect(parseReorderSettings(String(MAX_LEAD_TIME_DAYS), String(MAX_SAFETY_STOCK))).toEqual({
       leadTimeDays: MAX_LEAD_TIME_DAYS,
       safetyStock: MAX_SAFETY_STOCK,
-      invalid: []
+      invalid: [],
+      defaulted: []
     });
+  });
+
+  test('reports only the absent setting as defaulted', () => {
+    expect(parseReorderSettings('14', null).defaulted).toEqual(['safetyStock']);
+    expect(parseReorderSettings(null, '5').defaulted).toEqual(['leadTime']);
+  });
+
+  test('an invalid value is invalid, not defaulted', () => {
+    const settings = parseReorderSettings('abc', '5');
+    expect(settings.invalid).toEqual(['leadTime']);
+    expect(settings.defaulted).toEqual([]);
   });
 
   test('a valid zero lead time is kept, not replaced by the default', () => {
@@ -78,7 +99,8 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings(value, '5')).toEqual({
       leadTimeDays: DEFAULT_LEAD_TIME_DAYS,
       safetyStock: 5,
-      invalid: ['leadTime']
+      invalid: ['leadTime'],
+      defaulted: []
     });
   });
 
@@ -96,7 +118,8 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings('10', value)).toEqual({
       leadTimeDays: 10,
       safetyStock: DEFAULT_SAFETY_STOCK,
-      invalid: ['safetyStock']
+      invalid: ['safetyStock'],
+      defaulted: []
     });
   });
 
@@ -104,7 +127,8 @@ describe('parseReorderSettings', () => {
     expect(parseReorderSettings('-3', 'x')).toEqual({
       leadTimeDays: DEFAULT_LEAD_TIME_DAYS,
       safetyStock: DEFAULT_SAFETY_STOCK,
-      invalid: ['leadTime', 'safetyStock']
+      invalid: ['leadTime', 'safetyStock'],
+      defaulted: []
     });
   });
 });

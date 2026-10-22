@@ -7,7 +7,7 @@ See `proposal.md`, "Why". The platform facts come from `add-reorder-forecast` (a
 - `admin.product-details.block.render` receives `shopify.data.selected[0].id`, the product GID.
 - The app has `write_products`, `read_inventory`, `read_locations`, `read_orders` and Level 1 protected customer data (no customer fields). It does not have `read_all_orders`, so orders created more than 60 days ago are invisible: hence the 30- and 60-day windows.
 - `orders(query: "processed_at:>=…")` returns `processedAt` and line items with `product { id }`. The `orders` search syntax has a `sku` filter but no product filter (shopify.dev, `orders` query arguments, 2026-10).
-- `LineItem.currentQuantity` is the quantity after removals (refunds and order edits). Whether a cancelled order's line items report 0 is **(check: task 1.2)**.
+- `LineItem.currentQuantity` is the quantity after removals (refunds and order edits). A cancelled order's line items report 0 (task 1.3).
 - Settings live in `$app` / `lead-time` and `$app` / `safety-stock` (`number_integer`). The definitions arrive unpinned, so they appear under the product's metafields "View all".
 - Admin GraphQL requests cost at most 1,000 points (shopify.dev, API rate limits). Every connection must be sized with that in mind.
 - App 2's App Home (`apps/wholesale-discount/extensions/wholesale-home`) is the established pattern: `shopify.query`, a pure data module with a `QueryFunction` seam, Polaris web components, `shopify.i18n.translate`, and tests with `@shopify/ui-extensions-tester`.
@@ -65,10 +65,11 @@ shopify.query --> product.ts --(skus, timeZone, today)--> sales.ts --> load-fore
 
 ### 3. Reading sales: narrow by SKU, decide by product ID
 
-- `product.ts` reads the variants' SKUs. When every tracked variant has a non-empty SKU, `sales.ts` adds `(sku:"A" OR sku:"B" …)` to the orders query; otherwise it reads every order in the window.
-- Either way, each line item is counted only when its `product.id` equals the block's product. The SKU filter only reduces the pages read, so a fuzzy or stale SKU match can't inflate the numbers.
+- `product.ts` reads the SKUs of all the product's variants, tracked or not. When every variant has a non-empty SKU, `sales.ts` adds `(sku:"A" OR sku:"B" …)` to the orders query; otherwise it reads every order in the window.
+- Either way, each line item is counted only when its `product.id` equals the block's product. The SKU filter only reduces the pages read, so a fuzzy match on another product's SKU can't inflate the numbers. It can undercount: an order for a variant whose SKU changed, or which was deleted, within the window is not read. That is a known limit.
 - Units are `currentQuantity`, so refunds and removals are netted on the order's own day. A refund of an order processed before the window is not seen: the README states this.
-- Cancelled orders are excluded with `-status:cancelled` if task 1.2 shows they keep a non-zero `currentQuantity`.
+- Cancelled orders are left out of the search with `-status:cancelled`. Their line items already report a `currentQuantity` of 0, so this only saves pages.
+- The orders search is `processed_at:>=<today - 61 days>` and `processed_at:<<today + 1 day>`, one day wider than the 60-day window at each end. The time zone the search applies to a date bound is not documented, so the extra day makes it irrelevant. `averageDailySales` trims to the exact window, and an order whose shop date is after today is dropped before the forecast.
 - Dates are the order's `processedAt` converted to `YYYY-MM-DD` in the shop's `ianaTimezone` with `Intl.DateTimeFormat`. "Today" is computed the same way. Both are inputs to `shared/forecast.ts`, which never reads the clock.
 - **Alternatives considered:**
   - Bulk operations: asynchronous and polled, wrong for a block that renders on page load.
@@ -76,9 +77,11 @@ shopify.query --> product.ts --(skus, timeZone, today)--> sales.ts --> load-fore
 
 ### 4. Bounded reads, never partial results
 
-- Page sizes are chosen so each request's `requestedQueryCost` is at most 1,000. Task 2.2 records the measured cost. As an estimate, about 10 orders with 50 line items each.
+- Page sizes are chosen so each request's `requestedQueryCost` is at most 1,000. The measured costs are in "Check results": 100 orders with 100 line items each cost 191 and 100 variants with 20 locations each cost 175, so those are the page sizes.
 - An order whose line items don't fit in one page has its remaining line items read with a follow-up query (`order(id) { lineItems(after:) }`), using the same `collectPages`.
-- Orders are read in at most 30 pages. Beyond that, the block shows a **too-much-history** state instead of a forecast. That is roughly 300 orders containing the product in 60 days with the SKU filter, which is past what a demo needs, and an honest limit for a block that reads on every page view.
+- Orders are read in at most 30 pages. Beyond that, the block shows a **too-much-history** state instead of a forecast. That is roughly 3,000 orders containing the product in 60 days with the SKU filter, which is past what a demo needs, and an honest limit for a block that reads on every page view.
+- A single order's remaining line items are read for up to 20 pages of 250 (`MAX_FOLLOW_UP_PAGES`, 5,000 line items), resuming from the first page's end cursor. An order past that cap is a read failure, not a history-size problem, so it shows the **error** state, not too-much-history.
+- Throttling is not handled. Shopify admits a request on its requested cost (191, against a 1,000 maximum and a 2,000-point bucket) but deducts the actual cost, measured at 6 to 16 points per page on `kuhrt-codes`. So 30 pages fit in the bucket, and the cap stays at 30.
 - Any GraphQL error, any missing field, or the page cap stops the load. The spec's "never show figures computed from partial data" holds by construction: the forecast is computed only after every read succeeds.
 
 ### 5. Component states and layout
@@ -89,9 +92,9 @@ shopify.query --> product.ts --(skus, timeZone, today)--> sales.ts --> load-fore
   2. a short line saying when to reorder ("at or below N units");
   3. then the supporting detail: stock by location with the total, the 30- and 60-day averages, and the lead time and safety stock, each marked as default or invalid when it is.
   4. Last, a link to the product's metafields page (`shopify:admin/products/<id>/metafields`), with a one-line hint to pin the two settings.
-- Averages are shown to one decimal place. Everything else is a whole number.
+- Averages are shown to up to two decimal places. Everything else is a whole number.
 - Strings come from `locales/en.default.json` through `shopify.i18n.translate`. Tests assert roles, structure and state, never copy.
-- Status tones: out of stock is critical, reorder now is warning, low is attention, healthy is success.
+- Status tones: out of stock is critical, reorder now is warning, low is caution, healthy is success.
 
 ### 6. Testing
 
@@ -118,3 +121,22 @@ shopify.query --> product.ts --(skus, timeZone, today)--> sales.ts --> load-fore
 ## Open Questions
 
 None. Tasks 1.1 and 1.2 settle the two checks above before the code depends on them.
+
+## Check results
+
+Recorded 2026-10-21 on `kuhrt-codes`, API 2026-07.
+
+- **Workspace package in an extension build (task 1.1):** the extension build bundles an import from `@repo/admin-query`. The fallback in decision 2 is not needed.
+- **Time zones (task 1.2):** `Intl.DateTimeFormat` with `timeZone` formats dates in the shop's zone in the extension sandbox. The `shop.timezoneOffsetMinutes` fallback is not needed.
+- **Measured `requestedQueryCost`:**
+
+| Query | Page sizes | Cost |
+|---|---|---|
+| Product | 25 variants x 10 locations | 102 |
+| Product | 100 variants x 20 locations | 175 |
+| Orders | 10 orders x 45 line items | 70 |
+| Orders | 100 orders x 100 line items | 191 |
+| Line item follow-up | 250 line items | 25 |
+
+- **Chosen page sizes:** 100 orders x 100 line items, 100 variants x 20 locations, follow-up 250. At 30 order pages that is up to 3,000 orders.
+- **Refunds and cancellations (task 1.3):** a line item of 2 with 1 refunded reports `currentQuantity` 1, and every line item of a cancelled order reports 0 (`reorder-spike` orders #1002 and #1003, API 2026-10). Counting `currentQuantity` is therefore correct either way. The search still leaves cancelled orders out with `-status:cancelled`, which only saves pages.

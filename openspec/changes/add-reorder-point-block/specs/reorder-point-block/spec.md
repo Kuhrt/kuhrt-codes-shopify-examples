@@ -93,6 +93,10 @@ Average daily sales SHALL count only the units of this product's variants, from 
 - **WHEN** an order had 4 units of this product and 1 was refunded
 - **THEN** 3 units count, on the order's processed day
 
+#### Scenario: Cancelled order
+- **WHEN** an order containing this product is cancelled
+- **THEN** none of its units count
+
 #### Scenario: Late-evening order
 - **WHEN** an order is processed at 23:30 in the shop's timezone, which is the next day in UTC
 - **THEN** it counts on the shop's calendar day
