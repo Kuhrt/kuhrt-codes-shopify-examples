@@ -20,7 +20,7 @@ Prerequisite: `add-reorder-forecast`, archived. App 2's demo setup (`apps/wholes
   - Verify: the package's tests pass, including CLI argument building, JSON output parsing, CLI failure messages, user errors, missing payloads, and flag parsing.
 - [x] 2.3 Read `store execute` failures from stdout (design decision 7), and add `createAppExecutor` for `shopify app execute` (decision 6).
   - Verify: Vitest covers a `store execute` failure whose stdout holds the GraphQL errors, one with no stdout (stderr fallback), an `app execute` success, an `app execute` failure with empty stdout and a boxed, coloured stderr message, non-JSON stdout, and the arguments built for `app execute`.
-- [ ] 2.2 Switch App 2's demo setup to the package.
+- [x] 2.2 Switch App 2's demo setup to the package.
   - Verify: App 2's remaining tests pass with assertions unchanged; a deliberately broken assertion still fails; `pnpm check` passes; `pnpm --filter wholesale-discount demo:setup --store kuhrt-codes.myshopify.com --email <the user's demo address>` changes nothing on `kuhrt-codes` (the user runs it, or supplies the address).
 
 ## 3. Demo data and history (pure)

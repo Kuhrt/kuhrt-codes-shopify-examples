@@ -161,4 +161,8 @@ Recorded on `kuhrt-codes`, API 2026-10, Shopify CLI 4.9.3.
   - A second run failed at `product-set` on a failed token exchange, a step that wasn't retried. The next run created nothing and took 88 seconds, not seconds: each `app execute` call starts the CLI and exchanges for a token.
   - The store held 60 orders tagged `reorder-demo` on 60 distinct days, and each product's stock totalled the designed numbers across two locations.
   - The block on each demo product showed the designed status, reorder point and days until stockout: reorder now (42, 6 days), healthy (14, 60 days), healthy (2, 1,250 days), low (7, 10 days).
+- **After the review fixes:**
+  - A re-run with `-c kuhrt-codes` created nothing. It retried two failed token exchanges, at `inventory-set` and `inventory-activate`, and finished.
+  - `--store kuhrt-codes-demo.myshopify.com` stopped with exit 2, naming the missing `shopify.app.kuhrt-codes-demo.toml`, before any call.
+  - App 2's setup (`--email kuhrt.cowan@gmail.com`) ran on the shared package and exited 0 (task 2.2).
 - **`shopify app execute`:** data on stdout and exit 0 on success. On failure it also exits 0, with empty stdout and the error box on stderr. `--path` to a directory holding only `shopify.app.toml` works, and so does `app deploy`.
