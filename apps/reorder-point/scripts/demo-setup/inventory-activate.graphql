@@ -1,0 +1,12 @@
+mutation InventoryActivate($inventoryItemId: ID!, $locationId: ID!, $idempotencyKey: String!) {
+  inventoryActivate(inventoryItemId: $inventoryItemId, locationId: $locationId)
+    @idempotent(key: $idempotencyKey) {
+    inventoryLevel {
+      id
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}

@@ -1,3 +1,5 @@
+import type { Variables } from '@repo/store-execute';
+
 import { type DemoProduct, WHOLESALE_TAG } from './demo-data.ts';
 
 /** Each mutation's name mapped to the key its result is under in the response data. */
@@ -10,7 +12,6 @@ export const MUTATION_PAYLOAD_KEYS = {
 
 export type MutationName = keyof typeof MUTATION_PAYLOAD_KEYS;
 export type OperationName = 'publications' | MutationName;
-export type Variables = Record<string, unknown>;
 
 export const MUTATION_NAMES = Object.keys(MUTATION_PAYLOAD_KEYS) as MutationName[];
 export const OPERATION_NAMES: OperationName[] = ['publications', ...MUTATION_NAMES];

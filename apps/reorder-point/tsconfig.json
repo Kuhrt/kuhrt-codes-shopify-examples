@@ -1,5 +1,5 @@
 {
   "extends": "@repo/config/tsconfig.base.json",
-  "include": ["app-contract.test.ts", "shared/**/*.ts", "vitest.config.ts"],
+  "include": ["app-contract.test.ts", "shared/**/*.ts", "vitest.config.ts", "scripts/**/*.ts"],
   "compilerOptions": { "allowImportingTsExtensions": true, "types": ["node"] }
 }

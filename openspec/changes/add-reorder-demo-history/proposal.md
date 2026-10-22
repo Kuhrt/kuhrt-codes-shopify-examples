@@ -27,7 +27,7 @@ App 2's demo setup already solved running Admin GraphQL from a script without gi
   - **one backdated order per day** for the last 60 days, combining that day's sales of the demo products. The orders send no emails and don't move inventory.
 - Re-running it adds only the days that are missing up to yesterday, so running it before a recording brings the history up to date. It never duplicates a day.
 - It paces order creation to the development store limit (5 per minute) and can be stopped and resumed.
-- Like App 2's setup, it uses the developer's `shopify store auth` token, so the app itself gains no write scopes.
+- Creating orders needs an app's offline token, so a developer's `store auth` token can't do it. A config-only "Demo Seeder (dev)" app (`tools/demo-seeder/`) holds the write scopes instead, and the setup runs through `shopify app execute`. Reorder Point gains no write scopes.
 
 ## Capabilities
 
@@ -51,7 +51,7 @@ None. App 2's `wholesale-discount-guide` requirement "Demo setup is reproducible
   - `apps/wholesale-discount/scripts/demo-setup/`, which now imports it;
   - new `apps/reorder-point/scripts/demo-setup*`.
 - **App 2 is touched.** Its full test suite must pass with assertions unchanged. Its setup must be re-run against `kuhrt-codes` and change nothing.
-- **Developer token scopes**, used by the script, not the app: `write_products`, `write_inventory`, `write_locations`, `write_orders`, and whatever the order lookup needs past 60 days. The exact list is a **(check)**.
+- **Seeder app scopes**, used by the script, not by Reorder Point: `write_products`, `write_inventory`, `write_locations`, `write_orders`. The seeder is a second app in the Kuhrt.Codes org, with custom distribution to `kuhrt-codes`.
 - **External:**
   - on `kuhrt-codes`: demo products, possibly a location, and about 60 tagged orders;
   - the same on `kuhrt-codes-demo` when `ship-reorder-point` runs it there.

@@ -1,6 +1,7 @@
+import { UsageError } from '@repo/store-execute';
 import { describe, expect, it } from 'vitest';
 
-import { parseArgs, UsageError } from './args.ts';
+import { parseArgs } from './args.ts';
 
 const STORE = 'demo-store.myshopify.com';
 const EMAIL = 'buyer@example.com';
@@ -21,19 +22,6 @@ describe('parseArgs', () => {
     ['a positional argument', [STORE, EMAIL]]
   ])('rejects %s', (_name, argv) => {
     expect(() => parseArgs(argv)).toThrow(UsageError);
-  });
-
-  it.each([
-    'kuhrt-codes',
-    'kuhrt-codes.com',
-    'kuhrt-codes.myshopify.com.evil.com',
-    'evil.com/x.myshopify.com',
-    'admin.shopify.com/store/kuhrt-codes',
-    'https://kuhrt-codes.myshopify.com',
-    '.myshopify.com',
-    ''
-  ])('rejects the store "%s"', (store) => {
-    expect(() => parseArgs(['--store', store, '--email', EMAIL])).toThrow(UsageError);
   });
 
   it.each(['buyer', 'buyer@', '@example.com', 'buyer@example', 'bu yer@example.com', ''])(

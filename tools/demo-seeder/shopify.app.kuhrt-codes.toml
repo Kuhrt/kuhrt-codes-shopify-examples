@@ -1,0 +1,16 @@
+client_id = "c2a004b21c7f0a89292b09e795ec51c3"
+name = "Demo Seeder (dev)"
+application_url = "https://shopify.dev/apps/default-app-home"
+embedded = true
+
+[access_scopes]
+scopes = "write_products,write_inventory,write_locations,write_orders"
+
+[webhooks]
+api_version = "2026-10"
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+
+[build]
+dev_store_url = "kuhrt-codes.myshopify.com"

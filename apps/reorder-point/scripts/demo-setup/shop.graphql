@@ -1,0 +1,6 @@
+query Shop {
+  shop {
+    ianaTimezone
+    currencyCode
+  }
+}

@@ -1,6 +1,7 @@
+import { fakeExecutor as recordingExecutor, type Respond } from '@repo/store-execute';
+
 import { ONLINE_STORE_PUBLICATION } from './demo-data.ts';
-import type { Executor } from './run-demo-setup.ts';
-import type { OperationName, Variables } from './steps.ts';
+import type { OperationName } from './steps.ts';
 
 export const PUBLICATION_ID = 'gid://shopify/Publication/1';
 export const CUSTOMER_ID = 'gid://shopify/Customer/1';
@@ -9,15 +10,8 @@ export function productIdFor(handle: string): string {
   return `gid://shopify/Product/${handle}`;
 }
 
-export interface Call {
-  operation: OperationName;
-  variables: Variables;
-}
-
-export type Respond = (call: Call) => unknown;
-
 /** The response a store gives when every operation succeeds. */
-export const happyResponse: Respond = ({ operation, variables }) => {
+export const happyResponse: Respond<OperationName> = ({ operation, variables }) => {
   switch (operation) {
     case 'publications':
       return {
@@ -42,12 +36,6 @@ export const happyResponse: Respond = ({ operation, variables }) => {
 };
 
 /** An executor that records every call and answers with `respond`. */
-export function fakeExecutor(respond: Respond = happyResponse) {
-  const calls: Call[] = [];
-  const executor: Executor = (operation, variables) => {
-    const call = { operation, variables };
-    calls.push(call);
-    return Promise.resolve().then(() => respond(call));
-  };
-  return { executor, calls };
+export function fakeExecutor(respond: Respond<OperationName> = happyResponse) {
+  return recordingExecutor<OperationName>(respond);
 }

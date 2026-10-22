@@ -1,0 +1,8 @@
+query Locations {
+  locations(first: 10, query: "active:true") {
+    nodes {
+      id
+      name
+    }
+  }
+}

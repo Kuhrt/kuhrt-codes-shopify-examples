@@ -1,3 +1,4 @@
+import { StepError } from '@repo/store-execute';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DEMO_PRODUCTS } from './demo-data.ts';
@@ -8,7 +9,7 @@ import {
   productIdFor,
   PUBLICATION_ID
 } from './fake-executor.ts';
-import { type Executor, runDemoSetup, StepError } from './run-demo-setup.ts';
+import { type Executor, runDemoSetup } from './run-demo-setup.ts';
 import {
   customerSetVariables,
   MUTATION_NAMES,
