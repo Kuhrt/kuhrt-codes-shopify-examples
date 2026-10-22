@@ -4,10 +4,11 @@ Small, readable Shopify apps that show how common merchant problems get solved o
 
 ## Examples
 
-| App                                                           | What it shows                                                                                                                                    | Status |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| [Script Tag → App Embed](apps/script-tag-migration/README.md) | The same storefront widget built twice, as a legacy script tag and as a theme app extension embed, with a migration guide.                       | Live   |
-| [Wholesale Tier Discount](apps/wholesale-discount/README.md)  | A Shopify Function replacing a Shopify Script: volume discounts for tagged customers, with the tag and tiers edited in Shopify's discount pages. | Live   |
+| App                                                           | What it shows                                                                                                                                     | Status |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| [Script Tag → App Embed](apps/script-tag-migration/README.md) | The same storefront widget built twice, as a legacy script tag and as a theme app extension embed, with a migration guide.                        | Live   |
+| [Wholesale Tier Discount](apps/wholesale-discount/README.md)  | A Shopify Function replacing a Shopify Script: volume discounts for tagged customers, with the tag and tiers edited in Shopify's discount pages.  | Live   |
+| [Reorder Point](apps/reorder-point/README.md)                 | An admin block on the product page: stock by location, average daily sales, days until stockout and a reorder point, from the store's own orders. | Live   |
 
 ## Prerequisites
 
