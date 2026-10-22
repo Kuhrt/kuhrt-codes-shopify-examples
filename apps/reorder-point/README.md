@@ -8,19 +8,19 @@ A merchant who reorders too late runs out of stock, and one who reorders too ear
 
 ### How each figure is worked out
 
-- **Average daily sales** are net units sold per day over the complete days before today, in the shop's time zone. The block shows two: **30 days** and **60 days**. Days without sales count as zero, and refunded and cancelled units are netted off. The 30-day average drives the forecast; the 60-day one is there so you can see a slowdown or a spike.
+- **Average daily sales** are net units sold per day over the complete days before today, in the shop's time zone. The block shows two: **30 days** and **60 days**. Days without sales count as zero. A refund or order edit reduces the units on the day the order was placed, and cancelled orders are left out. The 30-day average drives the forecast; the 60-day one is there so you can see a slowdown or a spike.
 - **Reorder point** = `ceil(avg30 × lead time + safety stock)`. Lead time is the days between ordering and the stock arriving. It defaults to 7 and accepts 0 to 365. Safety stock defaults to 0 units and accepts 0 to 100,000. Both are product metafields.
-- **Days until stockout** = `floor(available / avg30)`, with `available` summed over every location of every tracked variant. It is 0 when nothing is available and has no estimate when the 30-day average is 0. The reorder point then equals the safety stock.
+- **Days until stockout** = `floor(available / avg30)`, with `available` summed over every location of every tracked variant. It is 0 when nothing is available. When the 30-day average is 0 there is no estimate, and the reorder point equals the safety stock.
 - **Status**, from the stock available and the reorder point:
 
   | Status       | When                                |
   | ------------ | ----------------------------------- |
-  | Out of stock | nothing available                   |
+  | Out of stock | 0 or fewer available                |
   | Reorder now  | at or below the reorder point       |
   | Low          | at or below 1.5 × the reorder point |
   | Healthy      | above 1.5 × the reorder point       |
 
-For example, a product that sells 6 a day with the default 7-day lead time has a reorder point of `6 × 7 + 0 = 42`. With 40 units available it is **reorder now**, with `floor(40 / 6) = 6` days left. A block that shows an average, a lead time and a safety stock lets you reproduce its reorder point from these lines.
+For example, a product that sells 6 a day with the default 7-day lead time has a reorder point of `6 × 7 + 0 = 42`. With 40 units available it is **reorder now**, with `floor(40 / 6) = 6` days left. A block that shows an average, a lead time and a safety stock lets you reproduce its reorder point from these lines. The block rounds the average to two decimals for display, so at long lead times a hand check from the shown figure can come out one unit low; the exact form is `ceil(units sold in the last 30 days / 30 × lead time + safety stock)`.
 
 ### What it does not account for
 
@@ -28,12 +28,12 @@ For example, a product that sells 6 a day with the default 7-day lead time has a
 - **Seasonality and trend.** Beyond showing both averages there is no model.
 - **A product launched inside a window.** Each average divides by the full window, so a product that is 10 days old has an under-estimated average until the window fills.
 - **Variants and locations.** Settings apply to the product, not to a variant or a location, and sales are summed over all variants.
-- **Orders older than 60 days.** The window is 60 days, not 90, because reading older orders needs `read_all_orders`, which Shopify approves case by case. Orders are visible by when they were created, so the oldest day's sales may be partly missing.
-- **Very large histories.** Past about 3,000 orders containing the product in 60 days, the block says so instead of showing a figure computed from part of the data.
+- **Orders older than 60 days.** The window is 60 days, not 90, because reading older orders needs `read_all_orders`, which Shopify approves case by case. Orders are visible by when they were created, so the oldest day's sales may be partly missing. A refund of an order placed before the window isn't seen at all.
+- **Very large histories and catalogues.** The block reads at most 3,000 orders from the last 60 days. When every variant has a SKU, those are the orders containing one of the product's SKUs (a SKU shared with another product counts that product's orders too). When any variant has none, it is any 3,000 orders in the store. Past that, the block says so instead of showing a figure computed from part of the data. A product with more than 100 variants, or a variant stocked at more than 20 locations, shows an error instead.
 
 ### Relationship to Restock Mate
 
-The days-until-stockout formula and the status thresholds are taken from Restock Mate, my inventory alert app. What differs is how sales are measured. Restock Mate infers them from day-over-day drops in stock in nightly snapshots, which needs a backend and miscounts a day with both a restock and sales. This sample reads the orders the store already has, so it works from the day it is installed and nets refunds and cancellations. It drops Restock Mate's rule that also marks "reorder now" when days until stockout is within the lead time: with a computed reorder point it never adds a case.
+The days-until-stockout formula and the status thresholds are taken from Restock Mate, my inventory alert app. What differs is how sales are measured. Restock Mate infers them from day-over-day drops in stock in nightly snapshots, which needs a backend and miscounts a day with both a restock and sales. This sample reads the orders the store already has, so it works from the day it is installed and leaves out refunded units and cancelled orders. It drops Restock Mate's rule that also marks "reorder now" when days until stockout is within the lead time: with a computed reorder point it never adds a case.
 
 ### Where it can be installed
 
@@ -71,9 +71,9 @@ Then run the setup, which stops with exit 2 before any store call when there is 
 pnpm --filter reorder-point demo:setup --store your-dev-store.myshopify.com
 ```
 
-The first run takes about 15 minutes. It creates one order per day for the last 60 days, paced to stay under the order creation limit, and a stopped run resumes when you run it again. Running it again creates nothing, but it resets the demo products' stock to the designed numbers. It adds a location ("Demo warehouse") only when the store has fewer than two.
+The first run takes about 15 minutes. It creates one order per day for the last 60 days, paced to stay under the order creation limit, and a stopped run resumes when you run it again. Running it again the same day creates nothing; on a later day it adds orders only for the days since. Every run resets the demo products' stock to the designed numbers. It adds a location ("Demo warehouse") only when the store has fewer than two.
 
-It creates four products, handles `reorder-demo-water-bottle`, `reorder-demo-tote-bag`, `reorder-demo-desk-planter` and `reorder-demo-winter-gloves`, and orders tagged `reorder-demo`. With the default settings they show reorder now, healthy, healthy and low. To remove the demo data, delete the orders tagged `reorder-demo` and the four products in the admin.
+It creates four products, handles `reorder-demo-water-bottle`, `reorder-demo-tote-bag`, `reorder-demo-desk-planter` and `reorder-demo-winter-gloves`, and orders tagged `reorder-demo`. With the default settings they show reorder now, healthy, healthy and low. To remove the demo data in the admin, cancel and then delete the orders tagged `reorder-demo`, delete the four products, and deactivate "Demo warehouse" if the setup added it.
 
 Orders are backdated from the day the setup runs. The winter gloves sold 8 a day until a month ago and 1 a day since; as the high days age out of the 60-day window that shape fades, so re-run the setup on a fresh store to restore it.
 
@@ -128,7 +128,7 @@ pnpm config:link
 pnpm dev --store your-dev-store.myshopify.com
 ```
 
-`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one). The block shows no sales until that app has a distribution method, because Shopify withholds order data from an app without one: in the Partner Dashboard, choose custom distribution to your development store. Install the app, open a product, and add **Reorder Point** from the page's app blocks menu, then pin it. `pnpm dev` builds the extension and starts a dev preview on your store.
+`pnpm install` installs the whole workspace. `pnpm config:link` connects the code to an app in your own Partner organization (choose to create a new one). The `shopify.app.*.toml` it writes may not include the `[access.admin]` and `[product.metafields.app.*]` sections. If it doesn't, copy them over from `shopify.app.toml`: without them the block can't query the store and the settings have no definitions. `pnpm test` checks every app config for them. The block shows no sales until that app has a distribution method, because Shopify withholds order data from an app without one: in the Partner Dashboard, choose custom distribution to your development store. Install the app, open a product, and add **Reorder Point** from the page's app blocks menu, then pin it. `pnpm dev` builds the extension and starts a dev preview on your store.
 
 Lead time and safety stock are product metafields, kept out of the block so it only reads. On a product, open the metafields card, choose **View all**, and edit them there. Pin them to see them on the card.
 

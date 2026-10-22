@@ -46,7 +46,7 @@ None. `examples-workspace`'s "Examples index" requirement already requires the n
   - `apps/reorder-point/README.md`;
   - `apps/reorder-point/app-contract.test.ts`;
   - `apps/reorder-point/shopify.app.production.toml` and `tools/demo-seeder/shopify.app.kuhrt-codes-demo.toml`;
-  - `docs/demo.gif`;
+  - `apps/reorder-point/docs/demo.gif`;
   - a root `README.md` row.
 - **External:**
   - two new apps in the Partner account, "Reorder Point" and "Demo Seeder", each with custom distribution to `kuhrt-codes-demo` and installed there;
